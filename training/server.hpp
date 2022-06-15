@@ -9,8 +9,12 @@
 #include <utility>
 #include <vector>
 #include <set>
+#include <map>
 
 using namespace std;
+
+using DocumentIndex = pair<string, set<int>>;
+using DocumentsIndexTable = map<string, set<int>>;
 
 struct Query {
     set<string> words;
@@ -29,18 +33,14 @@ public:
     vector<Document> FindTopDocuments(const string& raw_query) const;
 
 private:
-    struct DocumentContent {
-        int id = 0;
-        vector<string> words;
-    };
-    vector<DocumentContent> documents_;
+    DocumentsIndexTable documents_table_;
     set<string> stop_words_;
 
     bool IsStopWord(const string& word) const;
     vector<string> SplitIntoWordsNoStop(const string& text) const;
     Query ParseQuery(const string& text) const;
     vector<Document> FindAllDocuments(const Query& query) const;
-    static int MatchDocument(const DocumentContent& content, const Query& query_words);
+    static map<int,int> MatchDocument(const DocumentsIndexTable& doc_ids_table, const Query& query);
 };
 
 EXPORT int exec_main();

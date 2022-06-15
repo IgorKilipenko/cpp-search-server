@@ -54,7 +54,10 @@ void SearchServer::SetStopWords(const string& text) {
 
 void SearchServer::AddDocument(int document_id, const string& document) {
     const vector<string> words = SplitIntoWordsNoStop(document);
-    documents_.push_back({document_id, words});
+    for (const auto& w : words) {
+        auto& idxs = documents_table_[w];
+        idxs.insert(document_id);
+    }
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const {
@@ -101,35 +104,36 @@ Query SearchServer::ParseQuery(const string& text) const {
 }
 
 vector<Document> SearchServer::FindAllDocuments(const Query& query) const {
-    vector<Document> matched_documents;
-    for (const auto& document : documents_) {
-        const int relevance = MatchDocument(document, query);
-        if (relevance > 0) {
-            matched_documents.push_back({document.id, relevance});
-        }
+    const auto matched_documents = MatchDocument(documents_table_, query);
+    vector<Document> result{};
+    for (const auto& val : matched_documents) {
+        Document doc = {val.first, val.second};
+        result.push_back(doc);
     }
-    return matched_documents;
+    return result;
 }
 
 
-int SearchServer::MatchDocument(const DocumentContent& content, const Query& query) {
+map<int,int> SearchServer::MatchDocument(const DocumentsIndexTable& doc_ids_table, const Query& query) {
+    map<int,int> result{};
     if (query.words.empty()) {
-        return 0;
+        return result;
     }
-    set<string> matched_words;
-    for (const string& word : content.words) {
-        if (query.exclude_words.count(word) != 0) {
-            matched_words.clear();
-            break;
-        }
-        if (matched_words.count(word) != 0) {
-            continue;
-        }
-        if (query.words.count(word) != 0) {
-            matched_words.insert(word);
+
+    map<string,set<int>> matched;
+    for (const auto& word : query.words) {
+        if (doc_ids_table.count(word) == 0) continue;
+        const auto& ids = doc_ids_table.at(word);
+        matched[word].insert(ids.begin(), ids.end());
+    }
+
+    for (const auto& val : matched) {
+        for (const auto id : val.second) {
+            if (!query.exclude_words.count(val.first)) ++result[id];
         }
     }
-    return static_cast<int>(matched_words.size());
+
+    return result;
 }
 
 
