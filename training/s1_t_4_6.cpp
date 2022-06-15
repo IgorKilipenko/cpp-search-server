@@ -68,7 +68,6 @@ void SearchServer::AddDocument(int document_id, const string& document) {
         ids.insert(document_id);
         const auto freq = culcWordTermFrequency(w, words);
         word_to_document_freqs_[w][document_id] = freq;
-        //inverse_document_freqs_[w] = culcWordInverseDocumentFrequency(w);
     }
 }
 
@@ -158,7 +157,7 @@ map<int,double> SearchServer::MatchDocument(const DocumentsIndexTable& doc_ids_t
             if (!query.exclude_words.count(word)) {
                 assert(word_to_document_freqs_.count(word) && word_to_document_freqs_.at(word).count(id));
                 const auto freq =  word_to_document_freqs_.at(word).at(id);
-                result[id] = freq * culcWordInverseDocumentFrequency(word);
+                result[id] += freq * culcWordInverseDocumentFrequency(word);
             } else {
                 erase_ids.insert(id);
             }

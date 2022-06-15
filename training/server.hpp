@@ -37,7 +37,6 @@ private:
     size_t documents_count_ = 0;
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
-    //map<string, double> inverse_document_freqs_;
 
     bool IsStopWord(const string& word) const;
     vector<string> SplitIntoWordsNoStop(const string& text) const;
