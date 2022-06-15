@@ -4,6 +4,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <cmath>
+#include <cassert>
 
 #include "server.hpp"
 
@@ -53,11 +55,33 @@ void SearchServer::SetStopWords(const string& text) {
 }
 
 void SearchServer::AddDocument(int document_id, const string& document) {
+    bool is_new_document = true;
+    for (const auto& [_, ids] : documents_table_) {
+        if (!is_new_document) break;
+        is_new_document = !ids.count(document_id);
+    }
+    if (is_new_document) documents_count_ += 1;
+
     const vector<string> words = SplitIntoWordsNoStop(document);
     for (const auto& w : words) {
-        auto& idxs = documents_table_[w];
-        idxs.insert(document_id);
+        auto& ids = documents_table_[w];
+        ids.insert(document_id);
+        const auto freq = culcWordTermFrequency(w, words);
+        word_to_document_freqs_[w][document_id] = freq;
+        //inverse_document_freqs_[w] = culcWordInverseDocumentFrequency(w);
     }
+}
+
+double SearchServer::culcWordTermFrequency(const string &word, const vector<string>& words) const {
+    const auto result = static_cast<double>(count(words.begin(), words.end(), word)) / words.size();
+    return result;
+}
+
+double SearchServer::culcWordInverseDocumentFrequency(const string &word) const {
+    const auto ids_count = documents_table_.count(word) ? documents_table_.at(word).size() : 0;
+    const auto freq = static_cast<double>(documents_count_) / ids_count;
+    const auto result = log(static_cast<double>(documents_count_) / ids_count);
+    return result;
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const {
@@ -114,12 +138,13 @@ vector<Document> SearchServer::FindAllDocuments(const Query& query) const {
 }
 
 
-map<int,int> SearchServer::MatchDocument(const DocumentsIndexTable& doc_ids_table, const Query& query) {
-    map<int,int> result{};
+map<int,double> SearchServer::MatchDocument(const DocumentsIndexTable& doc_ids_table, const Query& query) const {
+    map<int,double> result{};
     if (query.words.empty()) {
         return result;
     }
 
+    // Find all documents matching the specified query words with documents contains exclude_words
     map<string,set<int>> matched;
     for (const auto& word : query.words) {
         if (doc_ids_table.count(word) == 0) continue;
@@ -127,12 +152,21 @@ map<int,int> SearchServer::MatchDocument(const DocumentsIndexTable& doc_ids_tabl
         matched[word].insert(ids.begin(), ids.end());
     }
 
-    for (const auto& val : matched) {
-        for (const auto id : val.second) {
-            if (!query.exclude_words.count(val.first)) ++result[id];
+    set<int> erase_ids{};
+    for (const auto& [word, ids] : matched) {
+        for (const auto id : ids) {
+            if (!query.exclude_words.count(word)) {
+                assert(word_to_document_freqs_.count(word) && word_to_document_freqs_.at(word).count(id));
+                const auto freq =  word_to_document_freqs_.at(word).at(id);
+                result[id] = freq * culcWordInverseDocumentFrequency(word);
+            } else {
+                erase_ids.insert(id);
+            }
         }
     }
-
+    for (const auto eid: erase_ids) {
+        result.erase(eid);
+    }
     return result;
 }
 

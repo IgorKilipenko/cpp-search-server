@@ -23,7 +23,7 @@ struct Query {
 
 struct Document {
     int id;
-    int relevance;
+    double relevance;
 };
 
 class SearchServer {
@@ -34,13 +34,18 @@ public:
 
 private:
     DocumentsIndexTable documents_table_;
+    size_t documents_count_ = 0;
     set<string> stop_words_;
+    map<string, map<int, double>> word_to_document_freqs_;
+    //map<string, double> inverse_document_freqs_;
 
     bool IsStopWord(const string& word) const;
     vector<string> SplitIntoWordsNoStop(const string& text) const;
     Query ParseQuery(const string& text) const;
     vector<Document> FindAllDocuments(const Query& query) const;
-    static map<int,int> MatchDocument(const DocumentsIndexTable& doc_ids_table, const Query& query);
+    map<int,double> MatchDocument(const DocumentsIndexTable& doc_ids_table, const Query& query) const;
+    double culcWordTermFrequency(const string &word, const vector<string>& words) const;
+    double culcWordInverseDocumentFrequency(const string &word) const;
 };
 
 EXPORT int exec_main();
