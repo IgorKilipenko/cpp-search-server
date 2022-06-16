@@ -169,7 +169,7 @@ vector<Document> SearchServer::FindAllDocuments(const Query &query) const {
     return matched_documents;
 }
 
-int SearchServer::ComputeAverageRating(const vector<int> &ratings) const {
+int SearchServer::ComputeAverageRating(const vector<int> &ratings) {
     const auto size = ratings.size();
     if (!size) return 0;
     const auto result =

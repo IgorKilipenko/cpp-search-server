@@ -53,7 +53,7 @@ private:
     vector<Document> FindAllDocuments(const Query& query) const;
     map<int,double> MatchDocument(const DocumentsIndexTable& doc_ids_table, const Query& query) const;
     double ComputeWordInverseDocumentFreq(const string& word) const;
-    int ComputeAverageRating(const vector<int>& ratings) const;
+    static int ComputeAverageRating(const vector<int>& ratings);
 };
 
 EXPORT int exec_main();
