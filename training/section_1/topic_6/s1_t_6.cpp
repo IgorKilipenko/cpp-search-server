@@ -170,7 +170,7 @@ vector<Document> SearchServer::FindAllDocuments(const Query &query) const {
 }
 
 int SearchServer::ComputeAverageRating(const vector<int> &ratings) {
-    const auto size = ratings.size();
+    const auto size = static_cast<int>(ratings.size());
     if (!size) return 0;
     const auto result =
         accumulate(ratings.begin(), ratings.end(), 0.0,
