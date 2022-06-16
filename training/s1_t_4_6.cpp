@@ -160,7 +160,6 @@ map<int,double> SearchServer::MatchDocument(const DocumentsIndexTable& doc_ids_t
         }
     }
 
-    set<int> erase_ids{};
     for (const auto& [word, ids] : matched) {
         for (const auto id : ids) {
             if (!exclude_ids.count(id)) {
