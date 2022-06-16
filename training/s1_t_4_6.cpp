@@ -78,6 +78,7 @@ double SearchServer::culcWordTermFrequency(const string &word, const vector<stri
 
 double SearchServer::culcWordInverseDocumentFrequency(const string &word) const {
     const auto ids_count = documents_table_.count(word) ? documents_table_.at(word).size() : 0;
+    if (!ids_count) return 0.0;
     const auto result = log(static_cast<double>(documents_count_) / ids_count);
     return result;
 }
