@@ -78,7 +78,6 @@ double SearchServer::culcWordTermFrequency(const string &word, const vector<stri
 
 double SearchServer::culcWordInverseDocumentFrequency(const string &word) const {
     const auto ids_count = documents_table_.count(word) ? documents_table_.at(word).size() : 0;
-    const auto freq = static_cast<double>(documents_count_) / ids_count;
     const auto result = log(static_cast<double>(documents_count_) / ids_count);
     return result;
 }
@@ -144,27 +143,31 @@ map<int,double> SearchServer::MatchDocument(const DocumentsIndexTable& doc_ids_t
     }
 
     // Find all documents matching the specified query words with documents contains exclude_words
-    map<string,set<int>> matched;
-    for (const auto& word : query.words) {
-        if (doc_ids_table.count(word) == 0) continue;
-        const auto& ids = doc_ids_table.at(word);
-        matched[word].insert(ids.begin(), ids.end());
+    map<string,set<int>> matched{};
+    for (const auto& q_word : query.words) {
+        if (doc_ids_table.count(q_word) == 0) continue;
+        const auto& ids = doc_ids_table.at(q_word);
+        matched[q_word].insert(ids.begin(), ids.end());
+    }
+
+    // Exclude documents matching the specified exclude_words
+    set<int> exclude_ids{}; 
+    for (const auto& exclude_word : query.exclude_words ){
+        if (doc_ids_table.count(exclude_word)) {
+            auto& ids = doc_ids_table.at(exclude_word);
+            exclude_ids.insert(ids.begin(), ids.end());
+        }
     }
 
     set<int> erase_ids{};
     for (const auto& [word, ids] : matched) {
         for (const auto id : ids) {
-            if (!query.exclude_words.count(word)) {
+            if (!exclude_ids.count(id)) {
                 assert(word_to_document_freqs_.count(word) && word_to_document_freqs_.at(word).count(id));
-                const auto freq =  word_to_document_freqs_.at(word).at(id);
+                const auto freq = word_to_document_freqs_.at(word).at(id);
                 result[id] += freq * culcWordInverseDocumentFrequency(word);
-            } else {
-                erase_ids.insert(id);
             }
         }
-    }
-    for (const auto eid: erase_ids) {
-        result.erase(eid);
     }
     return result;
 }
