@@ -118,15 +118,13 @@ Query SearchServer::ParseQuery(const string &text) const {
 }
 
 vector<int> SearchServer::ReadRatingsLine() {
-    vector<int> result = {};
     uint32_t size;
     cin >> size;
+    vector<int> result(size, 0);
     result.reserve(size);
-    for (int i = 0; i < size; i++) {
-        int v;
-        cin >> v;
-        result.push_back(v);
-    } 
+    for (auto& r : result) {
+        cin >> r;
+    }
     ReadLine();
     return result;
 }
