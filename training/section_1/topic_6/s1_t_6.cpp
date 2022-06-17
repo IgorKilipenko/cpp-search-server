@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <iostream>
 #include <map>
@@ -56,16 +57,13 @@ void SearchServer::SetStopWords(const string &text) {
 void SearchServer::AddDocument(int document_id, const string &document,
                                DocumentStatus status,
                                const vector<int> &ratings) {
-    ++document_count_;
     const vector<string> words = SplitIntoWordsNoStop(document);
     const double inv_word_count = 1.0 / words.size();
     for (const string &word : words) {
         word_to_document_freqs_[word][document_id] += inv_word_count;
     }
-    document_info_.emplace(document_id, DocumentInfo {
-        ComputeAverageRating(ratings),
-        status
-    });
+    documents_.emplace(document_id,
+                           DocumentInfo{ComputeAverageRating(ratings), status});
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string &raw_query,
@@ -136,7 +134,7 @@ vector<int> SearchServer::ReadRatingsLine() {
 
 // Existence required
 double SearchServer::ComputeWordInverseDocumentFreq(const string &word) const {
-    return log(document_count_ * 1.0 / word_to_document_freqs_.at(word).size());
+    return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
 }
 
 vector<Document> SearchServer::FindAllDocuments(const Query &query,
@@ -150,8 +148,9 @@ vector<Document> SearchServer::FindAllDocuments(const Query &query,
             ComputeWordInverseDocumentFreq(word);
         for (const auto [document_id, term_freq] :
              word_to_document_freqs_.at(word)) {
-            if (document_info_.count(document_id) &&
-                document_info_.at(document_id).status != status)
+            if (documents_.count(document_id) &&
+                static_cast<int>(documents_.at(document_id).status) ^
+                    static_cast<int>(status))
                 continue;
             document_to_relevance[document_id] +=
                 term_freq * inverse_document_freq;
@@ -169,10 +168,37 @@ vector<Document> SearchServer::FindAllDocuments(const Query &query,
 
     vector<Document> matched_documents;
     for (const auto [document_id, relevance] : document_to_relevance) {
-        const auto avg_rating = document_info_.at(document_id).rating;
+        const auto avg_rating = documents_.at(document_id).rating;
         matched_documents.push_back({document_id, relevance, avg_rating});
     }
     return matched_documents;
+}
+
+tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(
+    const string &raw_query, int document_id) const {
+    assert(documents_.count(document_id));
+    //if (!document_info_.count(document_id)) return {{}};
+
+    const Query query = ParseQuery(raw_query);
+    const auto [_, status] = documents_.at(document_id);
+
+    set<string> plus_words(query.plus_words.begin(), query.plus_words.end());
+    set<string> matched_words{};
+
+    for (const string &minus_word : query.minus_words) {
+        if (plus_words.count(minus_word)) plus_words.erase(minus_word);
+        if (word_to_document_freqs_.count(minus_word) == 0) continue;
+        const auto &ids = word_to_document_freqs_.at(minus_word);
+        if (ids.count(document_id)) return {{}, status};
+    }
+
+    for (const string &plus_word : plus_words) {
+        if (word_to_document_freqs_.count(plus_word) == 0) continue;
+        const auto &ids = word_to_document_freqs_.at(plus_word);
+        if (ids.count(document_id)) matched_words.insert(plus_word);
+    }
+
+    return {vector<string>(matched_words.begin(), matched_words.end()), status};
 }
 
 int SearchServer::ComputeAverageRating(const vector<int> &ratings) {
@@ -183,6 +209,8 @@ int SearchServer::ComputeAverageRating(const vector<int> &ratings) {
                    [size](double avg, double v) { return avg + v / size; });
     return result;
 }
+
+int SearchServer::GetDocumentCount(void) const { return documents_.size(); }
 
 /*
 SearchServer CreateSearchServer() {
@@ -205,6 +233,18 @@ void PrintDocument(const Document &document) {
          << "document_id = "s << document.id << ", "s
          << "relevance = "s << document.relevance << ", "s
          << "rating = "s << document.rating << " }"s << endl;
+}
+
+void PrintMatchDocumentResult(int document_id, const vector<string> &words,
+                              DocumentStatus status) {
+    cout << "{ "s
+         << "document_id = "s << document_id << ", "s
+         << "status = "s << static_cast<int>(status) << ", "s
+         << "words ="s;
+    for (const string &word : words) {
+        cout << ' ' << word;
+    }
+    cout << "}"s << endl;
 }
 
 void mock_data() {
@@ -233,8 +273,28 @@ void mock_data() {
     }
 }
 
-int exec_main() {
-    mock_data();
+void mock_data_for_MatchDocument() {
+    SearchServer search_server;
+    search_server.SetStopWords("и в на"s);
 
+    search_server.AddDocument(0, "белый кот и модный ошейник"s,
+                              DocumentStatus::ACTUAL, {8, -3});
+    search_server.AddDocument(1, "пушистый кот пушистый хвост"s,
+                              DocumentStatus::ACTUAL, {7, 2, 7});
+    search_server.AddDocument(2, "ухоженный пёс выразительные глаза"s,
+                              DocumentStatus::ACTUAL, {5, -12, 2, 1});
+    search_server.AddDocument(3, "ухоженный скворец евгений"s,
+                              DocumentStatus::BANNED, {9});
+
+    const int document_count = search_server.GetDocumentCount();
+    for (int document_id = 0; document_id < document_count; ++document_id) {
+        const auto [words, status] =
+            search_server.MatchDocument("пушистый кот"s, document_id);
+        PrintMatchDocumentResult(document_id, words, status);
+    }
+}
+
+int exec_main() {
+    mock_data_for_MatchDocument();
     return 0;
 }

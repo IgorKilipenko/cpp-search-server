@@ -41,7 +41,7 @@ class SearchServer {
         int rating;
         DocumentStatus status;
     };
-    
+
     void SetStopWords(const string& text);
     void AddDocument(int document_id, const string& document,
                      DocumentStatus status, const vector<int>& ratings);
@@ -49,12 +49,14 @@ class SearchServer {
         const string& raw_query,
         DocumentStatus status = DocumentStatus::ACTUAL) const;
     static vector<int> ReadRatingsLine();
+    int GetDocumentCount(void) const;
+    tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query,
+                                                        int document_id) const;
 
    private:
-    int document_count_ = 0;
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
-    map<int, DocumentInfo> document_info_;
+    map<int, DocumentInfo> documents_;
 
     bool IsStopWord(const string& word) const;
     vector<string> SplitIntoWordsNoStop(const string& text) const;
