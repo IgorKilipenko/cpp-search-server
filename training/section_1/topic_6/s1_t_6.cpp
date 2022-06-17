@@ -54,6 +54,7 @@ void SearchServer::SetStopWords(const string &text) {
 }
 
 void SearchServer::AddDocument(int document_id, const string &document,
+                               DocumentStatus status,
                                const vector<int> &ratings) {
     ++document_count_;
     const vector<string> words = SplitIntoWordsNoStop(document);
@@ -62,20 +63,29 @@ void SearchServer::AddDocument(int document_id, const string &document,
         word_to_document_freqs_[word][document_id] += inv_word_count;
     }
     document_ratings_[document_id] = ratings;
+    documents_status_[document_id] = status;
 }
 
-vector<Document> SearchServer::FindTopDocuments(const string &raw_query) const {
+vector<Document> SearchServer::FindTopDocuments(const string &raw_query,
+                                                DocumentStatus status) const {
     const Query query = ParseQuery(raw_query);
     auto matched_documents = FindAllDocuments(query);
 
     sort(matched_documents.begin(), matched_documents.end(),
          [](const Document &lhs, const Document &rhs) {
-             return lhs.relevance > rhs.relevance || (lhs.relevance == rhs.relevance && lhs.rating > rhs.rating);
+             return lhs.relevance > rhs.relevance ||
+                    (lhs.relevance == rhs.relevance && lhs.rating > rhs.rating);
          });
-    if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
-        matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
+         
+    vector<Document> result{};
+    for (int i = 0; i < matched_documents.size(); i++) {
+        const auto id = matched_documents.at(i).id;
+        if (documents_status_.count(id) && documents_status_.at(id) == status) {
+            result.push_back(matched_documents.at(i));
+        } 
+        if (result.size() == MAX_RESULT_DOCUMENT_COUNT) break;
     }
-    return matched_documents;
+    return result;
 }
 
 bool SearchServer::IsStopWord(const string &word) const {
@@ -122,7 +132,7 @@ vector<int> SearchServer::ReadRatingsLine() {
     cin >> size;
     vector<int> result(size, 0);
     result.reserve(size);
-    for (auto& r : result) {
+    for (auto &r : result) {
         cin >> r;
     }
     ReadLine();
@@ -176,6 +186,7 @@ int SearchServer::ComputeAverageRating(const vector<int> &ratings) {
     return result;
 }
 
+/*
 SearchServer CreateSearchServer() {
     SearchServer search_server;
     search_server.SetStopWords(ReadLine());
@@ -189,17 +200,43 @@ SearchServer CreateSearchServer() {
 
     return search_server;
 }
+*/
+
+void PrintDocument(const Document &document) {
+    cout << "{ "s
+         << "document_id = "s << document.id << ", "s
+         << "relevance = "s << document.relevance << ", "s
+         << "rating = "s << document.rating << " }"s << endl;
+}
+
+void mock_data() {
+    SearchServer search_server;
+    search_server.SetStopWords("и в на"s);
+
+    search_server.AddDocument(0, "белый кот и модный ошейник"s,
+                              DocumentStatus::ACTUAL, {8, -3});
+    search_server.AddDocument(1, "пушистый кот пушистый хвост"s,
+                              DocumentStatus::ACTUAL, {7, 2, 7});
+    search_server.AddDocument(2, "ухоженный пёс выразительные глаза"s,
+                              DocumentStatus::ACTUAL, {5, -12, 2, 1});
+    search_server.AddDocument(3, "ухоженный скворец евгений"s,
+                              DocumentStatus::BANNED, {9});
+
+    cout << "ACTUAL:"s << endl;
+    for (const Document &document : search_server.FindTopDocuments(
+             "пушистый ухоженный кот"s, DocumentStatus::ACTUAL)) {
+        PrintDocument(document);
+    }
+
+    cout << "BANNED:"s << endl;
+    for (const Document &document : search_server.FindTopDocuments(
+             "пушистый ухоженный кот"s, DocumentStatus::BANNED)) {
+        PrintDocument(document);
+    }
+}
 
 int exec_main() {
-    const SearchServer search_server = CreateSearchServer();
+    mock_data();
 
-    const string query = ReadLine();
-
-    for (auto [document_id, relevance, avg_rating] :
-         search_server.FindTopDocuments(query)) {
-        cout << "{ document_id = "s << document_id << ", "s
-             << "relevance = "s << relevance << ", "s
-             << "rating = "s << avg_rating << " }"s << endl;
-    }
     return 0;
 }

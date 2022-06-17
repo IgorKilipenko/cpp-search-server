@@ -5,11 +5,11 @@
 #define EXPORT
 #endif
 
+#include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
-#include <set>
-#include <map>
 
 using namespace std;
 
@@ -27,18 +27,22 @@ struct Document {
     int rating;
 };
 
+enum class DocumentStatus { ACTUAL, IRRELEVANT, BANNED, REMOVED };
+
 class SearchServer {
-public:
+   public:
     void SetStopWords(const string& text);
-    void AddDocument(int document_id, const string& document, const vector<int> &ratings);
-    vector<Document> FindTopDocuments(const string& raw_query) const;
+    void AddDocument(int document_id, const string& document,
+                     DocumentStatus status, const vector<int>& ratings);
+    vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus status) const;
     static vector<int> ReadRatingsLine();
 
-private:
+   private:
     int document_count_ = 0;
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, vector<int>> document_ratings_;
+    map<int, DocumentStatus> documents_status_;
 
     struct QueryWord {
         string data;
@@ -51,7 +55,8 @@ private:
     QueryWord ParseQueryWord(string text) const;
     Query ParseQuery(const string& text) const;
     vector<Document> FindAllDocuments(const Query& query) const;
-    map<int,double> MatchDocument(const DocumentsIndexTable& doc_ids_table, const Query& query) const;
+    map<int, double> MatchDocument(const DocumentsIndexTable& doc_ids_table,
+                                   const Query& query) const;
     double ComputeWordInverseDocumentFreq(const string& word) const;
     static int ComputeAverageRating(const vector<int>& ratings);
 };
