@@ -34,7 +34,9 @@ class SearchServer {
     void SetStopWords(const string& text);
     void AddDocument(int document_id, const string& document,
                      DocumentStatus status, const vector<int>& ratings);
-    vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus status) const;
+    vector<Document> FindTopDocuments(
+        const string& raw_query,
+        DocumentStatus status = DocumentStatus::ACTUAL) const;
     static vector<int> ReadRatingsLine();
 
    private:
@@ -54,7 +56,7 @@ class SearchServer {
     vector<string> SplitIntoWordsNoStop(const string& text) const;
     QueryWord ParseQueryWord(string text) const;
     Query ParseQuery(const string& text) const;
-    vector<Document> FindAllDocuments(const Query& query) const;
+    vector<Document> FindAllDocuments(const Query& query, DocumentStatus status) const;
     map<int, double> MatchDocument(const DocumentsIndexTable& doc_ids_table,
                                    const Query& query) const;
     double ComputeWordInverseDocumentFreq(const string& word) const;

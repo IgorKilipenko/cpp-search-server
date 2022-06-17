@@ -69,23 +69,16 @@ void SearchServer::AddDocument(int document_id, const string &document,
 vector<Document> SearchServer::FindTopDocuments(const string &raw_query,
                                                 DocumentStatus status) const {
     const Query query = ParseQuery(raw_query);
-    auto matched_documents = FindAllDocuments(query);
+    auto matched_documents = FindAllDocuments(query, status);
 
     sort(matched_documents.begin(), matched_documents.end(),
          [](const Document &lhs, const Document &rhs) {
-             return lhs.relevance > rhs.relevance ||
-                    (lhs.relevance == rhs.relevance && lhs.rating > rhs.rating);
+             return lhs.relevance > rhs.relevance;
          });
-         
-    vector<Document> result{};
-    for (int i = 0; i < matched_documents.size(); i++) {
-        const auto id = matched_documents.at(i).id;
-        if (documents_status_.count(id) && documents_status_.at(id) == status) {
-            result.push_back(matched_documents.at(i));
-        } 
-        if (result.size() == MAX_RESULT_DOCUMENT_COUNT) break;
+    if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
+        matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
     }
-    return result;
+    return matched_documents;
 }
 
 bool SearchServer::IsStopWord(const string &word) const {
@@ -144,7 +137,8 @@ double SearchServer::ComputeWordInverseDocumentFreq(const string &word) const {
     return log(document_count_ * 1.0 / word_to_document_freqs_.at(word).size());
 }
 
-vector<Document> SearchServer::FindAllDocuments(const Query &query) const {
+vector<Document> SearchServer::FindAllDocuments(const Query &query,
+                                                DocumentStatus status) const {
     map<int, double> document_to_relevance;
     for (const string &word : query.plus_words) {
         if (word_to_document_freqs_.count(word) == 0) {
@@ -154,6 +148,9 @@ vector<Document> SearchServer::FindAllDocuments(const Query &query) const {
             ComputeWordInverseDocumentFreq(word);
         for (const auto [document_id, term_freq] :
              word_to_document_freqs_.at(word)) {
+            if (documents_status_.count(document_id) &&
+                documents_status_.at(document_id) != status)
+                continue;
             document_to_relevance[document_id] +=
                 term_freq * inverse_document_freq;
         }
@@ -223,8 +220,8 @@ void mock_data() {
                               DocumentStatus::BANNED, {9});
 
     cout << "ACTUAL:"s << endl;
-    for (const Document &document : search_server.FindTopDocuments(
-             "пушистый ухоженный кот"s, DocumentStatus::ACTUAL)) {
+    for (const Document &document :
+         search_server.FindTopDocuments("пушистый ухоженный кот"s)) {
         PrintDocument(document);
     }
 
