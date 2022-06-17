@@ -31,6 +31,17 @@ enum class DocumentStatus { ACTUAL, IRRELEVANT, BANNED, REMOVED };
 
 class SearchServer {
    public:
+    struct QueryWord {
+        string data;
+        bool is_minus;
+        bool is_stop;
+    };
+
+    struct DocumentInfo {
+        int rating;
+        DocumentStatus status;
+    };
+    
     void SetStopWords(const string& text);
     void AddDocument(int document_id, const string& document,
                      DocumentStatus status, const vector<int>& ratings);
@@ -43,20 +54,14 @@ class SearchServer {
     int document_count_ = 0;
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
-    map<int, vector<int>> document_ratings_;
-    map<int, DocumentStatus> documents_status_;
-
-    struct QueryWord {
-        string data;
-        bool is_minus;
-        bool is_stop;
-    };
+    map<int, DocumentInfo> document_info_;
 
     bool IsStopWord(const string& word) const;
     vector<string> SplitIntoWordsNoStop(const string& text) const;
     QueryWord ParseQueryWord(string text) const;
     Query ParseQuery(const string& text) const;
-    vector<Document> FindAllDocuments(const Query& query, DocumentStatus status) const;
+    vector<Document> FindAllDocuments(const Query& query,
+                                      DocumentStatus status) const;
     map<int, double> MatchDocument(const DocumentsIndexTable& doc_ids_table,
                                    const Query& query) const;
     double ComputeWordInverseDocumentFreq(const string& word) const;

@@ -62,8 +62,10 @@ void SearchServer::AddDocument(int document_id, const string &document,
     for (const string &word : words) {
         word_to_document_freqs_[word][document_id] += inv_word_count;
     }
-    document_ratings_[document_id] = ratings;
-    documents_status_[document_id] = status;
+    document_info_.emplace(document_id, DocumentInfo {
+        ComputeAverageRating(ratings),
+        status
+    });
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string &raw_query,
@@ -148,8 +150,8 @@ vector<Document> SearchServer::FindAllDocuments(const Query &query,
             ComputeWordInverseDocumentFreq(word);
         for (const auto [document_id, term_freq] :
              word_to_document_freqs_.at(word)) {
-            if (documents_status_.count(document_id) &&
-                documents_status_.at(document_id) != status)
+            if (document_info_.count(document_id) &&
+                document_info_.at(document_id).status != status)
                 continue;
             document_to_relevance[document_id] +=
                 term_freq * inverse_document_freq;
@@ -167,8 +169,7 @@ vector<Document> SearchServer::FindAllDocuments(const Query &query,
 
     vector<Document> matched_documents;
     for (const auto [document_id, relevance] : document_to_relevance) {
-        const auto ratings = document_ratings_.at(document_id);
-        const auto avg_rating = ComputeAverageRating(ratings);
+        const auto avg_rating = document_info_.at(document_id).rating;
         matched_documents.push_back({document_id, relevance, avg_rating});
     }
     return matched_documents;
