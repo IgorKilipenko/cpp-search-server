@@ -7,6 +7,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <iomanip>
 
 #include "team_tasks.hpp"
 
@@ -20,22 +21,26 @@ const TasksInfo& TeamTasks::GetPersonTasksInfo(const string& person) const {
 void TeamTasks::AddNewTask(const string& person) {
     auto& tasks = team_tasks_[person];
     ++tasks[TaskStatus::NEW];
-
+    
+    /*tasks[TaskStatus::NEW] = 3;
+    tasks[TaskStatus::IN_PROGRESS] = 2;
+    tasks[TaskStatus::TESTING] = 4;
+    tasks[TaskStatus::DONE] = 1;*/
+    
     for (int i = static_cast<int>(TaskStatus::NEW) + 1; i <= static_cast<int>(TaskStatus::DONE); i++) {
         const auto status = static_cast<TaskStatus>(i);
         if (!tasks.count(status)) {
             tasks[status] = 0;
         }
     }
+    
 }
 
-tuple<TasksInfo, TasksInfo> TeamTasks::PerformPersonTasks(const string& person, int pop_task_count /* value for pop current task */) {
-    assert(team_tasks_.count(person));
+tuple<TasksInfo, TasksInfo> TeamTasks::PerformPersonTasks(const string& person, int pop_task_count) {
+    if (!team_tasks_.count(person)) return {{}, {}};
+
     TasksInfo updated_tasks{};
     TasksInfo not_updated_tasks{};
-
-    updated_tasks[TaskStatus::NEW] = 0;
-    const int initial_pop_task_count = pop_task_count;
 
     auto& curr_person_tasks = team_tasks_[person];
 
@@ -59,30 +64,20 @@ tuple<TasksInfo, TasksInfo> TeamTasks::PerformPersonTasks(const string& person, 
         
         curr_not_updated_count = max(initial_count - pop_task_count - curr_updated_count, 0);
         pop_task_count = max(pop_task_count - next_updated_count, 0);
-        //curr_not_updated_count = max(initial_count - initial_pop_task_count, 0);
 
-        if (next_updated_count == 0 && pop_task_count == 0) {
-            //curr_not_updated_count = 0;
-            break;
-        }
+        if (next_updated_count == 0 && pop_task_count == 0) break;
     }
-
-    /*
-    set<TaskStatus> empty_item{};
-    for (auto [status, task_count] : updated_tasks)
-        if (!task_count) empty_item.insert(status);
-    for (auto item : empty_item) updated_tasks.erase(item);
-
-    empty_item.clear();
-    for (auto [status, task_count] : not_updated_tasks)
-        if (!task_count) empty_item.insert(status);
-    for (auto item : empty_item) not_updated_tasks.erase(item);
-    */
-
+/*
+    const TaskStatus done_staus = TaskStatus::DONE;
+    if (pop_task_count && curr_person_tasks.count(done_staus)) {
+        const int updated_count = updated_tasks[done_staus];
+        const int available_for_update = max(curr_person_tasks.at(done_staus) - updated_count, 0);
+        curr_person_tasks.at(done_staus) = max(available_for_update - pop_task_count,0);
+    }
+*/
     if (not_updated_tasks.count(TaskStatus::DONE)) not_updated_tasks.erase(TaskStatus::DONE);
 
     return {updated_tasks, not_updated_tasks};
-    //return make_tuple(updated_tasks, not_updated_tasks);
 }
 
 // Принимаем словарь по значению, чтобы иметь возможность
@@ -96,52 +91,52 @@ void PrintTasksInfo(TasksInfo tasks_info) {
          << " tasks are being tested"s
          << ", "s << tasks_info[TaskStatus::DONE] << " tasks are done"s <<
        endl;*/
-    cout << "NEW: "s << tasks_info[TaskStatus::NEW] << " | "s
-         << "IN_PROGRESS: "s << tasks_info[TaskStatus::IN_PROGRESS] << " | "s
-         << "TESTING: "s << tasks_info[TaskStatus::TESTING] << " | "s
-         << "DONE: "s << tasks_info[TaskStatus::DONE] << endl;
+    cout << "NEW: "s << std::internal << setw(3) << tasks_info[TaskStatus::NEW] << " | "s
+         << "IN_PROGRESS: "s << setw(3) << tasks_info[TaskStatus::IN_PROGRESS] << " | "s
+         << "TESTING: "s << setw(3) << tasks_info[TaskStatus::TESTING] << " | "s
+         << "DONE: "s << setw(3) << tasks_info[TaskStatus::DONE] << endl;
 }
 
-int exec_main0() {
+int exec_main3() {
     TeamTasks tasks;
-    tasks.AddNewTask("Ilia"s);
     for (int i = 0; i < 3; ++i) {
         tasks.AddNewTask("Ivan"s);
     }
-    cout << "Ilia's tasks: "s;
-    PrintTasksInfo(tasks.GetPersonTasksInfo("Ilia"s));
-    cout << "Ivan's tasks: "s;
+
+    cout << "Ivan's tasks:\t"s;
     PrintTasksInfo(tasks.GetPersonTasksInfo("Ivan"s));
 
     TasksInfo updated_tasks, untouched_tasks;
 
-    tie(updated_tasks, untouched_tasks) = tasks.PerformPersonTasks("Ivan"s, 4);  //!
-    cout << "Updated Ivan's tasks: "s;
+    tie(updated_tasks, untouched_tasks) = tasks.PerformPersonTasks("Ivan"s, 4);
+    cout << "Total:\t\t"s;
+    PrintTasksInfo(tasks.GetPersonTasksInfo("Ivan"s));
+    cout << "Updated:\t"s;
     PrintTasksInfo(updated_tasks);
-    cout << "Untouched Ivan's tasks: "s;
+    cout << "Untouched:\t"s;
     PrintTasksInfo(untouched_tasks);
+    cout << endl;
 
     return 0;
 }
 
-int exec_main2() {
+int exec_main() {
     TeamTasks tasks;
-    tasks.AddNewTask("Ilia");
-    for (int i = 0; i < 30; ++i) {
+    for (int i = 0; i < 10000030; ++i) {
         tasks.AddNewTask("Ivan");
     }
-    cout << "Ilia's tasks: ";
-    PrintTasksInfo(tasks.GetPersonTasksInfo("Ilia"));
-    cout << "Ivan's tasks: ";
-    PrintTasksInfo(tasks.GetPersonTasksInfo("Ivan"));
+    cout << std::left << setw(14) << "Ivan's tasks: "s;
+    PrintTasksInfo(tasks.GetPersonTasksInfo("Ivan"s));
 
     TasksInfo updated_tasks, untouched_tasks;
-
-    for (int i = 0; i < 5; ++i) {
-        tie(updated_tasks, untouched_tasks) = tasks.PerformPersonTasks("Ivan", 10);
-        cout << "Updated Ivan's tasks: ";
+    cout << endl;
+    for (int i = 0; i < 10000030 / 5; ++i) {
+        tie(updated_tasks, untouched_tasks) = tasks.PerformPersonTasks("Ivan"s, 10000030 / 5);
+        cout << std::left << setw(14) << "Total: "s;
+        PrintTasksInfo(tasks.GetPersonTasksInfo("Ivan"s));
+        cout << std::left << setw(14) << "Updated: "s;
         PrintTasksInfo(updated_tasks);
-        cout << "Untouched Ivan's tasks: ";
+        cout << std::left << setw(14) << "Untouched: "s;
         PrintTasksInfo(untouched_tasks);
         cout << endl;
     }
@@ -149,7 +144,7 @@ int exec_main2() {
     return 0;
 }
 
-int exec_main() {
+int exec_main0() {
     TeamTasks tasks;
     for (int i = 0; i < 3; ++i) {
         tasks.AddNewTask("Ivan"s);
@@ -159,7 +154,7 @@ int exec_main() {
 
     TasksInfo updated_tasks, untouched_tasks;
     cout << endl;
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < 5; ++i) {
         tie(updated_tasks, untouched_tasks) = tasks.PerformPersonTasks("Ivan"s, 2);
         cout << "Total:\t\t"s;
         PrintTasksInfo(tasks.GetPersonTasksInfo("Ivan"s));
