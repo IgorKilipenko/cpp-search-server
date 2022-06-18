@@ -20,11 +20,7 @@ const TasksInfo& TeamTasks::GetPersonTasksInfo(const string& person) const {
 void TeamTasks::AddNewTask(const string& person) {
     auto& tasks = team_tasks_[person];
     ++tasks[TaskStatus::NEW];
-    /*tasks[TaskStatus::NEW] = 3;
-    tasks[TaskStatus::IN_PROGRESS] = 2;
-    tasks[TaskStatus::TESTING] = 4;
-    tasks[TaskStatus::DONE] = 4;*/
-    
+
     for (int i = static_cast<int>(TaskStatus::NEW) + 1;
          i <= static_cast<int>(TaskStatus::DONE); i++) {
         const auto status = static_cast<TaskStatus>(i);
@@ -34,47 +30,8 @@ void TeamTasks::AddNewTask(const string& person) {
     }
 }
 
-/*
-tuple<TasksInfo, TasksInfo> TeamTasks::PerformPersonTasks(const string& person,
-                                                          int task_count) {
-    assert(team_tasks_.count(person));
-    TasksInfo updated_tasks{};
-    TasksInfo not_updated_tasks{};
-
-    auto& curr_person_tasks = team_tasks_[person];
-
-    for (int i = static_cast<int>(TaskStatus::NEW);
-         i < static_cast<int>(TaskStatus::DONE); i++) {
-        const auto curr_status = static_cast<TaskStatus>(i);
-        const auto next_status = static_cast<TaskStatus>(i + 1);
-
-        while (curr_person_tasks.count(curr_status) &&
-               curr_person_tasks.at(curr_status)) {
-            if (!updated_tasks.count(next_status)) {
-                updated_tasks.insert({next_status, 0});
-            }
-            --curr_person_tasks[curr_status];
-            ++updated_tasks[next_status];
-            --task_count;
-        }
-    }
-
-    for (auto task_info : curr_person_tasks) {
-        if (task_info.first != TaskStatus::DONE) {
-            not_updated_tasks.insert({task_info.first, task_info.second});
-        }
-    }
-
-    for (auto update : updated_tasks) {
-        curr_person_tasks.at(update.first) += update.second;
-    }
-
-    return {updated_tasks, not_updated_tasks};
-}
-*/
-
-tuple<TasksInfo, TasksInfo> TeamTasks::PerformPersonTasks(const string& person,
-                                                          int task_count) {
+tuple<TasksInfo, TasksInfo> TeamTasks::PerformPersonTasks(
+    const string& person, int pop_task_count /* value for pop current task */) {
     assert(team_tasks_.count(person));
     TasksInfo updated_tasks{};
     TasksInfo not_updated_tasks{};
@@ -91,23 +48,19 @@ tuple<TasksInfo, TasksInfo> TeamTasks::PerformPersonTasks(const string& person,
         const int curr_task_count = curr_person_tasks.count(curr_status)
                                         ? curr_person_tasks.at(curr_status)
                                         : 0;
-        curr_person_tasks[curr_status] = max(curr_task_count - task_count, 0);
-        updated_tasks[next_status] =
-            max(curr_task_count - curr_person_tasks[curr_status], 0);
-        not_updated_tasks[curr_status] = max(curr_task_count - task_count, 0);
-        task_count = max(task_count - curr_task_count, 0);
+        curr_person_tasks[curr_status] = max(
+            curr_task_count +
+                updated_tasks[curr_status] /* is new task from prev step */ -
+                pop_task_count,
+            0);
+        updated_tasks[next_status] = max(
+            curr_task_count -
+                (curr_person_tasks[curr_status] - updated_tasks[curr_status]),
+            0);
+        not_updated_tasks[curr_status] =
+            max(curr_task_count - pop_task_count, 0);
+        pop_task_count = max(pop_task_count - curr_task_count, 0);
     }
-
-    /*
-    for (const auto [status, task_count] : curr_person_tasks) {
-        if (status != TaskStatus::DONE) {
-            not_updated_tasks.insert({status, task_count});
-        }
-    }
-
-    for (const auto [status, task_count] : updated_tasks) {
-        curr_person_tasks.at(status) += task_count;
-    }*/
 
     set<TaskStatus> empty_item{};
     for (auto [status, task_count] : updated_tasks)
@@ -153,12 +106,6 @@ int exec_main0() {
     PrintTasksInfo(updated_tasks);
     cout << "Untouched Ivan's tasks: "s;
     PrintTasksInfo(untouched_tasks);
-
-    /*
-    ! tie(updated_tasks, untouched_tasks) = tasks.PerformPersonTasks("Ivan"s,
-    2); ! cout << "Updated Ivan's tasks: "s; ! PrintTasksInfo(updated_tasks); !
-    cout << "Untouched Ivan's tasks: "s; ! PrintTasksInfo(untouched_tasks);
-    */
 
     return 0;
 }
