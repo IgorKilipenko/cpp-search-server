@@ -27,8 +27,7 @@ class TeamTasks {
 
     // Обновить статусы по данному количеству задач конкретного разработчика,
     // подробности см. ниже
-    tuple<TasksInfo, TasksInfo> PerformPersonTasks(const string& person,
-                                                   int task_count);
+    tuple<TasksInfo, TasksInfo> PerformPersonTasks(const string& person, int task_count);
 
    private:
     map<string, TasksInfo> team_tasks_;
