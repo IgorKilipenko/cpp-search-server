@@ -2,7 +2,7 @@
 #include <string>
 #include <set>
 
-#include "../training/section_1/topic_6/server.hpp"
+#include "../training/section_1/topic_7/team_tasks.hpp"
 
 // Решите загадку: Сколько чисел от 1 до 1000 содержат как минимум одну цифру 3?
 // Напишите ответ здесь: 271
