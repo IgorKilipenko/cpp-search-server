@@ -24,20 +24,6 @@ const TasksInfo& TeamTasks::GetPersonTasksInfo(const string& person) const {
 void TeamTasks::AddNewTask(const string& person) {
     auto& tasks = team_tasks_[person];
     ++tasks[TaskStatus::NEW];
-    
-    /*tasks[TaskStatus::NEW] = 3;
-    tasks[TaskStatus::IN_PROGRESS] = 2;
-    tasks[TaskStatus::TESTING] = 4;
-    tasks[TaskStatus::DONE] = 1;*/
-    
-    /*
-    for (int i = static_cast<int>(TaskStatus::NEW) + 1; i <= static_cast<int>(TaskStatus::DONE); i++) {
-        const auto status = static_cast<TaskStatus>(i);
-        if (!tasks.count(status)) {
-            tasks[status] = 0;
-        }
-    }
-    */
 }
 
 tuple<TasksInfo, TasksInfo> TeamTasks::PerformPersonTasks(const string& person, int pop_task_count) {
@@ -68,17 +54,8 @@ tuple<TasksInfo, TasksInfo> TeamTasks::PerformPersonTasks(const string& person, 
         
         curr_not_updated_count = max(initial_count - pop_task_count - curr_updated_count, 0);
         pop_task_count = max(pop_task_count - next_updated_count, 0);
+    }
 
-        //if (next_updated_count == 0 && pop_task_count == 0) break;
-    }
-/*
-    const TaskStatus done_staus = TaskStatus::DONE;
-    if (pop_task_count && curr_person_tasks.count(done_staus)) {
-        const int updated_count = updated_tasks[done_staus];
-        const int available_for_update = max(curr_person_tasks.at(done_staus) - updated_count, 0);
-        curr_person_tasks.at(done_staus) = max(available_for_update - pop_task_count,0);
-    }
-*/
     set<TaskStatus> empty_item{};
     for (auto [status, task_count] : updated_tasks)
         if (!task_count) empty_item.insert(status);
@@ -89,7 +66,6 @@ tuple<TasksInfo, TasksInfo> TeamTasks::PerformPersonTasks(const string& person, 
         if (!task_count) empty_item.insert(status);
     for (auto item : empty_item) not_updated_tasks.erase(item);
 
-    //if (not_updated_tasks.count(TaskStatus::DONE)) not_updated_tasks.erase(TaskStatus::DONE);
 
     return {updated_tasks, not_updated_tasks};
 }
