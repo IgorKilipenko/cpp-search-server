@@ -1,7 +1,9 @@
+#include <cassert>
 #include <cmath>
 #include <functional>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <set>
 #include <string>
 
@@ -41,8 +43,8 @@ class SearchServer {
 
     void AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
 
-    // template <typename T>
-    vector<Document> FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate) const;
+    template <typename T>
+    vector<Document> FindTopDocuments(const string& raw_query, T predicate) const;
 
     vector<Document> FindTopDocuments(const string& raw_query) const;
 
@@ -71,12 +73,6 @@ class SearchServer {
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
 
-    static bool defaultPredicate(int id, DocumentStatus status, int rating) {
-        if (status != DocumentStatus::ACTUAL) return false;
-        rating = 1;
-        return !!rating;
-    };
-
     bool IsStopWord(const string& word) const;
 
     vector<string> SplitIntoWordsNoStop(const string& text) const;
@@ -89,8 +85,8 @@ class SearchServer {
 
     double ComputeWordInverseDocumentFreq(const string& word) const;
 
-    // template <typename T>
-    vector<Document> FindAllDocuments(const Query& query, function<bool(int, DocumentStatus, int)> predicate) const;
+    template <typename T>
+    vector<Document> FindAllDocuments(const Query& query, T predicate) const;
 };
 
 vector<string> SplitIntoWords(const string& text) {
@@ -128,13 +124,14 @@ void SearchServer::AddDocument(int document_id, const string& document, Document
     documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
 }
 
-// template <typename T>
-vector<Document> SearchServer::FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate) const {
+template <typename T>
+vector<Document> SearchServer::FindTopDocuments(const string& raw_query, T predicate) const {
     const Query query = ParseQuery(raw_query);
     auto matched_documents = FindAllDocuments(query, predicate);
+    const double threshold = 1e-6;
 
-    sort(matched_documents.begin(), matched_documents.end(), [](const Document& lhs, const Document& rhs) {
-        if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
+    sort(matched_documents.begin(), matched_documents.end(), [threshold](const Document& lhs, const Document& rhs) {
+        if (abs(lhs.relevance - rhs.relevance) < threshold) {
             return lhs.rating > rhs.rating;
         } else {
             return lhs.relevance > rhs.relevance;
@@ -146,16 +143,21 @@ vector<Document> SearchServer::FindTopDocuments(const string& raw_query, functio
     return matched_documents;
 }
 
-vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const { return FindTopDocuments(raw_query, defaultPredicate); }
-
-vector<Document> SearchServer::FindTopDocuments(const string& raw_query, DocumentStatus status) const {
-    return FindTopDocuments(raw_query, [status](int id, DocumentStatus doc_status, int rating) -> bool {
-        rating = true;
-        return (doc_status == status) && rating;
+vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const {
+    return FindTopDocuments(raw_query, [](int id, DocumentStatus status, [[maybe_unused]] int rating) -> bool {
+        return status == DocumentStatus::ACTUAL;
     });
 }
 
-int SearchServer::GetDocumentCount() const { return documents_.size(); }
+vector<Document> SearchServer::FindTopDocuments(const string& raw_query, DocumentStatus status) const {
+    return FindTopDocuments(raw_query, [status](int id, DocumentStatus doc_status, [[maybe_unused]] int rating) -> bool {
+        return (doc_status == status);
+    });
+}
+
+int SearchServer::GetDocumentCount() const {
+    return documents_.size();
+}
 
 tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& raw_query, int document_id) const {
     const Query query = ParseQuery(raw_query);
@@ -180,7 +182,9 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& 
     return {matched_words, documents_.at(document_id).status};
 }
 
-bool SearchServer::IsStopWord(const string& word) const { return stop_words_.count(word) > 0; }
+bool SearchServer::IsStopWord(const string& word) const {
+    return stop_words_.count(word) > 0;
+}
 
 vector<string> SearchServer::SplitIntoWordsNoStop(const string& text) const {
     vector<string> words;
@@ -196,10 +200,11 @@ int SearchServer::ComputeAverageRating(const vector<int>& ratings) {
     if (ratings.empty()) {
         return 0;
     }
-    int rating_sum = 0;
-    for (const int rating : ratings) {
-        rating_sum += rating;
-    }
+
+    const int rating_sum = accumulate(ratings.begin(), ratings.end(), 0, [](int summ, int rating) {
+        return summ + rating;
+    });
+
     return rating_sum / static_cast<int>(ratings.size());
 }
 
@@ -233,8 +238,8 @@ double SearchServer::ComputeWordInverseDocumentFreq(const string& word) const {
     return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
 }
 
-// template <typename T>
-vector<Document> SearchServer::FindAllDocuments(const Query& query, function<bool(int, DocumentStatus, int)> predicate) const {
+template <typename T>
+vector<Document> SearchServer::FindAllDocuments(const Query& query, T predicate) const {
     map<int, double> document_to_relevance;
     for (const string& word : query.plus_words) {
         if (word_to_document_freqs_.count(word) == 0) {
@@ -293,8 +298,9 @@ int main() {
     }
 
     cout << "Even ids:"s << endl;
-    for (const Document& document : search_server.FindTopDocuments(
-             "пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return document_id % 2 == 0; })) {
+    for (const Document& document : search_server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) {
+             return document_id % 2 == 0;
+         })) {
         PrintDocument(document);
     }
 
