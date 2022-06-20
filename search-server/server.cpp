@@ -3,11 +3,9 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <map>
 #include <set>
 #include <string>
-#include <utility>
 #include <vector>
 
 vector<string> SplitIntoWords(const string& text) {
@@ -46,7 +44,7 @@ void SearchServer::AddDocument(int document_id, const string& document, Document
 }
 
 // template <typename T>
-vector<Document> SearchServer::FindTopDocuments(const string& raw_query, std::function<bool(int, DocumentStatus, int)> predicate) const {
+vector<Document> SearchServer::FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate) const {
     const Query query = ParseQuery(raw_query);
     auto matched_documents = FindAllDocuments(query, predicate);
 
@@ -151,7 +149,7 @@ double SearchServer::ComputeWordInverseDocumentFreq(const string& word) const {
 }
 
 // template <typename T>
-vector<Document> SearchServer::FindAllDocuments(const Query& query, std::function<bool(int, DocumentStatus, int)> predicate) const {
+vector<Document> SearchServer::FindAllDocuments(const Query& query, function<bool(int, DocumentStatus, int)> predicate) const {
     map<int, double> document_to_relevance;
     for (const string& word : query.plus_words) {
         if (word_to_document_freqs_.count(word) == 0) {
@@ -159,7 +157,7 @@ vector<Document> SearchServer::FindAllDocuments(const Query& query, std::functio
         }
         const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
         for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word)) {
-            if (!documents_.count(document_id)) continue;  // !
+            if (!documents_.count(document_id)) continue;
             const auto& document = documents_.at(document_id);
             if (predicate(document_id, document.status, document.rating)) {
                 document_to_relevance[document_id] += term_freq * inverse_document_freq;

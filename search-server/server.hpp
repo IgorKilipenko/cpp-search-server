@@ -1,19 +1,12 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-#include <algorithm>
-#include <cmath>
 #include <functional>
-#include <iostream>
 #include <map>
 #include <set>
 #include <string>
-#include <utility>
-#include <vector>
 
 using namespace std;
-
-// using FindDocumentPredicate = std::function<bool(int,DocumentStatus,int)>;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
 
@@ -37,7 +30,7 @@ class SearchServer {
     void AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
 
     // template <typename T>
-    vector<Document> FindTopDocuments(const string& raw_query, std::function<bool(int, DocumentStatus, int)> predicate) const;
+    vector<Document> FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate) const;
 
     vector<Document> FindTopDocuments(const string& raw_query) const;
 
@@ -86,7 +79,7 @@ class SearchServer {
     double ComputeWordInverseDocumentFreq(const string& word) const;
 
     // template <typename T>
-    vector<Document> FindAllDocuments(const Query& query, std::function<bool(int, DocumentStatus, int)> predicate) const;
+    vector<Document> FindAllDocuments(const Query& query, function<bool(int, DocumentStatus, int)> predicate) const;
 };
 
 #endif /* SERVER_HPP */
