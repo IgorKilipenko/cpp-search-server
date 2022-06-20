@@ -3,15 +3,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
-#include <functional>
-
-#include "common.hpp"
 
 #ifndef EXPORT
 #define EXPORT
@@ -19,7 +17,7 @@
 
 using namespace std;
 
-using FindDocumentPredicate = std::function<bool(int,DocumentStatus,int)>;
+// using FindDocumentPredicate = std::function<bool(int,DocumentStatus,int)>;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
 
@@ -42,9 +40,9 @@ class SearchServer {
 
     void AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
 
-    template <typename T>
-    vector<Document> FindTopDocuments(const string& raw_query, T predicate) const;
-    
+    // template <typename T>
+    vector<Document> FindTopDocuments(const string& raw_query, std::function<bool(int, DocumentStatus, int)> predicate) const;
+
     vector<Document> FindTopDocuments(const string& raw_query) const;
 
     int GetDocumentCount() const;
@@ -69,7 +67,12 @@ class SearchServer {
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
-    std::function<bool(int,DocumentStatus,int)> default_predicate_;
+    
+    static bool defaultPredicate(int id, DocumentStatus status, int rating) {       
+        if (status != DocumentStatus::ACTUAL) return false;
+        rating = 1;
+        return !!rating;
+    };
 
     bool IsStopWord(const string& word) const;
 
@@ -84,7 +87,8 @@ class SearchServer {
     // Existence required
     double ComputeWordInverseDocumentFreq(const string& word) const;
 
-    vector<Document> FindAllDocuments(const Query& query, DocumentStatus status) const;
+    // template <typename T>
+    vector<Document> FindAllDocuments(const Query& query, std::function<bool(int, DocumentStatus, int)> predicate) const;
 };
 
 EXPORT int exec_main();
