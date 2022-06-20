@@ -9,12 +9,17 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <functional>
+
+#include "common.hpp"
 
 #ifndef EXPORT
 #define EXPORT
 #endif
 
 using namespace std;
+
+using FindDocumentPredicate = std::function<bool(int,DocumentStatus,int)>;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
 
@@ -37,7 +42,10 @@ class SearchServer {
 
     void AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
 
-    vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus status = DocumentStatus::ACTUAL) const;
+    template <typename T>
+    vector<Document> FindTopDocuments(const string& raw_query, T predicate) const;
+    
+    vector<Document> FindTopDocuments(const string& raw_query) const;
 
     int GetDocumentCount() const;
 
@@ -61,6 +69,7 @@ class SearchServer {
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
+    std::function<bool(int,DocumentStatus,int)> default_predicate_;
 
     bool IsStopWord(const string& word) const;
 

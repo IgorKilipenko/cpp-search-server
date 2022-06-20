@@ -58,7 +58,8 @@ void SearchServer::AddDocument(int document_id, const string& document, Document
     documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
 }
 
-vector<Document> SearchServer::FindTopDocuments(const string& raw_query, DocumentStatus status) const {
+template <typename T>
+vector<Document> SearchServer::FindTopDocuments(const string& raw_query, T predicate) const {
     const Query query = ParseQuery(raw_query);
     auto matched_documents = FindAllDocuments(query, status);
 
@@ -73,6 +74,10 @@ vector<Document> SearchServer::FindTopDocuments(const string& raw_query, Documen
         matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
     }
     return matched_documents;
+}
+
+vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const {
+    return FindTopDocuments(raw_query, default_predicate_);
 }
 
 int SearchServer::GetDocumentCount() const { return documents_.size(); }
@@ -149,7 +154,9 @@ SearchServer::Query SearchServer::ParseQuery(const string& text) const {
 }
 
 // Existence required
-double SearchServer::ComputeWordInverseDocumentFreq(const string& word) const { return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size()); }
+double SearchServer::ComputeWordInverseDocumentFreq(const string& word) const {
+    return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
+}
 
 vector<Document> SearchServer::FindAllDocuments(const Query& query, DocumentStatus status) const {
     map<int, double> document_to_relevance;
@@ -197,11 +204,24 @@ int exec_main() {
     search_server.AddDocument(0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3});
     search_server.AddDocument(1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7});
     search_server.AddDocument(2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1});
+    search_server.AddDocument(3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9});
 
-    for (const Document& document : search_server.FindTopDocuments("ухоженный кот"s)) {
+    cout << "ACTUAL by default:"s << endl;
+    for (const Document& document : search_server.FindTopDocuments("пушистый ухоженный кот"s)) {
+        PrintDocument(document);
+    }
+
+    cout << "ACTUAL:"s << endl;
+    for (const Document& document : search_server.FindTopDocuments(
+             "пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return status == DocumentStatus::ACTUAL; })) {
+        PrintDocument(document);
+    }
+
+    cout << "Even ids:"s << endl;
+    for (const Document& document : search_server.FindTopDocuments(
+             "пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return document_id % 2 == 0; })) {
         PrintDocument(document);
     }
 
     return 0;
-    ;
 }
