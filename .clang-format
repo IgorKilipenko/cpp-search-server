@@ -6,7 +6,7 @@
     #BreakBeforeBraces: Allman, 
     #AllowShortIfStatementsOnASingleLine: false, 
     #IndentCaseLabels: false, 
-    ColumnLimit: 200, #0, 
+    ColumnLimit: 150, #0, 
     #AccessModifierOffset: -4, 
     #NamespaceIndentation: All, 
     #FixNamespaceComments: false 
