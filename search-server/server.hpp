@@ -41,6 +41,8 @@ class SearchServer {
 
     vector<Document> FindTopDocuments(const string& raw_query) const;
 
+    vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus status) const;
+
     int GetDocumentCount() const;
 
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const;
@@ -63,8 +65,8 @@ class SearchServer {
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
-    
-    static bool defaultPredicate(int id, DocumentStatus status, int rating) {       
+
+    static bool defaultPredicate(int id, DocumentStatus status, int rating) {
         if (status != DocumentStatus::ACTUAL) return false;
         rating = 1;
         return !!rating;

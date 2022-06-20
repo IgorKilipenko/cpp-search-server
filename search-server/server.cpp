@@ -1,4 +1,6 @@
 
+#include "./server.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -7,8 +9,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "./server.hpp"
 
 vector<string> SplitIntoWords(const string& text) {
     vector<string> words;
@@ -64,6 +64,13 @@ vector<Document> SearchServer::FindTopDocuments(const string& raw_query, std::fu
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const { return FindTopDocuments(raw_query, defaultPredicate); }
+
+vector<Document> SearchServer::FindTopDocuments(const string& raw_query, DocumentStatus status) const {
+    return FindTopDocuments(raw_query, [status](int id, DocumentStatus doc_status, int rating) -> bool {
+        rating = true;
+        return (doc_status == status) && rating;
+    });
+}
 
 int SearchServer::GetDocumentCount() const { return documents_.size(); }
 
