@@ -1,53 +1,47 @@
 #include <iostream>
 #include <string>
 
-#include "server.hpp"
+#include "synonyms.hpp"
+#include "./tests/tests.hpp"
 
-string ReadLine() {
-    string s;
-    getline(cin, s);
-    return s;
+void TestAreSynonyms() {
+    // Напишите недостающий код
 }
 
-int ReadLineWithNumber() {
-    int result;
-    cin >> result;
-    ReadLine();
-    return result;
-}
-
-void PrintDocument(const Document& document) {
-    cout << "{ "s
-         << "document_id = "s << document.id << ", "s
-         << "relevance = "s << document.relevance << ", "s
-         << "rating = "s << document.rating << " }"s << endl;
+void TestSynonyms() {
+    TestAddingSynonymsIncreasesTheirCount();
+    TestAreSynonyms();
 }
 
 int main() {
-    SearchServer search_server;
-    search_server.SetStopWords("и в на"s);
+    TestSynonyms();
 
-    search_server.AddDocument(0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3});
-    search_server.AddDocument(1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7});
-    search_server.AddDocument(2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1});
-    search_server.AddDocument(3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9});
+    Synonyms synonyms;
 
-    cout << "ACTUAL by default:"s << endl;
-    for (const Document& document : search_server.FindTopDocuments("пушистый ухоженный кот"s)) {
-        PrintDocument(document);
+    string line;
+    while (getline(cin, line)) {
+        istringstream command(line);
+        string action;
+        command >> action;
+
+        if (action == "ADD"s) {
+            string first_word, second_word;
+            command >> first_word >> second_word;
+            synonyms.Add(first_word, second_word);
+        } else if (action == "COUNT"s) {
+            string word;
+            command >> word;
+            cout << synonyms.GetSynonymCount(word) << endl;
+        } else if (action == "CHECK"s) {
+            string first_word, second_word;
+            command >> first_word >> second_word;
+            if (synonyms.AreSynonyms(first_word, second_word)) {
+                cout << "YES"s << endl;
+            } else {
+                cout << "NO"s << endl;
+            }
+        } else if (action == "EXIT"s) {
+            break;
+        }
     }
-
-    cout << "BANNED:"s << endl;
-    for (const Document& document : search_server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::BANNED)) {
-        PrintDocument(document);
-    }
-
-    cout << "Even ids:"s << endl;
-    for (const Document& document : search_server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) {
-             return document_id % 2 == 0;
-         })) {
-        PrintDocument(document);
-    }
-
-    return 0;
 }
