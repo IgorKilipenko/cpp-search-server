@@ -1,12 +1,8 @@
 #include <iostream>
 #include <string>
 
-#include "synonyms.hpp"
 #include "./tests/tests.hpp"
-
-void TestAreSynonyms() {
-    // Напишите недостающий код
-}
+#include "synonyms.hpp"
 
 void TestSynonyms() {
     TestAddingSynonymsIncreasesTheirCount();

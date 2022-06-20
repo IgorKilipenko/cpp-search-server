@@ -23,7 +23,7 @@ size_t Synonyms::GetSynonymCount(const string& word) const {
 
 bool Synonyms::AreSynonyms(const string& first_word, const string& second_word) const {
     // Напишите недостающий код
-    return false;
+    return synonyms_.count(first_word) && synonyms_.at(first_word).count(second_word);
 }
 
 map<string, set<string>> synonyms_;
