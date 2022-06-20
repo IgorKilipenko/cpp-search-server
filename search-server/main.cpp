@@ -1,5 +1,4 @@
 #include <iostream>
-#include <set>
 #include <string>
 
 #include "server.hpp"
@@ -38,9 +37,8 @@ int main() {
         PrintDocument(document);
     }
 
-    cout << "ACTUAL:"s << endl;
-    for (const Document& document : search_server.FindTopDocuments(
-             "пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return status == DocumentStatus::ACTUAL; })) {
+    cout << "BANNED:"s << endl;
+    for (const Document& document : search_server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::BANNED)) {
         PrintDocument(document);
     }
 
@@ -49,5 +47,6 @@ int main() {
              "пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return document_id % 2 == 0; })) {
         PrintDocument(document);
     }
+
     return 0;
 }
