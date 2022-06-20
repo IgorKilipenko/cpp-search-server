@@ -1,10 +1,11 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-#include <functional>
 #include <map>
 #include <set>
 #include <string>
+#include <vector>
+#include <functional>
 
 using namespace std;
 
@@ -59,12 +60,6 @@ class SearchServer {
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
 
-    static bool defaultPredicate(int id, DocumentStatus status, int rating) {
-        if (status != DocumentStatus::ACTUAL) return false;
-        rating = 1;
-        return !!rating;
-    };
-
     bool IsStopWord(const string& word) const;
 
     vector<string> SplitIntoWordsNoStop(const string& text) const;
@@ -75,7 +70,6 @@ class SearchServer {
 
     Query ParseQuery(const string& text) const;
 
-    // Existence required
     double ComputeWordInverseDocumentFreq(const string& word) const;
 
     // template <typename T>

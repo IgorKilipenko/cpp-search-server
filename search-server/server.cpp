@@ -3,7 +3,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <map>
+#include <numeric>
 #include <set>
 #include <string>
 #include <vector>
@@ -47,9 +49,10 @@ void SearchServer::AddDocument(int document_id, const string& document, Document
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate) const {
     const Query query = ParseQuery(raw_query);
     auto matched_documents = FindAllDocuments(query, predicate);
+    const double threshold = 1e-6;
 
-    sort(matched_documents.begin(), matched_documents.end(), [](const Document& lhs, const Document& rhs) {
-        if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
+    sort(matched_documents.begin(), matched_documents.end(), [threshold](const Document& lhs, const Document& rhs) {
+        if (abs(lhs.relevance - rhs.relevance) < threshold) {
             return lhs.rating > rhs.rating;
         } else {
             return lhs.relevance > rhs.relevance;
@@ -62,13 +65,14 @@ vector<Document> SearchServer::FindTopDocuments(const string& raw_query, functio
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const {
-    return FindTopDocuments(raw_query, defaultPredicate);
+    return FindTopDocuments(raw_query, [](int id, DocumentStatus status, [[maybe_unused]] int rating) -> bool {
+        return status == DocumentStatus::ACTUAL;
+    });
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query, DocumentStatus status) const {
-    return FindTopDocuments(raw_query, [status](int id, DocumentStatus doc_status, int rating) -> bool {
-        rating = true;
-        return (doc_status == status) && rating;
+    return FindTopDocuments(raw_query, [status](int id, DocumentStatus doc_status, [[maybe_unused]] int rating) -> bool {
+        return (doc_status == status);
     });
 }
 
@@ -117,10 +121,11 @@ int SearchServer::ComputeAverageRating(const vector<int>& ratings) {
     if (ratings.empty()) {
         return 0;
     }
-    int rating_sum = 0;
-    for (const int rating : ratings) {
-        rating_sum += rating;
-    }
+
+    const int rating_sum = accumulate(ratings.begin(), ratings.end(), 0, [](int summ, int rating) {
+        return summ + rating;
+    });
+
     return rating_sum / static_cast<int>(ratings.size());
 }
 
@@ -149,7 +154,6 @@ SearchServer::Query SearchServer::ParseQuery(const string& text) const {
     return query;
 }
 
-// Existence required
 double SearchServer::ComputeWordInverseDocumentFreq(const string& word) const {
     return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
 }
