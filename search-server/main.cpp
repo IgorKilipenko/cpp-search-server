@@ -43,8 +43,9 @@ int main() {
     }
 
     cout << "Even ids:"s << endl;
-    for (const Document& document : search_server.FindTopDocuments(
-             "пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) { return document_id % 2 == 0; })) {
+    for (const Document& document : search_server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) {
+             return document_id % 2 == 0;
+         })) {
         PrintDocument(document);
     }
 

@@ -61,7 +61,9 @@ vector<Document> SearchServer::FindTopDocuments(const string& raw_query, functio
     return matched_documents;
 }
 
-vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const { return FindTopDocuments(raw_query, defaultPredicate); }
+vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const {
+    return FindTopDocuments(raw_query, defaultPredicate);
+}
 
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query, DocumentStatus status) const {
     return FindTopDocuments(raw_query, [status](int id, DocumentStatus doc_status, int rating) -> bool {
@@ -70,7 +72,9 @@ vector<Document> SearchServer::FindTopDocuments(const string& raw_query, Documen
     });
 }
 
-int SearchServer::GetDocumentCount() const { return documents_.size(); }
+int SearchServer::GetDocumentCount() const {
+    return documents_.size();
+}
 
 tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& raw_query, int document_id) const {
     const Query query = ParseQuery(raw_query);
@@ -95,7 +99,9 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& 
     return {matched_words, documents_.at(document_id).status};
 }
 
-bool SearchServer::IsStopWord(const string& word) const { return stop_words_.count(word) > 0; }
+bool SearchServer::IsStopWord(const string& word) const {
+    return stop_words_.count(word) > 0;
+}
 
 vector<string> SearchServer::SplitIntoWordsNoStop(const string& text) const {
     vector<string> words;
