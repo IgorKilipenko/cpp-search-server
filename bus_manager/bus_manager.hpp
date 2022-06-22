@@ -4,11 +4,12 @@
 #include <cmath>
 #include <iterator>
 #include <map>
-#include <memory>
 #include <numeric>
 #include <set>
 #include <string>
 #include <vector>
+
+#include "datebase.hpp"
 
 using namespace std;
 
@@ -36,16 +37,17 @@ struct BusesForStopResponse {
 struct StopsForBusResponse {
     // Наполните полями эту структуру
     string bus;
-    vector<string> stops;
+    Table route;
     bool no_bus;
-    bool HasInterchange() const {
-        return stops.size() > 1;
+    bool HasInterchange(const string& stop) const {
+        if (!route.count(stop) || route.at(stop).empty()) return false;
+        return route.at(stop).size() > 1;
     }
 };
 
 struct AllBusesResponse {
     // Наполните полями эту структуру
-    vector<pair<string, vector<string>>> buses;
+    Table buses;
 };
 
 class BusManager {
@@ -59,134 +61,6 @@ class BusManager {
     AllBusesResponse GetAllBuses() const;
 
    private:
-    class Table : public vector<pair<string, vector<string>>> {
-       public:
-        int UpdateKeysValues(const vector<string>& keys, const string& value) {
-            int update_count = 0;
-            for (const auto& key : keys) {
-                auto& curr_values = (*this)[key];
-                if (!std::count(curr_values.begin(), curr_values.end(), value)) {
-                    curr_values.push_back(value);
-                    ++update_count;
-                }
-            }
-
-            return update_count;
-        }
-
-        /**
-         * @brief Synchronization of dependent tables
-         *
-         */
-        void SyncTables() {
-            throw "Not implemented yet";
-        }
-
-        int count(const string& key) const {
-            return count_if(this->begin(), this->end(), [&key](const auto& item) {
-                return item.first == key;
-            });
-        }
-
-        vector<string>& operator[](const string& key) {
-            if (!this->count(key)) {
-                this->push_back({key, {}});
-                return this->back().second;
-            }
-
-            for (auto& item : *this) {
-                if (item.first == key) return item.second;
-            }
-
-            throw "Error: Unknown key";
-        }
-
-        const vector<string>& at(const string& key) const {
-            for (auto& item : *this) {
-                if (item.first == key) return item.second;
-            }
-            throw "Argument not found: "s + key;
-        }
-
-       private:
-        set<shared_ptr<Table>> _ref_tables;
-    };
-    class Datebase {
-       public:
-        const vector<string>& AddBus(const string& bus, const vector<string>& stops) {
-            const auto& curr_buses = addToTable(bus, stops, _buses_to_stops);
-            _stops_to_buses.UpdateKeysValues(stops, bus);
-            return curr_buses;
-        }
-
-        const vector<string>& AddStop(const string& stop, const vector<string>& buses) {
-            const auto& curr_stops = addToTable(stop, buses, _stops_to_buses);
-            _buses_to_stops.UpdateKeysValues(buses, stop);
-            return curr_stops;
-        }
-
-        const Table& GetBusesTable() const {
-            return _buses_to_stops;
-        }
-        const Table& GetStopsTable() const {
-            return _stops_to_buses;
-        }
-
-        int ContainBus(const string& bus) const {
-            // return _buses_to_stops.count(bus);
-            return count_if(_buses_to_stops.begin(), _buses_to_stops.end(), [&bus](const auto& item) {
-                return item.first == bus;
-            });
-        }
-
-        int ContainStop(const string& stop) const {
-            // return _buses_to_stops.count(stop);
-            return count_if(_stops_to_buses.begin(), _stops_to_buses.end(), [&stop](const auto& item) {
-                return item.first == stop;
-            });
-        }
-
-        int GetBusesCount() const {
-            return _stops_to_buses.size();
-        }
-
-        vector<string> GetBuses() const {
-            vector<string> result{};
-            result.reserve(_buses_to_stops.size());
-            for (const auto& [bus, _] : _buses_to_stops) {
-                result.push_back(bus);
-            }
-            return result;
-        }
-
-        const vector<string>& GetBuses(const string& stop) const {
-            return _stops_to_buses.at(stop);
-        }
-
-        vector<string> GetStops() const {
-            vector<string> result{};
-            result.reserve(_stops_to_buses.size());
-            for (const auto& [stop, _] : _stops_to_buses) {
-                result.push_back(stop);
-            }
-            return result;
-        }
-
-        const vector<string>& GetStops(const string& bus) const {
-            return _buses_to_stops.at(bus);
-        }
-
-       private:
-        Table _buses_to_stops;
-        Table _stops_to_buses;
-
-        static vector<string>& addToTable(const string& key, const vector<string>& values, Table& table) {
-            auto& curr_values = table[key];
-            curr_values.insert(curr_values.end(), values.begin(), values.end());
-            return curr_values;
-        }
-    };
-
     Datebase _db;
 };
 

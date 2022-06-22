@@ -31,6 +31,16 @@ QueryType parseQueryType(const string& str) {
     throw "Invalid query string";
 }
 
+ostream& operator<<(ostream& os, const vector<string>& vals) {
+    string sep = ""s;
+    for (const auto& v : vals) {
+        os << sep << v;
+        if (sep.empty()) sep = " ";
+    }
+
+    return os;
+}
+
 istream& operator>>(istream& is, Query& q) {
     // Реализуйте эту функцию
     string type_str;
@@ -62,10 +72,10 @@ ostream& operator<<(ostream& os, const BusesForStopResponse& r) {
         return os;
     }
 
-    os << "Stop " << r.stop << ":"s;
-    const string sep = " "s;
+    string sep = ""s;
     for (const auto& bus : r.buses) {
         os << sep << bus;
+        if (sep.empty()) sep = " ";
     }
 
     return os;
@@ -78,16 +88,16 @@ ostream& operator<<(ostream& os, const StopsForBusResponse& r) {
         return os;
     }
 
-    os << "Bus " << r.bus << ":"s;
-
-    if (!r.HasInterchange()) {
-        os << " no interchange"s;
-        return os;
-    }
-
-    const string sep = " "s;
-    for (const auto& stop : r.stops) {
-        os << sep << stop;
+    bool is_first = true;
+    for (const auto& [stop, buses] : r.route) {
+        if (!is_first) os << endl;
+        os << "Stop " << stop << ": "s;
+        if (!r.HasInterchange(stop)) {
+            os << " no interchange"s;
+            continue;
+        }
+        os << buses;
+        if (is_first) is_first = false;
     }
 
     return os;
@@ -99,13 +109,11 @@ ostream& operator<<(ostream& os, const AllBusesResponse& r) {
         os << "No buses"s;
         return os;
     }
-
-    string sep = ""s;
     for (const auto& [bus, stops] : r.buses) {
-        os << sep << BusesForStopResponse{bus, stops};
-        if (sep.empty()) sep = '\n';
+        os << "Bus " << bus << ": "s;
+        os << stops;
+        os << endl;
     }
-
     return os;
 }
 
@@ -116,19 +124,38 @@ void BusManager::AddBus(const string& bus, const vector<string>& stops) {
 
 BusesForStopResponse BusManager::GetBusesForStop(const string& stop) const {
     if (!_db.ContainStop(stop)) return {stop, {}, true};
-    const auto buses = _db.GetBuses(stop);
+    const auto& buses = _db.GetBuses(stop);
     return {stop, buses};
 }
 
 StopsForBusResponse BusManager::GetStopsForBus(const string& bus) const {
     if (!_db.ContainBus(bus)) return {bus, {}, true};
-    const auto stops = _db.GetStops(bus);
-    return {bus, stops};
+    auto route = _db.GetRoute(bus);
+    for (auto& [_, buses] : route) {
+        if (buses.front() == bus) continue;
+
+        int curr_bus_idx = -1;
+        string curr_bus = "";
+        for (int i = 0; i < buses.size(); i++) {
+            if (buses[i] == bus) {
+                curr_bus_idx = i;
+                curr_bus = buses[i];
+                break;
+            }
+        }
+        if (curr_bus_idx > 0) {
+            buses.erase(buses.begin() + curr_bus_idx);
+            buses.insert(buses.begin(), curr_bus);
+        } else {
+            throw "Invalid bus number: " + curr_bus;
+        }
+    }
+    return {bus, route};
 }
 
 AllBusesResponse BusManager::GetAllBuses() const {
-    const auto t = _db.GetBusesTable();
-    const AllBusesResponse result{t};
+    const auto table = _db.GetBusesTable();
+    const AllBusesResponse result{table};
     return result;
 }
 
