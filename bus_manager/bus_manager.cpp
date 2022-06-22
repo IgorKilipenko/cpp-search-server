@@ -9,8 +9,6 @@
 #include <string>
 #include <vector>
 
-#include "datebase.hpp"
-
 using namespace std;
 
 QueryType parseQueryType(const string& str) {
@@ -199,11 +197,8 @@ int main() {
 
     stringstream ss;
 
-    ss << 2 << endl;
-    ss << "NEW_BUS 32 3 Tolstopaltsevo Marushkino Vnukovo"s << endl;
+    ss << 10 << endl;
     ss << "ALL_BUSES"s << endl;
-    ss << "NEW_BUS 32 3 Tolstopaltsevo Marushkino Vnukovo"s << endl;
-    /*ss << "ALL_BUSES"s << endl;
     ss << "BUSES_FOR_STOP Marushkino"s << endl;
     ss << "STOPS_FOR_BUS 32K"s << endl;
     ss << "NEW_BUS 32 3 Tolstopaltsevo Marushkino Vnukovo"s << endl;
@@ -212,9 +207,7 @@ int main() {
     ss << "NEW_BUS 950 6 Kokoshkino Marushkino Vnukovo Peredelkino Solntsevo Troparyovo"s << endl;
     ss << "NEW_BUS 272 4 Vnukovo Moskovsky Rumyantsevo Troparyovo"s << endl;
     ss << "STOPS_FOR_BUS 272"s << endl;
-    ss << "STOPS_FOR_BUS 32"s << endl;
-    ss << "STOPS_FOR_BUS 950"s << endl;
-    ss << "ALL_BUSES"s << endl;*/
+    ss << "ALL_BUSES"s << endl;
 
     ss >> query_count;
 
@@ -239,47 +232,6 @@ int main() {
 }
 
 /*
-No buses
-No stop
-No bus
-32 32K
-Stop Vnukovo: 32 32K 950
-Stop Moskovsky: no interchange
-Stop Rumyantsevo: no interchange
-Stop Troparyovo: 950
-Bus 272: Vnukovo Moskovsky Rumyantsevo Troparyovo
-Bus 32: Tolstopaltsevo Marushkino Vnukovo
-Bus 32K: Tolstopaltsevo Marushkino Vnukovo Peredelkino Solntsevo Skolkovo
-Bus 950: Kokoshkino Marushkino Vnukovo Peredelkino Solntsevo Troparyovo
-
-***************************************************************************
-No buses
-No stop
-No bus
-32 32K
-Stop Vnukovo: 32 32K 950
-Stop Moskovsky: no interchange
-Stop Rumyantsevo: no interchange
-Stop Troparyovo: 950
-Bus 272: Vnukovo Moskovsky Rumyantsevo Troparyovo
-Bus 32: Tolstopaltsevo Marushkino Vnukovo
-Bus 32K: Tolstopaltsevo Marushkino Vnukovo Peredelkino Solntsevo Skolkovo
-Bus 950: Kokoshkino Marushkino Vnukovo Peredelkino Solntsevo Troparyovo
-
-
-No buses
-No stop
-No bus
-32 32K
-Stop Vnukovo: 32 32K 950
-Stop Moskovsky: no interchange
-Stop Rumyantsevo: no interchange
-Stop Troparyovo: 950
-Bus 272: Vnukovo Moskovsky Rumyantsevo Troparyovo
-Bus 32: Tolstopaltsevo Marushkino Vnukovo
-Bus 32K: Tolstopaltsevo Marushkino Vnukovo Peredelkino Solntsevo Skolkovo
-Bus 950: Kokoshkino Marushkino Vnukovo Peredelkino Solntsevo Troparyovo
-
 No buses
 No stop
 No bus

@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "datebase.hpp"
+#include "table.hpp"
 
 using namespace std;
 
@@ -61,7 +61,6 @@ class BusManager {
     AllBusesResponse GetAllBuses() const;
 
    private:
-    Datebase _db;
     map<string, vector<string>> _buses_to_stops{};
     map<string, vector<string>> _stops_to_buses{};
 };
