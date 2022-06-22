@@ -1,10 +1,12 @@
 #ifndef __DATEBASE_H__
 #define __DATEBASE_H__
 
-#include <string>
-#include <vector>
 #include <memory>
 #include <set>
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
 
 using namespace std;
 
@@ -55,6 +57,14 @@ class Table : public vector<pair<string, vector<string>>> {
             if (item.first == key) return item.second;
         }
         throw "Argument not found: "s + key;
+    }
+
+    Table GetSortedTable() const {
+        Table result = *this;
+        sort(result.begin(), result.end(), [](const auto& lv, const auto& rv) {
+            return lv.first < rv.first;
+        });
+        return result;
     }
 
    private:
@@ -126,11 +136,33 @@ class Datebase {
     }
 
     const Table GetRoute(const string& bus) const {
+        const auto erase_current = [&bus](vector<std::string>& buses) {
+            if (buses.empty()) return;
+
+            int curr_bus_idx = -1;
+            string curr_bus = "";
+            for (int i = 0; i < buses.size(); i++) {
+                if (buses[i] == bus) {
+                    curr_bus_idx = i;
+                    curr_bus = buses[i];
+                    break;
+                }
+            }
+
+            if (curr_bus_idx < 0) {
+                throw "Invalid bus number: " + curr_bus;
+            }
+
+            if (curr_bus_idx >= 0) {
+                buses.erase(buses.begin() + curr_bus_idx);
+            }
+        };
         const auto& stops = _buses_to_stops.at(bus);
         Table result{};
         for (const auto& stop : stops) {
-            const auto& buses = GetBuses(stop);
+            auto buses = GetBuses(stop);
             if (buses.empty()) continue;
+            erase_current(buses);
             result.push_back({stop, buses});
         }
 

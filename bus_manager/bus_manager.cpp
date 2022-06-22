@@ -94,6 +94,7 @@ ostream& operator<<(ostream& os, const StopsForBusResponse& r) {
         os << "Stop " << stop << ": "s;
         if (!r.HasInterchange(stop)) {
             os << " no interchange"s;
+            if (is_first) is_first = false;
             continue;
         }
         os << buses;
@@ -125,37 +126,18 @@ void BusManager::AddBus(const string& bus, const vector<string>& stops) {
 BusesForStopResponse BusManager::GetBusesForStop(const string& stop) const {
     if (!_db.ContainStop(stop)) return {stop, {}, true};
     const auto& buses = _db.GetBuses(stop);
-    return {stop, buses};
+    return {stop, buses, false};
 }
 
 StopsForBusResponse BusManager::GetStopsForBus(const string& bus) const {
     if (!_db.ContainBus(bus)) return {bus, {}, true};
-    auto route = _db.GetRoute(bus);
-    for (auto& [_, buses] : route) {
-        if (buses.front() == bus) continue;
-
-        int curr_bus_idx = -1;
-        string curr_bus = "";
-        for (int i = 0; i < buses.size(); i++) {
-            if (buses[i] == bus) {
-                curr_bus_idx = i;
-                curr_bus = buses[i];
-                break;
-            }
-        }
-        if (curr_bus_idx > 0) {
-            buses.erase(buses.begin() + curr_bus_idx);
-            buses.insert(buses.begin(), curr_bus);
-        } else {
-            throw "Invalid bus number: " + curr_bus;
-        }
-    }
-    return {bus, route};
+    const auto& route = _db.GetRoute(bus);
+    return {bus, route, false};
 }
 
 AllBusesResponse BusManager::GetAllBuses() const {
-    const auto table = _db.GetBusesTable();
-    const AllBusesResponse result{table};
+    const auto& table = _db.GetBusesTable();
+    const AllBusesResponse result{table.GetSortedTable()};
     return result;
 }
 

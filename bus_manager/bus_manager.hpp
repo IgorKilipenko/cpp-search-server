@@ -40,8 +40,8 @@ struct StopsForBusResponse {
     Table route;
     bool no_bus;
     bool HasInterchange(const string& stop) const {
-        if (!route.count(stop) || route.at(stop).empty()) return false;
-        return route.at(stop).size() > 1;
+        if (!route.count(stop)) return false;
+        return !route.at(stop).empty();
     }
 };
 
