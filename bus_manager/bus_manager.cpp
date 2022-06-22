@@ -31,7 +31,7 @@ QueryType parseQueryType(const string& str) {
     throw "Invalid query string";
 }
 
-ostream& operator<<(ostream& os, const vector<string>& vals) {
+ostream& print_vector(ostream& os, const vector<string>& vals) {
     string sep = ""s;
     for (const auto& v : vals) {
         os << sep << v;
@@ -39,6 +39,10 @@ ostream& operator<<(ostream& os, const vector<string>& vals) {
     }
 
     return os;
+}
+
+ostream& operator<<(ostream& os, const vector<string>& vals) {
+    return print_vector(os, vals);
 }
 
 istream& operator>>(istream& is, Query& q) {
@@ -93,7 +97,7 @@ ostream& operator<<(ostream& os, const StopsForBusResponse& r) {
         if (!is_first) os << endl;
         os << "Stop " << stop << ": "s;
         if (!r.HasInterchange(stop)) {
-            os << " no interchange"s;
+            os << "no interchange"s;
             if (is_first) is_first = false;
             continue;
         }
@@ -114,33 +118,52 @@ ostream& operator<<(ostream& os, const AllBusesResponse& r) {
     for (const auto& [bus, stops] : r.buses) {
         if (!is_first) os << endl;
         os << "Bus " << bus << ": "s;
-        os << stops;
+        print_vector(os, stops);
         if (is_first) is_first = false;
     }
     return os;
 }
 
 void BusManager::AddBus(const string& bus, const vector<string>& stops) {
-    _db.AddBus(bus, stops);
-    return;
+    _buses_to_stops[bus] = stops;
+    for (const string& stop : stops) {
+        _stops_to_buses[stop].push_back(bus);
+    }
 }
 
 BusesForStopResponse BusManager::GetBusesForStop(const string& stop) const {
-    if (!_db.ContainStop(stop)) return {stop, {}, true};
-    const auto& buses = _db.GetBuses(stop);
-    return {stop, buses, false};
+    if (_stops_to_buses.count(stop) == 0) {
+        return {stop, {}, true};
+    }
+    return {stop, _stops_to_buses.at(stop), false};
 }
 
 StopsForBusResponse BusManager::GetStopsForBus(const string& bus) const {
-    if (!_db.ContainBus(bus)) return {bus, {}, true};
-    const auto& route = _db.GetRoute(bus);
+    if (_buses_to_stops.count(bus) == 0) {
+        return {bus, {}, true};
+    }
+    Table route{};
+    for (const string& stop : _buses_to_stops.at(bus)) {
+        pair<string, vector<string>> route_item(stop, {});
+        for (const string& other_bus : _stops_to_buses.at(stop)) {
+            if (bus != other_bus) {
+                route_item.second.push_back(other_bus);
+            }
+        }
+        route.push_back(route_item);
+    }
     return {bus, route, false};
 }
 
 AllBusesResponse BusManager::GetAllBuses() const {
-    const auto& table = _db.GetBusesTable();
-    const AllBusesResponse result{table.GetSortedTable()};
-    return result;
+    if (_buses_to_stops.empty()) {
+        return {};
+    }
+    map<string, vector<string>> result{};
+    for (const auto& [bus, stops] : _buses_to_stops) {
+        result[bus] = stops;
+    }
+    return {result};
 }
 
 // Не меняя тела функции main, реализуйте функции и классы выше
@@ -207,3 +230,18 @@ int main() {
         }
     }
 }
+
+/*
+No buses
+No stop
+No bus
+32 32K
+Stop Vnukovo: 32 32K 950
+Stop Moskovsky: no interchange
+Stop Rumyantsevo: no interchange
+Stop Troparyovo: 950
+Bus 272: Vnukovo Moskovsky Rumyantsevo Troparyovo
+Bus 32: Tolstopaltsevo Marushkino Vnukovo
+Bus 32K: Tolstopaltsevo Marushkino Vnukovo Peredelkino Solntsevo Skolkovo
+Bus 950: Kokoshkino Marushkino Vnukovo Peredelkino Solntsevo Troparyovo
+*/

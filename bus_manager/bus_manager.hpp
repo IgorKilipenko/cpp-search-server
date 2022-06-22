@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "datebase.hpp"
+#include "table.hpp"
 
 using namespace std;
 
@@ -47,7 +47,7 @@ struct StopsForBusResponse {
 
 struct AllBusesResponse {
     // Наполните полями эту структуру
-    Table buses;
+    map<string, vector<string>> buses;
 };
 
 class BusManager {
@@ -61,7 +61,8 @@ class BusManager {
     AllBusesResponse GetAllBuses() const;
 
    private:
-    Datebase _db;
+    map<string, vector<string>> _buses_to_stops{};
+    map<string, vector<string>> _stops_to_buses{};
 };
 
 #endif  // __BUS_MANAGER_H__
