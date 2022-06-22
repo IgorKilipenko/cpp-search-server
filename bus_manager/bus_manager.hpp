@@ -62,6 +62,8 @@ class BusManager {
 
    private:
     Datebase _db;
+    map<string, vector<string>> _buses_to_stops{};
+    map<string, vector<string>> _stops_to_buses{};
 };
 
 #endif  // __BUS_MANAGER_H__
