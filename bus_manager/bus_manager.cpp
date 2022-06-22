@@ -110,10 +110,12 @@ ostream& operator<<(ostream& os, const AllBusesResponse& r) {
         os << "No buses"s;
         return os;
     }
+    bool is_first = true;
     for (const auto& [bus, stops] : r.buses) {
+        if (!is_first) os << endl;
         os << "Bus " << bus << ": "s;
         os << stops;
-        os << endl;
+        if (is_first) is_first = false;
     }
     return os;
 }
