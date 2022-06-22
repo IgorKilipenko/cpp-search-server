@@ -33,7 +33,7 @@ QueryType parseQueryType(const string& str) {
     throw "Invalid query string";
 }
 
-ostream& operator<<(ostream& os, const vector<string>& vals) {
+ostream& print_vector(ostream& os, const vector<string>& vals) {
     string sep = ""s;
     for (const auto& v : vals) {
         os << sep << v;
@@ -41,6 +41,10 @@ ostream& operator<<(ostream& os, const vector<string>& vals) {
     }
 
     return os;
+}
+
+ostream& operator<<(ostream& os, const vector<string>& vals) {
+    return print_vector(os, vals);
 }
 
 istream& operator>>(istream& is, Query& q) {
@@ -112,10 +116,12 @@ ostream& operator<<(ostream& os, const AllBusesResponse& r) {
         os << "No buses"s;
         return os;
     }
+    bool is_first = true;
     for (const auto& [bus, stops] : r.buses) {
+        if (!is_first) os << endl;
         os << "Bus " << bus << ": "s;
-        os << stops;
-        os << endl;
+        print_vector(os, stops);
+        if (is_first) is_first = false;
     }
     return os;
 }
@@ -155,9 +161,9 @@ AllBusesResponse BusManager::GetAllBuses() const {
     if (_buses_to_stops.empty()) {
         return {};
     }
-    Table result{};
+    map<string, vector<string>> result{};
     for (const auto& [bus, stops] : _buses_to_stops) {
-        result.push_back({bus, stops});
+        result[bus] = stops;
     }
     return {result};
 }
@@ -193,8 +199,11 @@ int main() {
 
     stringstream ss;
 
-    ss << 10 << endl;
+    ss << 2 << endl;
+    ss << "NEW_BUS 32 3 Tolstopaltsevo Marushkino Vnukovo"s << endl;
     ss << "ALL_BUSES"s << endl;
+    ss << "NEW_BUS 32 3 Tolstopaltsevo Marushkino Vnukovo"s << endl;
+    /*ss << "ALL_BUSES"s << endl;
     ss << "BUSES_FOR_STOP Marushkino"s << endl;
     ss << "STOPS_FOR_BUS 32K"s << endl;
     ss << "NEW_BUS 32 3 Tolstopaltsevo Marushkino Vnukovo"s << endl;
@@ -203,7 +212,9 @@ int main() {
     ss << "NEW_BUS 950 6 Kokoshkino Marushkino Vnukovo Peredelkino Solntsevo Troparyovo"s << endl;
     ss << "NEW_BUS 272 4 Vnukovo Moskovsky Rumyantsevo Troparyovo"s << endl;
     ss << "STOPS_FOR_BUS 272"s << endl;
-    ss << "ALL_BUSES"s << endl;
+    ss << "STOPS_FOR_BUS 32"s << endl;
+    ss << "STOPS_FOR_BUS 950"s << endl;
+    ss << "ALL_BUSES"s << endl;*/
 
     ss >> query_count;
 

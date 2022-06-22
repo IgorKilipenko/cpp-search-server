@@ -47,7 +47,7 @@ struct StopsForBusResponse {
 
 struct AllBusesResponse {
     // Наполните полями эту структуру
-    Table buses;
+    map<string, vector<string>> buses;
 };
 
 class BusManager {
