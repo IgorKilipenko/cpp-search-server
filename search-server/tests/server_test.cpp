@@ -151,16 +151,26 @@ void TestMatchDocuments() {
     TRACE_DEBUG&& cout << "test: [TestMatchDocuments] completed successfully" << endl;
 }
 
+template <typename T>
+void ExpectTest(T (*test)(void), int& test_number) {
+    TRACE_DEBUG&& cout << endl << "Starting [test #"s << ++test_number << "]..." << endl;
+    test();
+    TRACE_DEBUG&& cout << "[Test #"s << test_number << "] completed successfully."s << endl;
+}
+
+
 void TestSearchServer() {
-    TRACE_DEBUG&& cout << "*** Start SearchServer testings..." << endl << endl;
+    TRACE_DEBUG&& cout << "*** Start SearchServer testings..." << endl;
 
-    TestExcludeStopWordsFromAddedDocumentContent();
+    int test_number = 0;
 
-    TestSetStopWords();
+    ExpectTest(TestExcludeStopWordsFromAddedDocumentContent, test_number);
 
-    TestAddDocument();
+    ExpectTest(TestSetStopWords, test_number);
 
-    TestMatchDocuments();
+    ExpectTest(TestAddDocument, test_number);
+
+    ExpectTest(TestMatchDocuments, test_number);
 
     TRACE_DEBUG&& cout << endl << "*** SearchServer testings completed." << endl;
 }
