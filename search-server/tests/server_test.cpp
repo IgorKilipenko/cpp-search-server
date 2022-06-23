@@ -64,7 +64,8 @@ void TestAddDocument() {
     vector<RawDocument> documents{{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
                                   {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
                                   {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
-                                  {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}}};
+                                  {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}},
+                                  {4, ""s, DocumentStatus::ACTUAL}};
     {
         SearchServer server;
         int expected_count = 0;
@@ -83,7 +84,8 @@ void TestMatchDocuments() {
     vector<RawDocument> documents{{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
                                   {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
                                   {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
-                                  {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}}};
+                                  {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}},
+                                  {4, ""s, DocumentStatus::ACTUAL}};
     SearchServer server;
     for (const auto& [id, content, status, ratings] : documents) {
         server.AddDocument(id, content, status, ratings);
