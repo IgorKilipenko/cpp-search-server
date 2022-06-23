@@ -160,7 +160,9 @@ void ExpectTest(T (*test)(void), int& test_number) {
 
 
 void TestSearchServer() {
-    TRACE_DEBUG&& cout << "*** Start SearchServer testings..." << endl;
+    TRACE_DEBUG&& cout << "SearchServer testings." << endl;
+    TRACE_DEBUG&& cout << "================================================================" << endl;
+    TRACE_DEBUG&& cout << "+++ Start SearchServer testings..." << endl;
 
     int test_number = 0;
 
@@ -172,5 +174,6 @@ void TestSearchServer() {
 
     ExpectTest(TestMatchDocuments, test_number);
 
-    TRACE_DEBUG&& cout << endl << "*** SearchServer testings completed." << endl;
+    TRACE_DEBUG&& cout << endl << "+++ SearchServer testings completed." << endl;
+    TRACE_DEBUG&& cout << "================================================================" << endl;
 }
