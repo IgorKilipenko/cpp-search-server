@@ -4,9 +4,11 @@ set(PROJECT_NAME "search-server")
 project(${PROJECT_NAME} CXX)
 
 set(SRC_DIR ./search-server)
+set(TESTS_DIR ./search-server/tests)
 set(LIBS 
     ${SRC_DIR}/main.cpp 
     ${SRC_DIR}/server.cpp
+    ${TESTS_DIR}/server_test.cpp
 )
 
 add_executable(${PROJECT_NAME} ${LIBS})

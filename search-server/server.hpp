@@ -1,11 +1,11 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
-#include <functional>
 
 using namespace std;
 
