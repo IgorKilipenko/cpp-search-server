@@ -24,6 +24,8 @@ enum class DocumentStatus {
     REMOVED,
 };
 
+vector<string> SplitIntoWords(const string& text);
+
 class SearchServer {
    public:
     void SetStopWords(const string& text);
@@ -40,6 +42,8 @@ class SearchServer {
     int GetDocumentCount() const;
 
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const;
+
+    set<std::string> GetStopWords() const;
 
    private:
     struct DocumentData {

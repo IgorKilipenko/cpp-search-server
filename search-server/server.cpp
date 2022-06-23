@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-vector<string> SplitIntoWords(const string& text) {
+extern vector<string> SplitIntoWords(const string& text) {
     vector<string> words;
     string word;
     for (const char c : text) {
@@ -78,6 +78,10 @@ vector<Document> SearchServer::FindTopDocuments(const string& raw_query, Documen
 
 int SearchServer::GetDocumentCount() const {
     return documents_.size();
+}
+
+set<std::string> SearchServer::GetStopWords() const {
+    return stop_words_;
 }
 
 tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& raw_query, int document_id) const {

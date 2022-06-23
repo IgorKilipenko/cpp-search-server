@@ -4,12 +4,21 @@ set(PROJECT_NAME "search-server")
 project(${PROJECT_NAME} CXX)
 
 set(SRC_DIR ./search-server)
-set(TESTS_DIR ./search-server/tests)
+set(MAIN_FILE ${SRC_DIR}/main.cpp )
+
+if (DEFINED TESTS)
+    set(TESTS_DIR ./search-server/tests)
+    set(MAIN_FILE ${TESTS_DIR}/main.cpp )
+endif()
+
 set(LIBS 
-    ${SRC_DIR}/main.cpp 
+    ${MAIN_FILE}
     ${SRC_DIR}/server.cpp
-    ${TESTS_DIR}/server_test.cpp
 )
+
+if (DEFINED TESTS)
+    list(APPEND LIBS ${TESTS_DIR}/server_test.cpp)
+endif()
 
 add_executable(${PROJECT_NAME} ${LIBS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
