@@ -20,7 +20,7 @@ if (DEFINED TESTS AND TESTS)
     list(APPEND LIBS ${TESTS_DIR}/server_test.cpp)
 endif()
 
-set(CFLAGS -Werror -pedantic)
+set(CFLAGS -Wall -Werror -pedantic)
 
 add_executable(${PROJECT_NAME} ${LIBS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
