@@ -613,6 +613,28 @@ void TestFilteringWihtPredicate(bool TRACE_DEBUG) {
  */
 void TestFindDocumentsBySpecifiedStatus(bool TRACE_DEBUG) {
     const string TAG = "TestFindDocumentsBySpecifiedStatus"s;
+
+    const string shared_word = "word"s;
+    const string query = shared_word;
+    vector<RawDocument> documents = {
+        {static_cast<int>(DocumentStatus::ACTUAL), shared_word + " белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
+        {static_cast<int>(DocumentStatus::BANNED), shared_word + " пушистый кот пушистый хвост"s, DocumentStatus::BANNED, {7, 2, 7}},
+        {static_cast<int>(DocumentStatus::IRRELEVANT),
+         shared_word + " ухоженный пёс выразительные глаза"s,
+         DocumentStatus::IRRELEVANT,
+         {5, -12, 2, 1}},
+        {static_cast<int>(DocumentStatus::REMOVED), shared_word + " ухоженный скворец евгений"s, DocumentStatus::REMOVED, {9}}};
+
+    SearchServer server;
+    for (const auto& [id, content, status, ratings] : documents) {
+        server.AddDocument(id, content, status, ratings);
+    }
+
+    for (const auto& raw_doc : documents) {
+        const auto& matched_documents = server.FindTopDocuments(query, static_cast<DocumentStatus>(raw_doc.id));
+        assert(matched_documents.size() == 1);
+        assert(matched_documents.front().id == raw_doc.id);
+    }
 }
 
 void TestFindTopDocuments(bool TRACE_DEBUG) {
@@ -640,18 +662,18 @@ void TestFindTopDocuments(bool TRACE_DEBUG) {
             server.AddDocument(doc.id, doc.content, doc.status, doc.ratings);
         }
 
-        const auto& matching_documents = server.FindTopDocuments(word);
-        assert(matching_documents.size() == expected_top_documents_count);
+        const auto& matched_documents = server.FindTopDocuments(word);
+        assert(matched_documents.size() == expected_top_documents_count);
 
         vector<RawDocument> expected_documents(raw_documents.end() - expected_top_documents_count, raw_documents.end());
         reverse(expected_documents.begin(), expected_documents.end());
 
         for (int i = 0; i < expected_top_documents_count; i++) {
-            assert(expected_documents[i].id == matching_documents[i].id);
+            assert(expected_documents[i].id == matched_documents[i].id);
         }
         for (int i = 0; i < expected_top_documents_count - 1; i++) {
-            const double relevance_order = matching_documents[i].relevance - matching_documents[i + 1].relevance;
-            assert(relevance_order > 0 || (abs(relevance_order) < threshold && matching_documents[i].rating >= matching_documents[i + 1].rating));
+            const double relevance_order = matched_documents[i].relevance - matched_documents[i + 1].relevance;
+            assert(relevance_order > 0 || (abs(relevance_order) < threshold && matched_documents[i].rating >= matched_documents[i + 1].rating));
         }
 
         TRACE_DEBUG&& cout << "test: [" << TAG << " | Max top count (sort by rating)] completed successfully" << endl;
@@ -693,6 +715,8 @@ void TestSearchServer() {
     ExpectTest(TestRatingSortOrder, test_number, TRACE_DEBUG);
 
     ExpectTest(TestFilteringWihtPredicate, test_number, TRACE_DEBUG);
+
+    ExpectTest(TestFindDocumentsBySpecifiedStatus, test_number, TRACE_DEBUG);
 
     ExpectTest(TestFindTopDocuments, test_number, TRACE_DEBUG);
 
