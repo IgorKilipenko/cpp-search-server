@@ -449,10 +449,49 @@ void TestRelevanceSortOrder(bool TRACE_DEBUG) {
     TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
 }
 
+/**
+ * @brief Сортировка найденных документов по релевантности.
+ * Возвращаемые при поиске документов результаты должны быть отсортированы в порядке убывания релевантности.
+ * @param TRACE_DEBUG
+ */
 void TestRatingSortOrder(bool TRACE_DEBUG) {
     const string TAG = "TestRatingSortOrder";
 
+    /*
+     * Expected result:
+     * { document_id = 4, relevance = 0.0, rating = 10 }
+     * { document_id = 3, relevance = 0.0, rating = 9 }
+     * { document_id = 1, relevance = 0.0, rating = 5 }
+     * { document_id = 0, relevance = 0.0, rating = 2 }
+     * { document_id = 2, relevance = 0.0, rating = -1 }
+     */
 
+    const DocumentStatus status = DocumentStatus::ACTUAL;
+    const string content = "word1 word2 word3"s;
+    const string query = content;
+    // Raw documents
+    vector<RawDocument> documents = {{0, content, status, {8, -3}},
+                                     {1, content, status, {7, 2, 7}},
+                                     {2, content, status, {5, -12, 2, 1}},
+                                     {3, content, status, {9}},
+                                     {4, content, status, {19, 2}}};
+    vector<Document> expected_top_documents{
+        {4, 0.0, 10}, {3, 0.0, 9}, {1, 0.0, 5}, {0, 0.0, 2}, {2, 0.0, -1},
+    };
+
+    SearchServer server;
+    for (const auto& [id, content, status, ratings] : documents) {
+        server.AddDocument(id, content, status, ratings);
+    }
+
+    const auto& matching_documents = server.FindTopDocuments(query);
+    assert(matching_documents.size() >= expected_top_documents.size());
+
+    for (int i = 0; i < expected_top_documents.size(); i++) {
+        assert(matching_documents[i].id == expected_top_documents[i].id && matching_documents[i].rating == expected_top_documents[i].rating);
+    }
+
+    TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
 }
 
 void TestFindTopDocuments(bool TRACE_DEBUG) {
@@ -480,7 +519,7 @@ void TestFindTopDocuments(bool TRACE_DEBUG) {
             server.AddDocument(doc.id, doc.content, doc.status, doc.ratings);
         }
 
-        const auto& matching_documents = server.FindTopDocuments(word + " ft");
+        const auto& matching_documents = server.FindTopDocuments(word);
         assert(matching_documents.size() == expected_top_documents_count);
 
         vector<RawDocument> expected_documents(raw_documents.end() - expected_top_documents_count, raw_documents.end());
@@ -529,6 +568,8 @@ void TestSearchServer() {
     ExpectTest(TestMatchDocuments, test_number, TRACE_DEBUG);
 
     ExpectTest(TestRelevanceSortOrder, test_number, TRACE_DEBUG);
+
+    ExpectTest(TestRatingSortOrder, test_number, TRACE_DEBUG);
 
     ExpectTest(TestFindTopDocuments, test_number, TRACE_DEBUG);
 
