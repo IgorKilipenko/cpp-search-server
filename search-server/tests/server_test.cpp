@@ -494,6 +494,127 @@ void TestRatingSortOrder(bool TRACE_DEBUG) {
     TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
 }
 
+/**
+ * @brief Фильтрация результатов поиска.
+ * Фильтрация результатов поиска с использованием предиката, задаваемого пользователем.
+ * @param TRACE_DEBUG
+ */
+void TestFilteringWihtPredicate(bool TRACE_DEBUG) {
+    const string TAG = "TestFilteringWihtPredicate";
+    const string shared_word = "word"s;
+    // Documents from example
+    vector<RawDocument> documents = {{0, shared_word + " белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
+                                     {1, shared_word + " пушистый кот пушистый хвост"s, DocumentStatus::BANNED, {7, 2, 7}},
+                                     {2, shared_word + " ухоженный пёс выразительные глаза"s, DocumentStatus::IRRELEVANT, {5, -12, 2, 1}},
+                                     {3, shared_word + " ухоженный скворец евгений"s, DocumentStatus::REMOVED, {9}}};
+    SearchServer server;
+    for (const auto& [id, content, status, ratings] : documents) {
+        server.AddDocument(id, content, status, ratings);
+    }
+
+    const string query = shared_word;
+    // Strict requests
+    auto strictRequests = [&]() {
+        // Test ACTUAL
+        {
+            const int request_id = 0;
+            const auto request_status = DocumentStatus::ACTUAL;
+            const int request_rating = 2;
+
+            const auto& matched_documents =
+                server.FindTopDocuments(query, [request_id, request_status, request_rating](int id, DocumentStatus status, int rating) -> bool {
+                    return id == request_id && status == request_status && rating == request_rating;
+                });
+            assert(matched_documents.size() == 1);
+
+            const auto& matched_doc = matched_documents.front();
+            assert(matched_doc.id == request_id);
+            assert(matched_doc.rating == request_rating);
+        }
+
+        // Test REMOVED
+        {
+            const int request_id = 3;
+            const auto request_status = DocumentStatus::REMOVED;
+            const int request_rating = 9;
+
+            const auto& matched_documents =
+                server.FindTopDocuments(query, [request_id, request_status, request_rating](int id, DocumentStatus status, int rating) -> bool {
+                    return id == request_id && status == request_status && rating == request_rating;
+                });
+            assert(matched_documents.size() == 1);
+
+            const auto& matched_doc = matched_documents.front();
+            assert(matched_doc.id == request_id);
+            assert(matched_doc.rating == request_rating);
+        }
+        TRACE_DEBUG&& cout << "test: [" << TAG << " | Strict requests] completed successfully" << endl;
+    };
+    strictRequests();
+
+    // Not Strict requests
+    auto notStrictRequests = [&]() {
+        // Test ACTUAL
+        {
+            // Expect success
+            {
+                const auto request_status = DocumentStatus::ACTUAL;
+                const int request_min_rating = 1;
+                const int expected_id = 0;
+                const int expected_rating = 2;
+
+                const auto& matched_documents = server.FindTopDocuments(
+                    query, [request_status, request_min_rating]([[maybe_unused]] int id, DocumentStatus status, int rating) -> bool {
+                        return status == request_status && rating > request_min_rating;
+                    });
+                assert(matched_documents.size() == 1);
+
+                const auto& matched_doc = matched_documents.front();
+                assert(matched_doc.id == expected_id);
+                assert(matched_doc.rating == expected_rating);
+            }
+
+            // Expect failure
+            {
+                {
+                    const auto request_status = DocumentStatus::ACTUAL;
+                    const int request_min_rating = 3;
+
+                    const auto& matched_documents = server.FindTopDocuments(
+                        query, [request_status, request_min_rating]([[maybe_unused]] int id, DocumentStatus status, int rating) -> bool {
+                            return status == request_status && rating > request_min_rating;
+                        });
+                    assert(matched_documents.size() == 0);
+                }
+                {
+                    const auto request_status = DocumentStatus::REMOVED;
+                    const int request_id = 0;
+
+                    const auto& matched_documents = server.FindTopDocuments(
+                        query, [request_status, request_id](int id, DocumentStatus status, [[maybe_unused]] int rating) -> bool {
+                            return status == request_status && id == request_id;
+                        });
+                    assert(matched_documents.size() == 0);
+                }
+            }
+        }
+
+        TRACE_DEBUG&& cout << "test: [" << TAG << " | Not Strict requests] completed successfully" << endl;
+    };
+    notStrictRequests();
+
+    TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
+}
+
+/**
+ * @brief Поиск документов, имеющих заданный статус.
+ *
+ * @param TRACE_DEBUG
+ */
+void TestFindDocumentsBySpecifiedStatus(bool TRACE_DEBUG) {
+    const string TAG = "TestFindDocumentsBySpecifiedStatus"s;
+}
+
 void TestFindTopDocuments(bool TRACE_DEBUG) {
     const string TAG = "TestFindTopDocuments"s;
 
@@ -570,6 +691,8 @@ void TestSearchServer() {
     ExpectTest(TestRelevanceSortOrder, test_number, TRACE_DEBUG);
 
     ExpectTest(TestRatingSortOrder, test_number, TRACE_DEBUG);
+
+    ExpectTest(TestFilteringWihtPredicate, test_number, TRACE_DEBUG);
 
     ExpectTest(TestFindTopDocuments, test_number, TRACE_DEBUG);
 
