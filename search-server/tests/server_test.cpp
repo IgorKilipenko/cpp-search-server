@@ -76,7 +76,7 @@ ostream& operator<<(ostream& os, DocumentStatus status) {
 
 /* ASSERTION define region -------------------------------------- */
 
-#if !defined (RUN_TEST)
+#if !defined(RUN_TEST)
 
 template <typename T>
 void RunTestImpl(T func, const string& func_name) {
@@ -88,7 +88,7 @@ void RunTestImpl(T func, const string& func_name) {
 
 #endif  // !RUN_TEST
 
-#if !defined (ASSERT)
+#if !defined(ASSERT)
 
 template <typename T, typename U>
 void AssertEqualImpl(const T& t, const U& u, const string& t_str, const string& u_str, const string& file, const string& func, unsigned line,
@@ -189,7 +189,7 @@ void TestSplitWords() {
 }
 
 /**
- * @brief Поддержка стоп-слов. 
+ * @brief Поддержка стоп-слов.
  * Стоп-слова исключаются из текста документов.
  * @param TRACE_DEBUG
  */
@@ -221,7 +221,7 @@ void TestExcludeStopWords() {
 }
 
 /**
- * @brief Поддержка стоп-слов. 
+ * @brief Поддержка стоп-слов.
  * Стоп-слова исключаются из текста документов.
  * Альтернативный вариант реализации
  * @param TRACE_DEBUG
@@ -256,7 +256,7 @@ void TestStopWords() {
             const vector<string> queries{"евгений word", "глаза", "ухоженный"};
             for (auto& query : queries) {
                 const auto found_docs = server.FindTopDocuments(query);
-                ASSERT_EQUAL(found_docs.size(), (query == queries[0] ? 4 : query == queries[1] ? 1 : 5) );
+                ASSERT_EQUAL(found_docs.size(), (query == queries[0] ? 4 : query == queries[1] ? 1 : 5));
                 for (const auto& doc : found_docs) {
                     const auto& [words, status] = server.MatchDocument(query, doc.id);
                     ASSERT_EQUAL(status, DocumentStatus::ACTUAL);
@@ -616,17 +616,16 @@ void TestFilteringWihtPredicate() {
 
     const string query = shared_word;
     // Strict requests
-    auto strictRequests = [&]() {
+    {
         // Test ACTUAL
         {
             const int request_id = 0;
             const auto request_status = DocumentStatus::ACTUAL;
             const int request_rating = 2;
 
-            const auto& matched_documents =
-                server.FindTopDocuments(query, [request_id, request_status, request_rating](int id, DocumentStatus status, int rating) -> bool {
-                    return id == request_id && status == request_status && rating == request_rating;
-                });
+            const auto& matched_documents = server.FindTopDocuments(query, [](int id, DocumentStatus status, int rating) -> bool {
+                return id == request_id && status == request_status && rating == request_rating;
+            });
             ASSERT_EQUAL(matched_documents.size(), 1);
 
             const auto& matched_doc = matched_documents.front();
@@ -640,10 +639,9 @@ void TestFilteringWihtPredicate() {
             const auto request_status = DocumentStatus::REMOVED;
             const int request_rating = 9;
 
-            const auto& matched_documents =
-                server.FindTopDocuments(query, [request_id, request_status, request_rating](int id, DocumentStatus status, int rating) -> bool {
-                    return id == request_id && status == request_status && rating == request_rating;
-                });
+            const auto& matched_documents = server.FindTopDocuments(query, [](int id, DocumentStatus status, int rating) -> bool {
+                return id == request_id && status == request_status && rating == request_rating;
+            });
             ASSERT_EQUAL(matched_documents.size(), 1);
 
             const auto& matched_doc = matched_documents.front();
@@ -651,11 +649,10 @@ void TestFilteringWihtPredicate() {
             ASSERT_EQUAL(matched_doc.rating, request_rating);
         }
         TRACE_DEBUG&& cout << "test: [" << TAG << " | Strict requests] completed successfully" << endl;
-    };
-    strictRequests();
+    }
 
     // Not Strict requests
-    auto notStrictRequests = [&]() {
+    {
         // Test ACTUAL
         {
             // Expect success
@@ -665,8 +662,8 @@ void TestFilteringWihtPredicate() {
                 const int expected_id = 0;
                 const int expected_rating = 2;
 
-                const auto& matched_documents = server.FindTopDocuments(
-                    query, [request_status, request_min_rating]([[maybe_unused]] int id, DocumentStatus status, int rating) -> bool {
+                const auto& matched_documents =
+                    server.FindTopDocuments(query, []([[maybe_unused]] int id, DocumentStatus status, int rating) -> bool {
                         return status == request_status && rating > request_min_rating;
                     });
                 ASSERT_EQUAL(matched_documents.size(), 1);
@@ -682,8 +679,8 @@ void TestFilteringWihtPredicate() {
                     const auto request_status = DocumentStatus::ACTUAL;
                     const int request_min_rating = 3;
 
-                    const auto& matched_documents = server.FindTopDocuments(
-                        query, [request_status, request_min_rating]([[maybe_unused]] int id, DocumentStatus status, int rating) -> bool {
+                    const auto& matched_documents =
+                        server.FindTopDocuments(query, []([[maybe_unused]] int id, DocumentStatus status, int rating) -> bool {
                             return status == request_status && rating > request_min_rating;
                         });
                     ASSERT_EQUAL(matched_documents.size(), 0);
@@ -692,8 +689,8 @@ void TestFilteringWihtPredicate() {
                     const auto request_status = DocumentStatus::REMOVED;
                     const int request_id = 0;
 
-                    const auto& matched_documents = server.FindTopDocuments(
-                        query, [request_status, request_id](int id, DocumentStatus status, [[maybe_unused]] int rating) -> bool {
+                    const auto& matched_documents =
+                        server.FindTopDocuments(query, [](int id, DocumentStatus status, [[maybe_unused]] int rating) -> bool {
                             return status == request_status && id == request_id;
                         });
                     ASSERT_EQUAL(matched_documents.size(), 0);
@@ -702,8 +699,7 @@ void TestFilteringWihtPredicate() {
         }
 
         TRACE_DEBUG&& cout << "test: [" << TAG << " | Not Strict requests] completed successfully" << endl;
-    };
-    notStrictRequests();
+    }
 
     TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
 }
@@ -926,7 +922,6 @@ void TestCommon() {
 }
 
 void TestSearchServer() {
-    
     TRACE_DEBUG&& cout << "SearchServer testings." << endl;
     TRACE_DEBUG&& cout << "================================================================" << endl;
     TRACE_DEBUG&& cout << "+++ Start SearchServer testings..." << endl;
