@@ -230,31 +230,49 @@ void TestMinusWords(bool TRACE_DEBUG) {
  */
 void TestAddDocument(bool TRACE_DEBUG) {
     const string TAG = "TestAddDocument";
-    const int doc_id = 0;
-    const std::string document_text = "A quick brown fox jumps over lazy dog"s;
-    const vector<int> doc_ratings = {1, 2, 3, 4, 5, 5};
-    const DocumentStatus status = DocumentStatus::BANNED;
+    struct RawDocument {
+        int id;
+        string content;
+        DocumentStatus status;
+        vector<int> ratings;
+    };
+
+    vector<RawDocument> documents{{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
+                                  {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
+                                  {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
+                                  {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}},
+                                  {4, ""s, DocumentStatus::ACTUAL, {0}}};
+
     SearchServer server;
-    server.AddDocument(doc_id, document_text, status, doc_ratings);
 
-    // Добавление документа увеличивает счетчик
-    assert(server.GetDocumentCount() == 1);
+    int expected_count = 0;
+    assert(server.GetDocumentCount() == expected_count);
 
-    // Проверим, что документу присвоен рейтинг
-    {
-        const std::string query = "fox"s;
-        const int avg_rating = static_cast<double>(std::accumulate(doc_ratings.begin(), doc_ratings.end(), 0)) / doc_ratings.size();
-        auto documents = server.FindTopDocuments(query, status);
-        assert(documents.size() == 1);
-        assert(documents.at(0).id == doc_id);
-        assert(documents.at(0).rating == avg_rating);
+    for (const auto& [id, content, status, ratings] : documents) {
+        server.AddDocument(id, content, status, ratings);
+        assert(server.GetDocumentCount() == ++expected_count);
     }
 
-    // Проверим, что документу присвоен статус
+    // Test for document is matching
     {
-        const std::string query = "fox"s;
-        auto [words, matched_status] = server.MatchDocument(query, doc_id);
-        assert(status == matched_status);
+        for (const auto& [id, content, status, ratings] : documents) {
+            const auto& [words, mathed_status] = server.MatchDocument(content, id);
+            assert(mathed_status == status);
+            assert(!words.empty() || (content.empty() && words.empty()));
+        }
+        TRACE_DEBUG&& cout << "test: [" << TAG << " | document is matching] completed successfully" << endl;
+    }
+
+    // Test for document in tops
+    {
+        for (const auto& raw_doc : documents) {
+            const auto& mathed_documents = server.FindTopDocuments(raw_doc.content, raw_doc.status);
+            const int tops_count = count_if(mathed_documents.begin(), mathed_documents.end(), [&raw_doc](const auto& document) {
+                return document.id == raw_doc.id;
+            });
+            assert(tops_count || (raw_doc.content.empty() && tops_count == 0));
+        }
+        TRACE_DEBUG&& cout << "test: [" << TAG << " | document in tops] completed successfully" << endl;
     }
 
     TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
