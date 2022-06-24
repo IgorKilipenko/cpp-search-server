@@ -9,8 +9,6 @@
 #include <string>
 #include <vector>
 
-static const bool TRACE_DEBUG = true;
-
 struct RawDocument {
     int id;
     string content;
@@ -27,31 +25,6 @@ static shared_ptr<Document> getDocumentById(int id, vector<Document> documents) 
             return curr;
         });
     return result;
-}
-
-static string generateDocumentContent(int size, int length) {
-    string words = ""s;
-    srand(time(nullptr));
-
-    while (size--) {
-        int stringLen = (rand() % length) + 1;
-        string s = "";
-        for (int i = 0; i < stringLen; i++) {
-            if (rand() % 2 == 0) {
-                s += 'A' + (rand() % 26);
-            } else {
-                s += 'a' + (rand() % 26);
-            }
-        }
-        words += s + " ";
-    }
-    if (!words.empty()) words.erase(words.end() - 1);
-    return words;
-}
-
-static RawDocument generateRawDocument(int id, DocumentStatus status = DocumentStatus::ACTUAL) {
-    string content = generateDocumentContent(5, 5);
-    return {id, content, status, {0}};
 }
 
 static bool equalDocuments(const Document& d1, const Document d2) {
@@ -71,7 +44,8 @@ static const vector<RawDocument> initial_documents{{0, "белый кот и м�
                                                    {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}},
                                                    {4, ""s, DocumentStatus::ACTUAL, {0}}};
 
-void TestExcludeStopWordsFromAddedDocumentContent() {
+/// Поддержка стоп-слов. Стоп-слова исключаются из текста документов.
+void TestExcludeStopWordsFromAddedDocumentContent(bool TRACE_DEBUG) {
     const int doc_id = 42;
     const string content = "cat in the city"s;
     const vector<int> ratings = {1, 2, 3};
@@ -98,57 +72,11 @@ void TestExcludeStopWordsFromAddedDocumentContent() {
     TRACE_DEBUG&& cout << "test: [TestExcludeStopWordsFromAddedDocumentContent] completed successfully" << endl;
 }
 
-void TestSplitWords() {
-    const string TAG = "TestSplitWords"s;
-    const string stop_words = "   word   word1  word2    "s;
-    const auto stops = SplitIntoWords(stop_words);
-    assert(stops.size() == 3 && stops[0] == "word" && stops[2] == "word2");
-
-    TRACE_DEBUG&& cout << "test: ["s << TAG << "] completed successfully" << endl;
-}
-
-void TestMinusWords() {
-    const string TAG = "TestSplitWords"s;
-
-    vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
-                                     {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
-                                     {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
-                                     {3, "ухоженный скворец евгений"s, DocumentStatus::ACTUAL, {9}},
-                                     {4, "ухоженный скворец евгений"s, DocumentStatus::ACTUAL, {9}},
-                                     {5, "ухоженный скворец евгений"s, DocumentStatus::ACTUAL, {9}},
-                                     {6, "ухоженный скворец евгений"s, DocumentStatus::ACTUAL, {9}}};
-    SearchServer server;
-    for (const auto& [id, content, status, ratings] : documents) {
-        server.AddDocument(id, content, status, ratings);
-    }
-    {
-        // const set<string> minus_words = {"-ошейник", "-евгений"};
-        int expected_count = 1;
-        int expected_id = 2;
-        const string query = "ухоженный белый -ошейник -евгений"s;
-        const auto& top_documents = server.FindTopDocuments(query);
-        assert(top_documents.size() == expected_count && top_documents[0].id == expected_id);
-    }
-    {
-        const string query = "ухоженный белый кот пёс -ошейник -евгений"s;
-        for (int i = 3; i <= 6; i++) {
-            const auto& [words, _] = server.MatchDocument(query, i);
-            assert(words.empty());
-        }
-        {
-            const auto& [words, _] = server.MatchDocument(query, 0);
-            assert(words.empty());
-        }
-        {
-            const auto& [words, _] = server.MatchDocument(query, 2);
-            assert(!words.empty());
-        }
-    }
-
-    TRACE_DEBUG&& cout << "test: ["s << TAG << "] completed successfully" << endl;
-}
-
-void TestStopWords() {
+/**
+ * @brief Поддержка стоп-слов. Стоп-слова исключаются из текста документов.
+ * Альтернативный вариант реализации
+ */
+void TestStopWords(bool TRACE_DEBUG) {
     const string TAG = "TestStopWords"s;
     {
         const string stop_words = "word word1 word2"s;
@@ -228,12 +156,67 @@ void TestStopWords() {
     TRACE_DEBUG&& cout << "test: ["s << TAG << "] completed successfully" << endl;
 }
 
+void TestSplitWords(bool TRACE_DEBUG) {
+    const string TAG = "TestSplitWords"s;
+    const string stop_words = "   word   word1  word2    "s;
+    const auto stops = SplitIntoWords(stop_words);
+    assert(stops.size() == 3 && stops[0] == "word" && stops[2] == "word2");
+
+    TRACE_DEBUG&& cout << "test: ["s << TAG << "] completed successfully" << endl;
+}
+
+void TestMinusWords(bool TRACE_DEBUG) {
+    const string TAG = "TestSplitWords"s;
+
+    vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
+                                     {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
+                                     {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
+                                     {3, "ухоженный скворец евгений"s, DocumentStatus::ACTUAL, {9}},
+                                     {4, "ухоженный скворец евгений"s, DocumentStatus::ACTUAL, {9}},
+                                     {5, "ухоженный скворец евгений"s, DocumentStatus::ACTUAL, {9}},
+                                     {6, "ухоженный скворец евгений"s, DocumentStatus::ACTUAL, {9}}};
+    SearchServer server;
+    for (const auto& [id, content, status, ratings] : documents) {
+        server.AddDocument(id, content, status, ratings);
+    }
+    {
+        // const set<string> minus_words = {"-ошейник", "-евгений"};
+        int expected_count = 1;
+        int expected_id = 2;
+        const string query = "ухоженный белый -ошейник -евгений"s;
+        const auto& top_documents = server.FindTopDocuments(query);
+        assert(top_documents.size() == expected_count && top_documents[0].id == expected_id);
+    }
+    {
+        const string query = "ухоженный белый кот пёс -ошейник -евгений"s;
+        for (int i = 3; i <= 6; i++) {
+            const auto& [words, _] = server.MatchDocument(query, i);
+            assert(words.empty());
+        }
+        {
+            const auto& [words, _] = server.MatchDocument(query, 0);
+            assert(words.empty());
+        }
+        {
+            const auto& [words, _] = server.MatchDocument(query, 2);
+            assert(!words.empty());
+        }
+    }
+
+    TRACE_DEBUG&& cout << "test: ["s << TAG << "] completed successfully" << endl;
+}
+
 /**
  * @brief Добавление документов.
  * Добавленный документ должен находиться по поисковому запросу, который содержит слова из документа.
  */
-void TestAddDocument() {
+void TestAddDocument(bool TRACE_DEBUG) {
+    const string TAG = "TestAddDocument";
     vector<RawDocument> documents = initial_documents;
+    SearchServer server;
+    /*
+    int expected_count = 0;
+    assert(server.GetDocumentCount() == expected_count);
     {
         SearchServer server;
         int expected_count = 0;
@@ -243,12 +226,38 @@ void TestAddDocument() {
             server.AddDocument(id, content, status, ratings);
             assert(server.GetDocumentCount() == ++expected_count);
         }
+    }*/
+
+    for (const auto& [id, content, status, ratings] : documents) {
+        server.AddDocument(id, content, status, ratings);
     }
 
-    TRACE_DEBUG&& cout << "test: [TestAddDocument] completed successfully" << endl;
+    // Test for document is matching
+    {
+        for (const auto& [id, content, status, ratings] : documents) {
+            const auto& [words, mathed_status] = server.MatchDocument(content, id);
+            assert(mathed_status == status);
+            assert(!words.empty() || (content.empty() && words.empty()));
+        }
+        TRACE_DEBUG&& cout << "test: [" << TAG << " | document is matching] completed successfully" << endl;
+    }
+
+    // Test for document in tops
+    {
+        for (const auto& raw_doc : documents) {
+            const auto& mathed_documents = server.FindTopDocuments(raw_doc.content, raw_doc.status);
+            const int tops_count = count_if(mathed_documents.begin(), mathed_documents.end(), [&raw_doc](const auto& document) {
+                return document.id == raw_doc.id;
+            });
+            assert(tops_count || (raw_doc.content.empty() && tops_count == 0));
+        }
+        TRACE_DEBUG&& cout << "test: [" << TAG << " | document in tops] completed successfully" << endl;
+    }
+
+    TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
 }
 
-void TestMatchDocuments() {
+void TestMatchDocuments(bool TRACE_DEBUG) {
     // Without minus_words test
     {
         vector<RawDocument> documents = initial_documents;
@@ -321,7 +330,7 @@ void TestMatchDocuments() {
     TRACE_DEBUG&& cout << "test: [TestMatchDocuments] completed successfully" << endl;
 }
 
-void TestFindTopDocuments() {
+void TestFindTopDocuments(bool TRACE_DEBUG) {
     const string TAG = "TestFindTopDocuments"s;
     // Test on know documents from the example (without stop_words)
     {
@@ -339,7 +348,7 @@ void TestFindTopDocuments() {
          */
 
         // WITHOUT STOP WORDS:
-        auto test_without_stop_words = [&TAG](void) {
+        auto test_without_stop_words = [&TAG, TRACE_DEBUG](void) {
             // Documents from example
             vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
                                              {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
@@ -412,7 +421,7 @@ void TestFindTopDocuments() {
         test_without_stop_words();
 
         // WITHOUT STOP WORDS:
-        auto test_with_stop_words = [&TAG](void) {
+        auto test_with_stop_words = [&TAG, TRACE_DEBUG](void) {
             /*
              * WITH STOP WORDS:
              * Expected results:
@@ -499,7 +508,7 @@ void TestFindTopDocuments() {
     // Max top count (sort by rating) documents test
     {
         const double threshold = 1e-6;
-        const int documents_size = 100;
+        const int documents_size = 10;
         const int expected_top_documents_count = MAX_RESULT_DOCUMENT_COUNT;
 
         SearchServer server;
@@ -538,7 +547,7 @@ void TestFindTopDocuments() {
     // Max top count (full sort order) documents test
     {
         const double threshold = 1e-6;
-        const int documents_size = 1000;
+        const int documents_size = 10;
         const int expected_top_documents_count = MAX_RESULT_DOCUMENT_COUNT;
 
         SearchServer server;
@@ -581,13 +590,15 @@ void TestFindTopDocuments() {
 }
 
 template <typename T>
-void ExpectTest(T (*test)(void), int& test_number) {
+void ExpectTest(T (*test)(bool), int& test_number, bool TRACE_DEBUG = false) {
     TRACE_DEBUG&& cout << endl << "Starting [test #"s << ++test_number << "]..." << endl;
-    test();
+    test(TRACE_DEBUG);
     TRACE_DEBUG&& cout << "[Test #"s << test_number << "] completed successfully."s << endl;
 }
 
 void TestSearchServer() {
+    const bool TRACE_DEBUG = true;
+
     TRACE_DEBUG&& cout << "SearchServer testings." << endl;
     TRACE_DEBUG&& cout << "================================================================" << endl;
     TRACE_DEBUG&& cout << "+++ Start SearchServer testings..." << endl;
