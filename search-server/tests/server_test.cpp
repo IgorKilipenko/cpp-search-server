@@ -9,58 +9,40 @@
 #include <string>
 #include <vector>
 
-
-/* HELPERS region ---------------------------------------------------------------- */
-
-struct RawDocument {
-    int id;
-    string content;
-    DocumentStatus status;
-    vector<int> ratings;
-};
-
-static shared_ptr<Document> getDocumentById(int id, vector<Document> documents) {
-    const shared_ptr<Document> result =
-        accumulate(documents.begin(), documents.end(), shared_ptr<Document>{nullptr}, [id](shared_ptr<Document> curr, const Document& doc) {
-            if (doc.id == id) {
-                curr = make_shared<Document>(doc);
-            }
-            return curr;
-        });
-    return result;
-}
-
-static bool equalDocuments(const Document& d1, const Document d2) {
-    const double relevance_threshold = 0.000001;
-    return d1.id == d2.id && (abs(d1.relevance - d2.relevance) < relevance_threshold) && d1.rating == d2.rating;
-}
-
-template <typename T>
-static set<T> toSet(const vector<T>& values) {
-    set<T> result(values.begin(), values.end());
-    return result;
-}
-
-template <typename T>
-void ExpectTest(T (*test)(bool), int& test_number, bool TRACE_DEBUG = false) {
-    TRACE_DEBUG&& cout << endl << "Starting [test #"s << ++test_number << "]..." << endl;
-    test(TRACE_DEBUG);
-    TRACE_DEBUG&& cout << "[Test #"s << test_number << "] completed successfully."s << endl;
-}
-
-/* ---------------------------------------------------------------- */
-
-static const vector<RawDocument> initial_documents{{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
-                                                   {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
-                                                   {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
-                                                   {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}},
-                                                   {4, ""s, DocumentStatus::ACTUAL, {0}}};
-
 void TestSplitWords(bool TRACE_DEBUG) {
     const string TAG = "TestSplitWords"s;
+
     const string stop_words = "   word   word1  word2    "s;
     const auto stops = SplitIntoWords(stop_words);
     assert(stops.size() == 3 && stops[0] == "word" && stops[2] == "word2");
+
+    TRACE_DEBUG&& cout << "test: ["s << TAG << "] completed successfully" << endl;
+}
+
+void TestQueryDoesntFindMinusWords(bool TRACE_DEBUG) {
+    const string TAG = "TestQueryDoesntFindMinusWords"s;
+
+    SearchServer server;
+    const std::string document_text = "word word1 word2"s;
+    server.AddDocument(0, document_text, DocumentStatus::ACTUAL, {5});
+
+    const std::string query = "word -word1 -word2"s;
+    auto results = server.FindTopDocuments(query);
+    assert(results.empty());
+
+    TRACE_DEBUG&& cout << "test: ["s << TAG << "] completed successfully" << endl;
+}
+
+void TestQueryDoesntMatchMinusWords(bool TRACE_DEBUG) {
+    const string TAG = "TestQueryDoesntMatchMinusWords"s;
+
+    SearchServer server;
+    const std::string document_text = "word word1 word2"s;
+    server.AddDocument(0, document_text, DocumentStatus::ACTUAL, {5});
+
+    const std::string query = "word -word1 -word2"s;
+    auto [matched_words, status] = server.MatchDocument(query, 0);
+    assert(matched_words.empty());
 
     TRACE_DEBUG&& cout << "test: ["s << TAG << "] completed successfully" << endl;
 }
@@ -99,6 +81,17 @@ void TestExcludeStopWordsFromAddedDocumentContent(bool TRACE_DEBUG) {
  */
 void TestStopWords(bool TRACE_DEBUG) {
     const string TAG = "TestStopWords"s;
+    struct RawDocument {
+        int id;
+        string content;
+        DocumentStatus status;
+        vector<int> ratings;
+    };
+    const auto toSet = [](const vector<string>& values) {
+        set<string> result(values.begin(), values.end());
+        return result;
+    };
+
     {
         const string stop_words = "word word1 word2"s;
         const set<string> stop_words_set = toSet(SplitIntoWords(stop_words));
@@ -184,6 +177,12 @@ void TestStopWords(bool TRACE_DEBUG) {
  */
 void TestMinusWords(bool TRACE_DEBUG) {
     const string TAG = "TestSplitWords"s;
+    struct RawDocument {
+        int id;
+        string content;
+        DocumentStatus status;
+        vector<int> ratings;
+    };
 
     vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
                                      {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
@@ -231,37 +230,31 @@ void TestMinusWords(bool TRACE_DEBUG) {
  */
 void TestAddDocument(bool TRACE_DEBUG) {
     const string TAG = "TestAddDocument";
-    vector<RawDocument> documents = initial_documents;
+    const int doc_id = 0;
+    const std::string document_text = "A quick brown fox jumps over lazy dog"s;
+    const vector<int> doc_ratings = {1, 2, 3, 4, 5, 5};
+    const DocumentStatus status = DocumentStatus::BANNED;
     SearchServer server;
+    server.AddDocument(doc_id, document_text, status, doc_ratings);
 
-    int expected_count = 0;
-    assert(server.GetDocumentCount() == expected_count);
+    // Добавление документа увеличивает счетчик
+    assert(server.GetDocumentCount() == 1);
 
-    for (const auto& [id, content, status, ratings] : documents) {
-        server.AddDocument(id, content, status, ratings);
-        assert(server.GetDocumentCount() == ++expected_count);
+    // Проверим, что документу присвоен рейтинг
+    {
+        const std::string query = "fox"s;
+        const int avg_rating = static_cast<double>(std::accumulate(doc_ratings.begin(), doc_ratings.end(), 0)) / doc_ratings.size();
+        auto documents = server.FindTopDocuments(query, status);
+        assert(documents.size() == 1);
+        assert(documents.at(0).id == doc_id);
+        assert(documents.at(0).rating == avg_rating);
     }
 
-    // Test for document is matching
+    // Проверим, что документу присвоен статус
     {
-        for (const auto& [id, content, status, ratings] : documents) {
-            const auto& [words, mathed_status] = server.MatchDocument(content, id);
-            assert(mathed_status == status);
-            assert(!words.empty() || (content.empty() && words.empty()));
-        }
-        TRACE_DEBUG&& cout << "test: [" << TAG << " | document is matching] completed successfully" << endl;
-    }
-
-    // Test for document in tops
-    {
-        for (const auto& raw_doc : documents) {
-            const auto& mathed_documents = server.FindTopDocuments(raw_doc.content, raw_doc.status);
-            const int tops_count = count_if(mathed_documents.begin(), mathed_documents.end(), [&raw_doc](const auto& document) {
-                return document.id == raw_doc.id;
-            });
-            assert(tops_count || (raw_doc.content.empty() && tops_count == 0));
-        }
-        TRACE_DEBUG&& cout << "test: [" << TAG << " | document in tops] completed successfully" << endl;
+        const std::string query = "fox"s;
+        auto [words, matched_status] = server.MatchDocument(query, doc_id);
+        assert(status == matched_status);
     }
 
     TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
@@ -275,10 +268,21 @@ void TestAddDocument(bool TRACE_DEBUG) {
  */
 void TestMatchDocuments(bool TRACE_DEBUG) {
     const string TAG = "TestMatchDocuments";
+    struct RawDocument {
+        int id;
+        string content;
+        DocumentStatus status;
+        vector<int> ratings;
+    };
 
     // Without minus_words test
     {
-        vector<RawDocument> documents = initial_documents;
+        vector<RawDocument> documents{{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
+                                      {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
+                                      {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
+                                      {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}},
+                                      {4, ""s, DocumentStatus::ACTUAL, {0}}};
+        ;
         SearchServer server;
         for (const auto& [id, content, status, ratings] : documents) {
             server.AddDocument(id, content, status, ratings);
@@ -328,7 +332,12 @@ void TestMatchDocuments(bool TRACE_DEBUG) {
 
     // With minus_words test
     {
-        vector<RawDocument> documents = initial_documents;
+        vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
+                                         {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
+                                         {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
+                                         {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}},
+                                         {4, ""s, DocumentStatus::ACTUAL, {0}}};
+        ;
         SearchServer server;
         for (const auto& [id, content, status, ratings] : documents) {
             server.AddDocument(id, content, status, ratings);
@@ -374,6 +383,26 @@ void TestMatchDocuments(bool TRACE_DEBUG) {
  */
 void TestRelevanceSortOrder(bool TRACE_DEBUG) {
     const string TAG = "TestRelevanceSortOrder";
+    struct RawDocument {
+        int id;
+        string content;
+        DocumentStatus status;
+        vector<int> ratings;
+    };
+    const auto equalDocuments = [](const Document& d1, const Document d2) -> bool {
+        const double relevance_threshold = 0.000001;
+        return d1.id == d2.id && (abs(d1.relevance - d2.relevance) < relevance_threshold) && d1.rating == d2.rating;
+    };
+    const auto getDocumentById = [](int id, vector<Document> documents) -> shared_ptr<Document> {
+        const shared_ptr<Document> result =
+            accumulate(documents.begin(), documents.end(), shared_ptr<Document>{nullptr}, [id](shared_ptr<Document> curr, const Document& doc) {
+                if (doc.id == id) {
+                    curr = make_shared<Document>(doc);
+                }
+                return curr;
+            });
+        return result;
+    };
 
     const DocumentStatus status = DocumentStatus::ACTUAL;
     // Documents from example
@@ -459,6 +488,12 @@ void TestRelevanceSortOrder(bool TRACE_DEBUG) {
  */
 void TestRatingSortOrder(bool TRACE_DEBUG) {
     const string TAG = "TestRatingSortOrder";
+    struct RawDocument {
+        int id;
+        string content;
+        DocumentStatus status;
+        vector<int> ratings;
+    };
 
     /*
      * Expected result:
@@ -504,6 +539,13 @@ void TestRatingSortOrder(bool TRACE_DEBUG) {
  */
 void TestFilteringWihtPredicate(bool TRACE_DEBUG) {
     const string TAG = "TestFilteringWihtPredicate";
+    struct RawDocument {
+        int id;
+        string content;
+        DocumentStatus status;
+        vector<int> ratings;
+    };
+
     const string shared_word = "word"s;
     // Documents from example
     vector<RawDocument> documents = {{0, shared_word + " белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
@@ -616,6 +658,12 @@ void TestFilteringWihtPredicate(bool TRACE_DEBUG) {
  */
 void TestFindDocumentsBySpecifiedStatus(bool TRACE_DEBUG) {
     const string TAG = "TestFindDocumentsBySpecifiedStatus"s;
+    struct RawDocument {
+        int id;
+        string content;
+        DocumentStatus status;
+        vector<int> ratings;
+    };
 
     const string shared_word = "word"s;
     const string query = shared_word;
@@ -644,6 +692,12 @@ void TestFindDocumentsBySpecifiedStatus(bool TRACE_DEBUG) {
 
 void TestFindTopDocuments(bool TRACE_DEBUG) {
     const string TAG = "TestFindTopDocuments"s;
+    struct RawDocument {
+        int id;
+        string content;
+        DocumentStatus status;
+        vector<int> ratings;
+    };
 
     // Max top count (sort by rating) documents test
     {
@@ -689,11 +743,32 @@ void TestFindTopDocuments(bool TRACE_DEBUG) {
 
 /**
  * @brief Корректное вычисление релевантности найденных документов.
- * 
- * @param TRACE_DEBUG 
+ *
+ * @param TRACE_DEBUG
  */
 void TestCommon(bool TRACE_DEBUG) {
     const string TAG = "TestCommon"s;
+    struct RawDocument {
+        int id;
+        string content;
+        DocumentStatus status;
+        vector<int> ratings;
+    };
+    const auto equalDocuments = [](const Document& d1, const Document d2) -> bool {
+        const double relevance_threshold = 0.000001;
+        return d1.id == d2.id && (abs(d1.relevance - d2.relevance) < relevance_threshold) && d1.rating == d2.rating;
+    };
+
+    const auto getDocumentById = [](int id, vector<Document> documents) -> shared_ptr<Document> {
+        const shared_ptr<Document> result =
+            accumulate(documents.begin(), documents.end(), shared_ptr<Document>{nullptr}, [id](shared_ptr<Document> curr, const Document& doc) {
+                if (doc.id == id) {
+                    curr = make_shared<Document>(doc);
+                }
+                return curr;
+            });
+        return result;
+    };
 
     // WITHOUT STOP WORDS:
     {
@@ -864,16 +939,21 @@ void TestCommon(bool TRACE_DEBUG) {
 
 void TestSearchServer() {
     const bool TRACE_DEBUG = true;
-
-    TRACE_DEBUG&& cout << "SearchServer testings." << endl;
-    TRACE_DEBUG&& cout << "================================================================" << endl;
-    TRACE_DEBUG&& cout << "+++ Start SearchServer testings..." << endl;
+    const auto ExpectTest = [](void (*test)(bool), int& test_number, bool TRACE_DEBUG = false) {
+        TRACE_DEBUG&& cout << endl << "Starting [test #"s << ++test_number << "]..." << endl;
+        test(TRACE_DEBUG);
+        TRACE_DEBUG&& cout << "[Test #"s << test_number << "] completed successfully."s << endl;
+    };
 
     int test_number = 0;
 
     ExpectTest(TestSplitWords, test_number, TRACE_DEBUG);
 
     ExpectTest(TestAddDocument, test_number, TRACE_DEBUG);
+
+    ExpectTest(TestQueryDoesntFindMinusWords, test_number, TRACE_DEBUG);
+
+    ExpectTest(TestQueryDoesntMatchMinusWords, test_number, TRACE_DEBUG);
 
     ExpectTest(TestExcludeStopWordsFromAddedDocumentContent, test_number, TRACE_DEBUG);
 
@@ -892,7 +972,7 @@ void TestSearchServer() {
     ExpectTest(TestFindDocumentsBySpecifiedStatus, test_number, TRACE_DEBUG);
 
     ExpectTest(TestFindTopDocuments, test_number, TRACE_DEBUG);
-    
+
     ExpectTest(TestCommon, test_number, TRACE_DEBUG);
 
     TRACE_DEBUG&& cout << endl << "+++ All SearchServer testings completed successfully." << endl;

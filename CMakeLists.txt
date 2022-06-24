@@ -20,5 +20,8 @@ if (DEFINED TESTS AND TESTS)
     list(APPEND LIBS ${TESTS_DIR}/server_test.cpp)
 endif()
 
+set(CFLAGS -Werror -pedantic)
+
 add_executable(${PROJECT_NAME} ${LIBS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+target_compile_options(${PROJECT_NAME} PRIVATE ${CFLAGS})
