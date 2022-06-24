@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+static const bool TRACE_DEBUG = true;
+
 /* OSTREAM operator<< overrides region -------------------------------------- */
 
 template <typename T>
@@ -74,13 +76,19 @@ ostream& operator<<(ostream& os, DocumentStatus status) {
 
 /* ASSERTION define region -------------------------------------- */
 
+#if !defined (RUN_TEST)
+
 template <typename T>
-void RunTestImpl(T func, const string& func_name, bool TRACE_DEBUG) {
-    func(TRACE_DEBUG);
+void RunTestImpl(T func, const string& func_name) {
+    func();
     cerr << func_name << " success" << endl;
 }
 
-#define RUN_TEST(func, TRACE_DEBUG) RunTestImpl((func), (#func), (TRACE_DEBUG))
+#define RUN_TEST(func) RunTestImpl((func), (#func))
+
+#endif  // !RUN_TEST
+
+#if !defined (ASSERT)
 
 template <typename T, typename U>
 void AssertEqualImpl(const T& t, const U& u, const string& t_str, const string& u_str, const string& file, const string& func, unsigned line,
@@ -117,6 +125,8 @@ void AssertImpl(bool value, const string& expr_str, const string& file, const st
 #define ASSERT(expr) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, ""s)
 
 #define ASSERT_HINT(expr, hint) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, (hint))
+
+#endif  // !ASSERT
 
 /* HELPERS region ---------------------------------------------------------------- */
 
@@ -157,7 +167,7 @@ static void testStrictOrderEqual(vector<Document> result_documents, vector<Docum
         ASSERT_HINT(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr), "Non-strict order does not match."s);
         ASSERT_HINT(equalDocuments(rd, expected_documents[i]), "Non-strict order does not match."s);
     }
-};
+}
 
 /* ---------------------------------------------------------------- */
 
@@ -167,7 +177,7 @@ static const vector<RawDocument> initial_documents{{0, "белый кот и м�
                                                    {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}},
                                                    {4, ""s, DocumentStatus::ACTUAL, {0}}};
 
-void TestSplitWords(bool TRACE_DEBUG) {
+void TestSplitWords() {
     const string TAG = "TestSplitWords"s;
     const string stop_words = "   word   word1  word2    "s;
     const auto stops = SplitIntoWords(stop_words);
@@ -183,7 +193,7 @@ void TestSplitWords(bool TRACE_DEBUG) {
  * Стоп-слова исключаются из текста документов.
  * @param TRACE_DEBUG
  */
-void TestExcludeStopWords(bool TRACE_DEBUG) {
+void TestExcludeStopWords() {
     const int doc_id = 42;
     const string content = "cat in the city"s;
     const vector<int> ratings = {1, 2, 3};
@@ -216,7 +226,7 @@ void TestExcludeStopWords(bool TRACE_DEBUG) {
  * Альтернативный вариант реализации
  * @param TRACE_DEBUG
  */
-void TestStopWords(bool TRACE_DEBUG) {
+void TestStopWords() {
     const string TAG = "TestStopWords"s;
     {
         const string stop_words = "word word1 word2"s;
@@ -281,7 +291,7 @@ void TestStopWords(bool TRACE_DEBUG) {
  * Документы, содержащие минус-слова поискового запроса, не должны включаться в результаты поиска.
  * @param TRACE_DEBUG
  */
-void TestMinusWords(bool TRACE_DEBUG) {
+void TestMinusWords() {
     const string TAG = "TestSplitWords"s;
 
     vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
@@ -330,7 +340,7 @@ void TestMinusWords(bool TRACE_DEBUG) {
  * @brief Добавление документов.
  * Добавленный документ должен находиться по поисковому запросу, который содержит слова из документа.
  */
-void TestAddDocument(bool TRACE_DEBUG) {
+void TestAddDocument() {
     const string TAG = "TestAddDocument";
     vector<RawDocument> documents = initial_documents;
     SearchServer server;
@@ -374,7 +384,7 @@ void TestAddDocument(bool TRACE_DEBUG) {
  * Если есть соответствие хотя бы по одному минус-слову, должен возвращаться пустой список слов.
  * @param TRACE_DEBUG
  */
-void TestMatchDocuments(bool TRACE_DEBUG) {
+void TestMatchDocuments() {
     const string TAG = "TestMatchDocuments";
 
     // Without minus_words test
@@ -473,7 +483,7 @@ void TestMatchDocuments(bool TRACE_DEBUG) {
  * Возвращаемые при поиске документов результаты должны быть отсортированы в порядке убывания релевантности.
  * @param TRACE_DEBUG
  */
-void TestRelevanceSortOrder(bool TRACE_DEBUG) {
+void TestRelevanceSortOrder() {
     const string TAG = "TestRelevanceSortOrder";
 
     const DocumentStatus status = DocumentStatus::ACTUAL;
@@ -545,7 +555,7 @@ void TestRelevanceSortOrder(bool TRACE_DEBUG) {
  * Возвращаемые при поиске документов результаты должны быть отсортированы в порядке убывания релевантности.
  * @param TRACE_DEBUG
  */
-void TestRatingSortOrder(bool TRACE_DEBUG) {
+void TestRatingSortOrder() {
     const string TAG = "TestRatingSortOrder";
 
     /*
@@ -591,7 +601,7 @@ void TestRatingSortOrder(bool TRACE_DEBUG) {
  * Фильтрация результатов поиска с использованием предиката, задаваемого пользователем.
  * @param TRACE_DEBUG
  */
-void TestFilteringWihtPredicate(bool TRACE_DEBUG) {
+void TestFilteringWihtPredicate() {
     const string TAG = "TestFilteringWihtPredicate";
     const string shared_word = "word"s;
     // Documents from example
@@ -703,7 +713,7 @@ void TestFilteringWihtPredicate(bool TRACE_DEBUG) {
  *
  * @param TRACE_DEBUG
  */
-void TestFindDocumentsBySpecifiedStatus(bool TRACE_DEBUG) {
+void TestFindDocumentsBySpecifiedStatus() {
     const string TAG = "TestFindDocumentsBySpecifiedStatus"s;
 
     const string shared_word = "word"s;
@@ -731,7 +741,7 @@ void TestFindDocumentsBySpecifiedStatus(bool TRACE_DEBUG) {
     TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
 }
 
-void TestFindTopDocuments(bool TRACE_DEBUG) {
+void TestFindTopDocuments() {
     const string TAG = "TestFindTopDocuments"s;
 
     // Max top count (sort by rating) documents test
@@ -781,7 +791,7 @@ void TestFindTopDocuments(bool TRACE_DEBUG) {
  *
  * @param TRACE_DEBUG
  */
-void TestCommon(bool TRACE_DEBUG) {
+void TestCommon() {
     const string TAG = "TestCommon"s;
 
     // WITHOUT STOP WORDS:
@@ -916,37 +926,34 @@ void TestCommon(bool TRACE_DEBUG) {
 }
 
 void TestSearchServer() {
-    const bool TRACE_DEBUG = true;
-
+    
     TRACE_DEBUG&& cout << "SearchServer testings." << endl;
     TRACE_DEBUG&& cout << "================================================================" << endl;
     TRACE_DEBUG&& cout << "+++ Start SearchServer testings..." << endl;
 
-    int test_number = 0;
+    RUN_TEST(TestSplitWords);
 
-    RUN_TEST(TestSplitWords, TRACE_DEBUG);
+    RUN_TEST(TestAddDocument);
 
-    RUN_TEST(TestAddDocument, TRACE_DEBUG);
+    RUN_TEST(TestExcludeStopWords);
 
-    RUN_TEST(TestExcludeStopWords, TRACE_DEBUG);
+    RUN_TEST(TestStopWords);
 
-    RUN_TEST(TestStopWords, TRACE_DEBUG);
+    RUN_TEST(TestMinusWords);
 
-    RUN_TEST(TestMinusWords, TRACE_DEBUG);
+    RUN_TEST(TestMatchDocuments);
 
-    RUN_TEST(TestMatchDocuments, TRACE_DEBUG);
+    RUN_TEST(TestRelevanceSortOrder);
 
-    RUN_TEST(TestRelevanceSortOrder, TRACE_DEBUG);
+    RUN_TEST(TestRatingSortOrder);
 
-    RUN_TEST(TestRatingSortOrder, TRACE_DEBUG);
+    RUN_TEST(TestFilteringWihtPredicate);
 
-    RUN_TEST(TestFilteringWihtPredicate, TRACE_DEBUG);
+    RUN_TEST(TestFindDocumentsBySpecifiedStatus);
 
-    RUN_TEST(TestFindDocumentsBySpecifiedStatus, TRACE_DEBUG);
+    RUN_TEST(TestFindTopDocuments);
 
-    RUN_TEST(TestFindTopDocuments, TRACE_DEBUG);
-
-    RUN_TEST(TestCommon, TRACE_DEBUG);
+    RUN_TEST(TestCommon);
 
     TRACE_DEBUG&& cout << endl << "+++ All SearchServer testings completed successfully." << endl;
     TRACE_DEBUG&& cout << "================================================================" << endl;
