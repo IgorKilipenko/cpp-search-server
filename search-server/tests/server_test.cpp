@@ -1,7 +1,6 @@
 #include "server_test.hpp"
 
 #include <algorithm>
-#include <cassert>
 #include <cstdarg>
 #include <iostream>
 #include <memory>
@@ -9,6 +8,115 @@
 #include <string>
 #include <vector>
 
+/* OSTREAM operator<< overrides region -------------------------------------- */
+
+template <typename T>
+ostream& _printCollection(ostream& os, const T& values) {
+    string sep = "";
+    for (const auto& v : values) {
+        os << sep << v;
+        if (sep.empty()) sep = ", ";
+    }
+    return os;
+}
+
+template <typename T>
+ostream& _printDictionary(ostream& os, const T& values) {
+    string sep = "";
+    for (const auto& [k, v] : values) {
+        os << sep << k << ": " << v;
+        if (sep.empty()) sep = ", ";
+    }
+    return os;
+}
+
+template <typename T>
+ostream& operator<<(ostream& os, const vector<T> values) {
+    os << "[";
+    _printCollection(os, values);
+    os << "]";
+    return os;
+}
+
+template <typename T>
+ostream& operator<<(ostream& os, const set<T> values) {
+    os << "{";
+    _printCollection(os, values);
+    os << "}";
+    return os;
+}
+
+template <typename K, typename V>
+ostream& operator<<(ostream& os, const map<K, V> values) {
+    os << "{";
+    _printDictionary(os, values);
+    os << "}";
+    return os;
+}
+
+ostream& operator<<(ostream& os, DocumentStatus status) {
+    switch (status) {
+        case DocumentStatus::ACTUAL:
+            os << "ACTUAL"s;
+            break;
+        case DocumentStatus::IRRELEVANT:
+            os << "IRRELEVANT"s;
+            break;
+        case DocumentStatus::BANNED:
+            os << "BANNED"s;
+            break;
+        case DocumentStatus::REMOVED:
+            os << "REMOVED"s;
+            break;
+    }
+    return os;
+}
+
+/* ASSERTION define region -------------------------------------- */
+
+template <typename T>
+void RunTestImpl(T func, const string& func_name, bool TRACE_DEBUG) {
+    func(TRACE_DEBUG);
+    cerr << func_name << " success" << endl;
+}
+
+#define RUN_TEST(func, TRACE_DEBUG) RunTestImpl((func), (#func), (TRACE_DEBUG))
+
+template <typename T, typename U>
+void AssertEqualImpl(const T& t, const U& u, const string& t_str, const string& u_str, const string& file, const string& func, unsigned line,
+                     const string& hint) {
+    if (t != u) {
+        cerr << boolalpha;
+        cerr << file << "("s << line << "): "s << func << ": "s;
+        cerr << "ASSERT_EQUAL("s << t_str << ", "s << u_str << ") failed: "s;
+        cerr << t << " != "s << u << "."s;
+        if (!hint.empty()) {
+            cout << " Hint: "s << hint;
+        }
+        cerr << endl;
+        abort();
+    }
+}
+
+#define ASSERT_EQUAL(a, b) AssertEqualImpl((a), (b), #a, #b, __FILE__, __FUNCTION__, __LINE__, ""s)
+
+#define ASSERT_EQUAL_HINT(a, b, hint) AssertEqualImpl((a), (b), #a, #b, __FILE__, __FUNCTION__, __LINE__, (hint))
+
+void AssertImpl(bool value, const string& expr_str, const string& file, const string& func, unsigned line, const string& hint) {
+    if (!value) {
+        cerr << file << "("s << line << "): "s << func << ": "s;
+        cerr << "ASSERT("s << expr_str << ") failed."s;
+        if (!hint.empty()) {
+            cerr << " Hint: "s << hint;
+        }
+        cerr << endl;
+        abort();
+    }
+}
+
+#define ASSERT(expr) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, ""s)
+
+#define ASSERT_HINT(expr, hint) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, (hint))
 
 /* HELPERS region ---------------------------------------------------------------- */
 
@@ -41,12 +149,15 @@ static set<T> toSet(const vector<T>& values) {
     return result;
 }
 
-template <typename T>
-void ExpectTest(T (*test)(bool), int& test_number, bool TRACE_DEBUG = false) {
-    TRACE_DEBUG&& cout << endl << "Starting [test #"s << ++test_number << "]..." << endl;
-    test(TRACE_DEBUG);
-    TRACE_DEBUG&& cout << "[Test #"s << test_number << "] completed successfully."s << endl;
-}
+static void testStrictOrderEqual(vector<Document> result_documents, vector<Document> expected_documents) {
+    ASSERT_EQUAL(result_documents.size(), expected_documents.size());
+    for (int i = 0; i < result_documents.size(); i++) {
+        const Document& rd = result_documents[i];
+        const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
+        ASSERT_HINT(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr), "Non-strict order does not match."s);
+        ASSERT_HINT(equalDocuments(rd, expected_documents[i]), "Non-strict order does not match."s);
+    }
+};
 
 /* ---------------------------------------------------------------- */
 
@@ -60,13 +171,19 @@ void TestSplitWords(bool TRACE_DEBUG) {
     const string TAG = "TestSplitWords"s;
     const string stop_words = "   word   word1  word2    "s;
     const auto stops = SplitIntoWords(stop_words);
-    assert(stops.size() == 3 && stops[0] == "word" && stops[2] == "word2");
+    ASSERT_EQUAL(stops.size(), 3);
+    ASSERT_EQUAL(stops[0], "word");
+    ASSERT_EQUAL(stops[2], "word2");
 
-    TRACE_DEBUG&& cout << "test: ["s << TAG << "] completed successfully" << endl;
+    TRACE_DEBUG&& cerr << "test: ["s << TAG << "] completed successfully" << endl;
 }
 
-/// Поддержка стоп-слов. Стоп-слова исключаются из текста документов.
-void TestExcludeStopWordsFromAddedDocumentContent(bool TRACE_DEBUG) {
+/**
+ * @brief Поддержка стоп-слов. 
+ * Стоп-слова исключаются из текста документов.
+ * @param TRACE_DEBUG
+ */
+void TestExcludeStopWords(bool TRACE_DEBUG) {
     const int doc_id = 42;
     const string content = "cat in the city"s;
     const vector<int> ratings = {1, 2, 3};
@@ -76,9 +193,9 @@ void TestExcludeStopWordsFromAddedDocumentContent(bool TRACE_DEBUG) {
         SearchServer server;
         server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
         const auto found_docs = server.FindTopDocuments("in"s);
-        assert(found_docs.size() == 1);
+        ASSERT_EQUAL(found_docs.size(), 1);
         const Document& doc0 = found_docs[0];
-        assert(doc0.id == doc_id);
+        ASSERT_EQUAL(doc0.id, doc_id);
     }
 
     // Затем убеждаемся, что поиск этого же слова, входящего в список стоп-слов,
@@ -87,15 +204,17 @@ void TestExcludeStopWordsFromAddedDocumentContent(bool TRACE_DEBUG) {
         SearchServer server;
         server.SetStopWords("in the"s);
         server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
-        assert(server.FindTopDocuments("in"s).empty());
+        ASSERT(server.FindTopDocuments("in"s).empty());
     }
 
     TRACE_DEBUG&& cout << "test: [TestExcludeStopWordsFromAddedDocumentContent] completed successfully" << endl;
 }
 
 /**
- * @brief Поддержка стоп-слов. Стоп-слова исключаются из текста документов.
+ * @brief Поддержка стоп-слов. 
+ * Стоп-слова исключаются из текста документов.
  * Альтернативный вариант реализации
+ * @param TRACE_DEBUG
  */
 void TestStopWords(bool TRACE_DEBUG) {
     const string TAG = "TestStopWords"s;
@@ -110,50 +229,30 @@ void TestStopWords(bool TRACE_DEBUG) {
                                          {3, "ухоженный скворец евгений word"s, DocumentStatus::ACTUAL, {9}},
                                          {4, "ухоженный скворец евгений word1"s, DocumentStatus::ACTUAL, {9}},
                                          {5, "ухоженный скворец евгений word2"s, DocumentStatus::ACTUAL, {9}},
-                                         {6, "   ухоженный скворец евгений word word1 word2     "s, DocumentStatus::ACTUAL, {9}},
+                                         {6, "ухоженный скворец евгений word word1 word2"s, DocumentStatus::ACTUAL, {9}},
                                          {7, stop_words, DocumentStatus::ACTUAL, {0}},
                                          {8, ""s, DocumentStatus::ACTUAL, {0}}};
 
         for (const auto& [id, content, status, ratings] : documents) {
             server.AddDocument(id, content, status, ratings);
         }
+
         {
             const auto found_docs = server.FindTopDocuments(" "s);
-            assert(found_docs.size() == 0);
+            ASSERT_EQUAL(found_docs.size(), 0);
         }
+
         {
-            const string word = "евгений word";
-            const auto found_docs = server.FindTopDocuments(word);
-            assert(found_docs.size() == 4);
-            for (const auto& doc : found_docs) {
-                const auto& [words, status] = server.MatchDocument(word, doc.id);
-                assert(status == DocumentStatus::ACTUAL);
-                for (const auto& w : words) {
-                    assert(!stop_words_set.count(w));
-                }
-            }
-        }
-        {
-            const string word = "глаза";
-            const auto found_docs = server.FindTopDocuments(word);
-            assert(found_docs.size() == 1);
-            for (const auto& doc : found_docs) {
-                const auto& [words, status] = server.MatchDocument(word, doc.id);
-                assert(status == DocumentStatus::ACTUAL);
-                for (const auto& w : words) {
-                    assert(!stop_words_set.count(w));
-                }
-            }
-        }
-        {
-            const string word = "ухоженный";
-            const auto found_docs = server.FindTopDocuments(word);
-            assert(found_docs.size() == 5);
-            for (const auto& doc : found_docs) {
-                const auto& [words, status] = server.MatchDocument(word, doc.id);
-                assert(status == DocumentStatus::ACTUAL);
-                for (const auto& w : words) {
-                    assert(!stop_words_set.count(w));
+            const vector<string> queries{"евгений word", "глаза", "ухоженный"};
+            for (auto& query : queries) {
+                const auto found_docs = server.FindTopDocuments(query);
+                ASSERT_EQUAL(found_docs.size(), (query == queries[0] ? 4 : query == queries[1] ? 1 : 5) );
+                for (const auto& doc : found_docs) {
+                    const auto& [words, status] = server.MatchDocument(query, doc.id);
+                    ASSERT_EQUAL(status, DocumentStatus::ACTUAL);
+                    for (const auto& w : words) {
+                        ASSERT(!stop_words_set.count(w));
+                    }
                 }
             }
         }
@@ -164,9 +263,9 @@ void TestStopWords(bool TRACE_DEBUG) {
                 const auto& found_docs = server.FindTopDocuments(sw);
                 for (const auto& doc : found_docs) {
                     const auto& [words, status] = server.MatchDocument(sw, doc.id);
-                    assert(status == DocumentStatus::ACTUAL);
+                    ASSERT_EQUAL(status, DocumentStatus::ACTUAL);
                     for (const auto& w : words) {
-                        assert(!stop_words_set.count(w));
+                        ASSERT(!stop_words_set.count(w));
                     }
                 }
             }
@@ -201,24 +300,26 @@ void TestMinusWords(bool TRACE_DEBUG) {
         int expected_id = 2;
         const string query = "ухоженный белый -ошейник -евгений"s;
         const auto& top_documents = server.FindTopDocuments(query);
-        assert(top_documents.size() == expected_count && top_documents[0].id == expected_id);
-        assert(!count_if(top_documents.begin(), top_documents.end(), [](const auto& doc) {
+        ASSERT_EQUAL(top_documents.size(), expected_count);
+        ASSERT_EQUAL(top_documents[0].id, expected_id);
+        ASSERT(!count_if(top_documents.begin(), top_documents.end(), [](const auto& doc) {
             return doc.id == 0 || doc.id > 2;
         }));
     }
+
     {
         const string query = "ухоженный белый кот пёс -ошейник -евгений"s;
         {
             const auto& [words, _] = server.MatchDocument(query, 0);
-            assert(words.empty());
+            ASSERT(words.empty());
         }
         {
             const auto& [words, _] = server.MatchDocument(query, 2);
-            assert(!words.empty());
+            ASSERT(!words.empty());
         }
         for (int i = 3; i <= 6; i++) {
             const auto& [words, _] = server.MatchDocument(query, i);
-            assert(words.empty());
+            ASSERT(words.empty());
         }
     }
 
@@ -235,19 +336,19 @@ void TestAddDocument(bool TRACE_DEBUG) {
     SearchServer server;
 
     int expected_count = 0;
-    assert(server.GetDocumentCount() == expected_count);
+    ASSERT_EQUAL(server.GetDocumentCount(), expected_count);
 
     for (const auto& [id, content, status, ratings] : documents) {
         server.AddDocument(id, content, status, ratings);
-        assert(server.GetDocumentCount() == ++expected_count);
+        ASSERT_EQUAL(server.GetDocumentCount(), ++expected_count);
     }
 
     // Test for document is matching
     {
         for (const auto& [id, content, status, ratings] : documents) {
             const auto& [words, mathed_status] = server.MatchDocument(content, id);
-            assert(mathed_status == status);
-            assert(!words.empty() || (content.empty() && words.empty()));
+            ASSERT_EQUAL(mathed_status, status);
+            ASSERT(!words.empty() || (content.empty() && words.empty()));
         }
         TRACE_DEBUG&& cout << "test: [" << TAG << " | document is matching] completed successfully" << endl;
     }
@@ -259,7 +360,7 @@ void TestAddDocument(bool TRACE_DEBUG) {
             const int tops_count = count_if(mathed_documents.begin(), mathed_documents.end(), [&raw_doc](const auto& document) {
                 return document.id == raw_doc.id;
             });
-            assert(tops_count || (raw_doc.content.empty() && tops_count == 0));
+            ASSERT(tops_count || (raw_doc.content.empty() && tops_count == 0));
         }
         TRACE_DEBUG&& cout << "test: [" << TAG << " | document in tops] completed successfully" << endl;
     }
@@ -287,12 +388,12 @@ void TestMatchDocuments(bool TRACE_DEBUG) {
         for (const auto& doc : documents) {
             const auto& [matched_words, status] = server.MatchDocument(raw_query, doc.id);
 
-            assert(status == doc.status);  // Check status
+            ASSERT_EQUAL(status, doc.status);  // Check status
 
             auto query_words = SplitIntoWords(raw_query);
             const int mathed_words_count = count_if(matched_words.begin(), matched_words.end(), [&query_words](const auto& mw) {
                 int _count = count(query_words.begin(), query_words.end(), mw);
-                assert(_count > 0);  // Mathed word must contained in query
+                ASSERT(_count > 0);  // Mathed word must contained in query
                 return _count ? 1 : 0;
             });
 
@@ -302,7 +403,7 @@ void TestMatchDocuments(bool TRACE_DEBUG) {
                 return _count ? 1 : 0;
             });
 
-            assert(expected_mathed_words_count == mathed_words_count);
+            ASSERT_EQUAL(expected_mathed_words_count, mathed_words_count);
         }
         TRACE_DEBUG&& cout << "test: [" << TAG << " | Without minus_words] completed successfully" << endl;
     }
@@ -320,8 +421,8 @@ void TestMatchDocuments(bool TRACE_DEBUG) {
         string raw_query = initial_content + " -" + expected_minus_word;
 
         const auto& [matched_words, status] = server.MatchDocument(raw_query, raw_doc.id);
-        assert(status == DocumentStatus::ACTUAL);
-        assert(matched_words.empty());
+        ASSERT_EQUAL(status, DocumentStatus::ACTUAL);
+        ASSERT(matched_words.empty());
 
         TRACE_DEBUG&& cout << "test: [" << TAG << " | With minus_words] completed successfully" << endl;
     }
@@ -339,15 +440,15 @@ void TestMatchDocuments(bool TRACE_DEBUG) {
         for (const auto& doc : documents) {
             const auto& [matched_words, status] = server.MatchDocument(raw_query, doc.id);
 
-            assert(status == doc.status);                                                     // Check status
-            assert(!count(matched_words.begin(), matched_words.end(), expected_minus_word));  // Check for matched_words not contained minus_words
+            ASSERT_EQUAL(status, doc.status);  // Check status
+            ASSERT_HINT(!count(matched_words.begin(), matched_words.end(), expected_minus_word), "Matched_words contained minus_words");
 
             auto query_words = SplitIntoWords(raw_query);
             query_words.erase(query_words.end() - 1);  // Remove minus_word
 
             const int mathed_words_count = count_if(matched_words.begin(), matched_words.end(), [&query_words](const auto& mw) {
                 int _count = count(query_words.begin(), query_words.end(), mw);
-                assert(_count > 0);  // Mathed word must contained in query
+                ASSERT_HINT(_count > 0, "Mathed word not contained in query."s);
                 return _count ? 1 : 0;
             });
 
@@ -359,7 +460,7 @@ void TestMatchDocuments(bool TRACE_DEBUG) {
                     return _count ? 1 : 0;
                 });
 
-            assert(expected_mathed_words_count == mathed_words_count);
+            ASSERT_EQUAL(expected_mathed_words_count, mathed_words_count);
         }
         TRACE_DEBUG&& cout << "test: [" << TAG << "| With minus_words] completed successfully" << endl;
     }
@@ -406,14 +507,8 @@ void TestRelevanceSortOrder(bool TRACE_DEBUG) {
 
         const auto& result_documents = server.FindTopDocuments(query, status);
 
-        assert(result_documents.size() == expected_documents.size());
+        testStrictOrderEqual(result_documents, expected_documents);
 
-        for (int i = 0; i < result_documents.size(); i++) {
-            const Document& rd = result_documents[i];
-            const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
-            assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
-            assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
-        }
         TRACE_DEBUG&& cout << "test: [" << TAG << " | Without stop_words] completed successfully" << endl;
     }
 
@@ -437,14 +532,7 @@ void TestRelevanceSortOrder(bool TRACE_DEBUG) {
 
         const auto& result_documents = server.FindTopDocuments(query);
 
-        assert(result_documents.size() == expected_documents.size());
-
-        for (int i = 0; i < result_documents.size(); i++) {
-            const Document& rd = result_documents[i];
-            const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
-            assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
-            assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
-        }
+        testStrictOrderEqual(result_documents, expected_documents);
 
         TRACE_DEBUG&& cout << "test: [" << TAG << " | with stop_words] completed successfully" << endl;
     }
@@ -488,10 +576,11 @@ void TestRatingSortOrder(bool TRACE_DEBUG) {
     }
 
     const auto& matching_documents = server.FindTopDocuments(query);
-    assert(matching_documents.size() >= expected_top_documents.size());
+    ASSERT(matching_documents.size() >= expected_top_documents.size());
 
     for (int i = 0; i < expected_top_documents.size(); i++) {
-        assert(matching_documents[i].id == expected_top_documents[i].id && matching_documents[i].rating == expected_top_documents[i].rating);
+        ASSERT_EQUAL(matching_documents[i].id, expected_top_documents[i].id);
+        ASSERT_EQUAL(matching_documents[i].rating, expected_top_documents[i].rating);
     }
 
     TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
@@ -528,11 +617,11 @@ void TestFilteringWihtPredicate(bool TRACE_DEBUG) {
                 server.FindTopDocuments(query, [request_id, request_status, request_rating](int id, DocumentStatus status, int rating) -> bool {
                     return id == request_id && status == request_status && rating == request_rating;
                 });
-            assert(matched_documents.size() == 1);
+            ASSERT_EQUAL(matched_documents.size(), 1);
 
             const auto& matched_doc = matched_documents.front();
-            assert(matched_doc.id == request_id);
-            assert(matched_doc.rating == request_rating);
+            ASSERT_EQUAL(matched_doc.id, request_id);
+            ASSERT_EQUAL(matched_doc.rating, request_rating);
         }
 
         // Test REMOVED
@@ -545,11 +634,11 @@ void TestFilteringWihtPredicate(bool TRACE_DEBUG) {
                 server.FindTopDocuments(query, [request_id, request_status, request_rating](int id, DocumentStatus status, int rating) -> bool {
                     return id == request_id && status == request_status && rating == request_rating;
                 });
-            assert(matched_documents.size() == 1);
+            ASSERT_EQUAL(matched_documents.size(), 1);
 
             const auto& matched_doc = matched_documents.front();
-            assert(matched_doc.id == request_id);
-            assert(matched_doc.rating == request_rating);
+            ASSERT_EQUAL(matched_doc.id, request_id);
+            ASSERT_EQUAL(matched_doc.rating, request_rating);
         }
         TRACE_DEBUG&& cout << "test: [" << TAG << " | Strict requests] completed successfully" << endl;
     };
@@ -570,11 +659,11 @@ void TestFilteringWihtPredicate(bool TRACE_DEBUG) {
                     query, [request_status, request_min_rating]([[maybe_unused]] int id, DocumentStatus status, int rating) -> bool {
                         return status == request_status && rating > request_min_rating;
                     });
-                assert(matched_documents.size() == 1);
+                ASSERT_EQUAL(matched_documents.size(), 1);
 
                 const auto& matched_doc = matched_documents.front();
-                assert(matched_doc.id == expected_id);
-                assert(matched_doc.rating == expected_rating);
+                ASSERT_EQUAL(matched_doc.id, expected_id);
+                ASSERT_EQUAL(matched_doc.rating, expected_rating);
             }
 
             // Expect failure
@@ -587,7 +676,7 @@ void TestFilteringWihtPredicate(bool TRACE_DEBUG) {
                         query, [request_status, request_min_rating]([[maybe_unused]] int id, DocumentStatus status, int rating) -> bool {
                             return status == request_status && rating > request_min_rating;
                         });
-                    assert(matched_documents.size() == 0);
+                    ASSERT_EQUAL(matched_documents.size(), 0);
                 }
                 {
                     const auto request_status = DocumentStatus::REMOVED;
@@ -597,7 +686,7 @@ void TestFilteringWihtPredicate(bool TRACE_DEBUG) {
                         query, [request_status, request_id](int id, DocumentStatus status, [[maybe_unused]] int rating) -> bool {
                             return status == request_status && id == request_id;
                         });
-                    assert(matched_documents.size() == 0);
+                    ASSERT_EQUAL(matched_documents.size(), 0);
                 }
             }
         }
@@ -635,8 +724,8 @@ void TestFindDocumentsBySpecifiedStatus(bool TRACE_DEBUG) {
 
     for (const auto& raw_doc : documents) {
         const auto& matched_documents = server.FindTopDocuments(query, static_cast<DocumentStatus>(raw_doc.id));
-        assert(matched_documents.size() == 1);
-        assert(matched_documents.front().id == raw_doc.id);
+        ASSERT_EQUAL(matched_documents.size(), 1);
+        ASSERT_EQUAL(matched_documents.front().id, raw_doc.id);
     }
 
     TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
@@ -668,17 +757,17 @@ void TestFindTopDocuments(bool TRACE_DEBUG) {
         }
 
         const auto& matched_documents = server.FindTopDocuments(word);
-        assert(matched_documents.size() == expected_top_documents_count);
+        ASSERT_EQUAL(matched_documents.size(), expected_top_documents_count);
 
         vector<RawDocument> expected_documents(raw_documents.end() - expected_top_documents_count, raw_documents.end());
         reverse(expected_documents.begin(), expected_documents.end());
 
         for (int i = 0; i < expected_top_documents_count; i++) {
-            assert(expected_documents[i].id == matched_documents[i].id);
+            ASSERT_EQUAL(expected_documents[i].id, matched_documents[i].id);
         }
         for (int i = 0; i < expected_top_documents_count - 1; i++) {
             const double relevance_order = matched_documents[i].relevance - matched_documents[i + 1].relevance;
-            assert(relevance_order > 0 || (abs(relevance_order) < threshold && matched_documents[i].rating >= matched_documents[i + 1].rating));
+            ASSERT(relevance_order > 0 || (abs(relevance_order) < threshold && matched_documents[i].rating >= matched_documents[i + 1].rating));
         }
 
         TRACE_DEBUG&& cout << "test: [" << TAG << " | Max top count (sort by rating)] completed successfully" << endl;
@@ -689,8 +778,8 @@ void TestFindTopDocuments(bool TRACE_DEBUG) {
 
 /**
  * @brief Корректное вычисление релевантности найденных документов.
- * 
- * @param TRACE_DEBUG 
+ *
+ * @param TRACE_DEBUG
  */
 void TestCommon(bool TRACE_DEBUG) {
     const string TAG = "TestCommon"s;
@@ -731,14 +820,8 @@ void TestCommon(bool TRACE_DEBUG) {
 
             const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s);
 
-            assert(result_documents.size() == expected_documents.size());
+            testStrictOrderEqual(result_documents, expected_documents);
 
-            for (int i = 0; i < result_documents.size(); i++) {
-                const Document& rd = result_documents[i];
-                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
-                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
-                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
-            }
             TRACE_DEBUG&& cout << "test: [" << TAG << " | ACTUAL by default without stop_words] completed successfully" << endl;
         }
 
@@ -747,14 +830,8 @@ void TestCommon(bool TRACE_DEBUG) {
             const vector<Document> expected_documents{{3, 0.231049, 9}};
             const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::BANNED);
 
-            assert(result_documents.size() == expected_documents.size());
+            testStrictOrderEqual(result_documents, expected_documents);
 
-            for (int i = 0; i < result_documents.size(); i++) {
-                const Document& rd = result_documents[i];
-                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
-                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
-                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
-            }
             TRACE_DEBUG&& cout << "test: [" << TAG << " | BANNED without stop_words] completed successfully" << endl;
         }
 
@@ -765,14 +842,8 @@ void TestCommon(bool TRACE_DEBUG) {
                 return document_id % 2 == 0;
             });
 
-            assert(result_documents.size() == expected_documents.size());
+            testStrictOrderEqual(result_documents, expected_documents);
 
-            for (int i = 0; i < result_documents.size(); i++) {
-                const Document& rd = result_documents[i];
-                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
-                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
-                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
-            }
             TRACE_DEBUG&& cout << "test: [" << TAG << " | Even ids without stop_words] completed successfully" << endl;
         }
 
@@ -813,14 +884,8 @@ void TestCommon(bool TRACE_DEBUG) {
 
             const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s);
 
-            assert(result_documents.size() == expected_documents.size());
+            testStrictOrderEqual(result_documents, expected_documents);
 
-            for (int i = 0; i < result_documents.size(); i++) {
-                const Document& rd = result_documents[i];
-                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
-                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
-                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
-            }
             TRACE_DEBUG&& cout << "test: [" << TAG << " | ACTUAL by default with stop_words] completed successfully" << endl;
         }
 
@@ -829,14 +894,8 @@ void TestCommon(bool TRACE_DEBUG) {
             const vector<Document> expected_documents{{3, 0.231049, 9}};
             const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::BANNED);
 
-            assert(result_documents.size() == expected_documents.size());
+            testStrictOrderEqual(result_documents, expected_documents);
 
-            for (int i = 0; i < result_documents.size(); i++) {
-                const Document& rd = result_documents[i];
-                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
-                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
-                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
-            }
             TRACE_DEBUG&& cout << "test: [" << TAG << " | BANNED with stop_words] completed successfully" << endl;
         }
 
@@ -847,14 +906,8 @@ void TestCommon(bool TRACE_DEBUG) {
                 return document_id % 2 == 0;
             });
 
-            assert(result_documents.size() == expected_documents.size());
+            testStrictOrderEqual(result_documents, expected_documents);
 
-            for (int i = 0; i < result_documents.size(); i++) {
-                const Document& rd = result_documents[i];
-                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
-                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
-                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
-            }
             TRACE_DEBUG&& cout << "test: [" << TAG << " | Even ids with stop_words] completed successfully" << endl;
         }
 
@@ -871,29 +924,29 @@ void TestSearchServer() {
 
     int test_number = 0;
 
-    ExpectTest(TestSplitWords, test_number, TRACE_DEBUG);
+    RUN_TEST(TestSplitWords, TRACE_DEBUG);
 
-    ExpectTest(TestAddDocument, test_number, TRACE_DEBUG);
+    RUN_TEST(TestAddDocument, TRACE_DEBUG);
 
-    ExpectTest(TestExcludeStopWordsFromAddedDocumentContent, test_number, TRACE_DEBUG);
+    RUN_TEST(TestExcludeStopWords, TRACE_DEBUG);
 
-    ExpectTest(TestStopWords, test_number, TRACE_DEBUG);
+    RUN_TEST(TestStopWords, TRACE_DEBUG);
 
-    ExpectTest(TestMinusWords, test_number, TRACE_DEBUG);
+    RUN_TEST(TestMinusWords, TRACE_DEBUG);
 
-    ExpectTest(TestMatchDocuments, test_number, TRACE_DEBUG);
+    RUN_TEST(TestMatchDocuments, TRACE_DEBUG);
 
-    ExpectTest(TestRelevanceSortOrder, test_number, TRACE_DEBUG);
+    RUN_TEST(TestRelevanceSortOrder, TRACE_DEBUG);
 
-    ExpectTest(TestRatingSortOrder, test_number, TRACE_DEBUG);
+    RUN_TEST(TestRatingSortOrder, TRACE_DEBUG);
 
-    ExpectTest(TestFilteringWihtPredicate, test_number, TRACE_DEBUG);
+    RUN_TEST(TestFilteringWihtPredicate, TRACE_DEBUG);
 
-    ExpectTest(TestFindDocumentsBySpecifiedStatus, test_number, TRACE_DEBUG);
+    RUN_TEST(TestFindDocumentsBySpecifiedStatus, TRACE_DEBUG);
 
-    ExpectTest(TestFindTopDocuments, test_number, TRACE_DEBUG);
-    
-    ExpectTest(TestCommon, test_number, TRACE_DEBUG);
+    RUN_TEST(TestFindTopDocuments, TRACE_DEBUG);
+
+    RUN_TEST(TestCommon, TRACE_DEBUG);
 
     TRACE_DEBUG&& cout << endl << "+++ All SearchServer testings completed successfully." << endl;
     TRACE_DEBUG&& cout << "================================================================" << endl;
