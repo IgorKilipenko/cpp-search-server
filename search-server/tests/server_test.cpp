@@ -193,39 +193,6 @@ void TestSplitWords() {
  * Стоп-слова исключаются из текста документов.
  * @param TRACE_DEBUG
  */
-void TestExcludeStopWords() {
-    const int doc_id = 42;
-    const string content = "cat in the city"s;
-    const vector<int> ratings = {1, 2, 3};
-    // Сначала убеждаемся, что поиск слова, не входящего в список стоп-слов,
-    // находит нужный документ
-    {
-        SearchServer server;
-        server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
-        const auto found_docs = server.FindTopDocuments("in"s);
-        ASSERT_EQUAL(found_docs.size(), 1);
-        const Document& doc0 = found_docs[0];
-        ASSERT_EQUAL(doc0.id, doc_id);
-    }
-
-    // Затем убеждаемся, что поиск этого же слова, входящего в список стоп-слов,
-    // возвращает пустой результат
-    {
-        SearchServer server;
-        server.SetStopWords("in the"s);
-        server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
-        ASSERT(server.FindTopDocuments("in"s).empty());
-    }
-
-    TRACE_DEBUG&& cout << "test: [TestExcludeStopWordsFromAddedDocumentContent] completed successfully" << endl;
-}
-
-/**
- * @brief Поддержка стоп-слов.
- * Стоп-слова исключаются из текста документов.
- * Альтернативный вариант реализации
- * @param TRACE_DEBUG
- */
 void TestStopWords() {
     const string TAG = "TestStopWords"s;
     {
@@ -782,145 +749,6 @@ void TestFindTopDocuments() {
     TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
 }
 
-/**
- * @brief Корректное вычисление релевантности найденных документов.
- *
- * @param TRACE_DEBUG
- */
-void TestCommon() {
-    const string TAG = "TestCommon"s;
-
-    // WITHOUT STOP WORDS:
-    {
-        /*
-         * Expected results [WITHOUT STOP WORDS]:
-         * ACTUAL by default:
-         * { document_id = 1, relevance = 0.866434, rating = 5 }
-         * { document_id = 2, relevance = 0.173287, rating = -1 }
-         * { document_id = 0, relevance = 0.138629, rating = 2 }
-         * BANNED:
-         * { document_id = 3, relevance = 0.231049, rating = 9 }
-         * Even ids:
-         * { document_id = 2, relevance = 0.173287, rating = -1 }
-         * { document_id = 0, relevance = 0.138629, rating = 2 }
-         */
-
-        // Documents from example
-        vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
-                                         {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
-                                         {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
-                                         {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}}};
-
-        SearchServer server;
-        for (const auto& [id, content, status, ratings] : documents) {
-            server.AddDocument(id, content, status, ratings);
-        }
-
-        // ACTUAL by default;
-        {
-            const vector<Document> expected_documents{
-                {1, 0.866434, 5},
-                {2, 0.173287, -1},
-                {0, 0.138629, 2},
-            };
-
-            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s);
-
-            testStrictOrderEqual(result_documents, expected_documents);
-
-            TRACE_DEBUG&& cout << "test: [" << TAG << " | ACTUAL by default without stop_words] completed successfully" << endl;
-        }
-
-        // BANNED
-        {
-            const vector<Document> expected_documents{{3, 0.231049, 9}};
-            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::BANNED);
-
-            testStrictOrderEqual(result_documents, expected_documents);
-
-            TRACE_DEBUG&& cout << "test: [" << TAG << " | BANNED without stop_words] completed successfully" << endl;
-        }
-
-        // Even ids
-        {
-            const vector<Document> expected_documents{{2, 0.173287, -1}, {0, 0.138629, 2}};
-            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) {
-                return document_id % 2 == 0;
-            });
-
-            testStrictOrderEqual(result_documents, expected_documents);
-
-            TRACE_DEBUG&& cout << "test: [" << TAG << " | Even ids without stop_words] completed successfully" << endl;
-        }
-
-        TRACE_DEBUG&& cout << "test: [" << TAG << " | without stop_words] completed successfully" << endl;
-    }
-
-    // WITH STOP WORDS:
-    {
-        /*
-         * Expected results [WITH STOP WORDS]:
-         * Expected results:
-         * ACTUAL by default:
-         * { document_id = 1, relevance = 0.866434, rating = 5 }
-         * { document_id = 0, relevance = 0.173287, rating = 2 }
-         * { document_id = 2, relevance = 0.173287, rating = -1 }
-         * BANNED:
-         * { document_id = 3, relevance = 0.231049, rating = 9 }
-         * Even ids:
-         * { document_id = 0, relevance = 0.173287, rating = 2 }
-         * { document_id = 2, relevance = 0.173287, rating = -1 }
-         */
-
-        // Documents from example
-        vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
-                                         {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
-                                         {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
-                                         {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}}};
-
-        SearchServer server;
-        server.SetStopWords("и в на"s);
-        for (const auto& [id, content, status, ratings] : documents) {
-            server.AddDocument(id, content, status, ratings);
-        }
-
-        // ACTUAL by default;
-        {
-            const vector<Document> expected_documents{{1, 0.866434, 5}, {0, 0.173287, 2}, {2, 0.173287, -1}};
-
-            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s);
-
-            testStrictOrderEqual(result_documents, expected_documents);
-
-            TRACE_DEBUG&& cout << "test: [" << TAG << " | ACTUAL by default with stop_words] completed successfully" << endl;
-        }
-
-        // BANNED
-        {
-            const vector<Document> expected_documents{{3, 0.231049, 9}};
-            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::BANNED);
-
-            testStrictOrderEqual(result_documents, expected_documents);
-
-            TRACE_DEBUG&& cout << "test: [" << TAG << " | BANNED with stop_words] completed successfully" << endl;
-        }
-
-        // Even ids
-        {
-            const vector<Document> expected_documents{{0, 0.173287, 2}, {2, 0.173287, -1}};
-            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) {
-                return document_id % 2 == 0;
-            });
-
-            testStrictOrderEqual(result_documents, expected_documents);
-
-            TRACE_DEBUG&& cout << "test: [" << TAG << " | Even ids with stop_words] completed successfully" << endl;
-        }
-
-        TRACE_DEBUG&& cout << "test: [" << TAG << " | with stop_words] completed successfully" << endl;
-    }
-}
-
 void TestSearchServer() {
     TRACE_DEBUG&& cout << "SearchServer testings." << endl;
     TRACE_DEBUG&& cout << "================================================================" << endl;
@@ -929,8 +757,6 @@ void TestSearchServer() {
     RUN_TEST(TestSplitWords);
 
     RUN_TEST(TestAddDocument);
-
-    RUN_TEST(TestExcludeStopWords);
 
     RUN_TEST(TestStopWords);
 
@@ -947,8 +773,6 @@ void TestSearchServer() {
     RUN_TEST(TestFindDocumentsBySpecifiedStatus);
 
     RUN_TEST(TestFindTopDocuments);
-
-    RUN_TEST(TestCommon);
 
     TRACE_DEBUG&& cout << endl << "+++ All SearchServer testings completed successfully." << endl;
     TRACE_DEBUG&& cout << "================================================================" << endl;
