@@ -9,6 +9,9 @@
 #include <string>
 #include <vector>
 
+
+/* HELPERS region ---------------------------------------------------------------- */
+
 struct RawDocument {
     int id;
     string content;
@@ -37,6 +40,15 @@ static set<T> toSet(const vector<T>& values) {
     set<T> result(values.begin(), values.end());
     return result;
 }
+
+template <typename T>
+void ExpectTest(T (*test)(bool), int& test_number, bool TRACE_DEBUG = false) {
+    TRACE_DEBUG&& cout << endl << "Starting [test #"s << ++test_number << "]..." << endl;
+    test(TRACE_DEBUG);
+    TRACE_DEBUG&& cout << "[Test #"s << test_number << "] completed successfully."s << endl;
+}
+
+/* ---------------------------------------------------------------- */
 
 static const vector<RawDocument> initial_documents{{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
                                                    {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
@@ -92,7 +104,7 @@ void TestStopWords(bool TRACE_DEBUG) {
         const set<string> stop_words_set = toSet(SplitIntoWords(stop_words));
         SearchServer server;
         server.SetStopWords(stop_words);
-        vector<RawDocument> documents = {{0, "  белый кот и модный ошейник   "s, DocumentStatus::ACTUAL, {8, -3}},
+        vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
                                          {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
                                          {2, "ухоженный пёс выразительные глаза word"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
                                          {3, "ухоженный скворец евгений word"s, DocumentStatus::ACTUAL, {9}},
@@ -221,22 +233,13 @@ void TestAddDocument(bool TRACE_DEBUG) {
     const string TAG = "TestAddDocument";
     vector<RawDocument> documents = initial_documents;
     SearchServer server;
-    /*
+
     int expected_count = 0;
     assert(server.GetDocumentCount() == expected_count);
-    {
-        SearchServer server;
-        int expected_count = 0;
-        assert(server.GetDocumentCount() == expected_count);
-
-        for (const auto& [id, content, status, ratings] : documents) {
-            server.AddDocument(id, content, status, ratings);
-            assert(server.GetDocumentCount() == ++expected_count);
-        }
-    }*/
 
     for (const auto& [id, content, status, ratings] : documents) {
         server.AddDocument(id, content, status, ratings);
+        assert(server.GetDocumentCount() == ++expected_count);
     }
 
     // Test for document is matching
@@ -635,6 +638,8 @@ void TestFindDocumentsBySpecifiedStatus(bool TRACE_DEBUG) {
         assert(matched_documents.size() == 1);
         assert(matched_documents.front().id == raw_doc.id);
     }
+
+    TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
 }
 
 void TestFindTopDocuments(bool TRACE_DEBUG) {
@@ -682,11 +687,179 @@ void TestFindTopDocuments(bool TRACE_DEBUG) {
     TRACE_DEBUG&& cout << "test: [" << TAG << "] completed successfully" << endl;
 }
 
-template <typename T>
-void ExpectTest(T (*test)(bool), int& test_number, bool TRACE_DEBUG = false) {
-    TRACE_DEBUG&& cout << endl << "Starting [test #"s << ++test_number << "]..." << endl;
-    test(TRACE_DEBUG);
-    TRACE_DEBUG&& cout << "[Test #"s << test_number << "] completed successfully."s << endl;
+/**
+ * @brief Корректное вычисление релевантности найденных документов.
+ * 
+ * @param TRACE_DEBUG 
+ */
+void TestCommon(bool TRACE_DEBUG) {
+    const string TAG = "TestCommon"s;
+
+    // WITHOUT STOP WORDS:
+    {
+        /*
+         * Expected results [WITHOUT STOP WORDS]:
+         * ACTUAL by default:
+         * { document_id = 1, relevance = 0.866434, rating = 5 }
+         * { document_id = 2, relevance = 0.173287, rating = -1 }
+         * { document_id = 0, relevance = 0.138629, rating = 2 }
+         * BANNED:
+         * { document_id = 3, relevance = 0.231049, rating = 9 }
+         * Even ids:
+         * { document_id = 2, relevance = 0.173287, rating = -1 }
+         * { document_id = 0, relevance = 0.138629, rating = 2 }
+         */
+
+        // Documents from example
+        vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
+                                         {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
+                                         {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
+                                         {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}}};
+
+        SearchServer server;
+        for (const auto& [id, content, status, ratings] : documents) {
+            server.AddDocument(id, content, status, ratings);
+        }
+
+        // ACTUAL by default;
+        {
+            const vector<Document> expected_documents{
+                {1, 0.866434, 5},
+                {2, 0.173287, -1},
+                {0, 0.138629, 2},
+            };
+
+            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s);
+
+            assert(result_documents.size() == expected_documents.size());
+
+            for (int i = 0; i < result_documents.size(); i++) {
+                const Document& rd = result_documents[i];
+                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
+                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
+                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
+            }
+            TRACE_DEBUG&& cout << "test: [" << TAG << " | ACTUAL by default without stop_words] completed successfully" << endl;
+        }
+
+        // BANNED
+        {
+            const vector<Document> expected_documents{{3, 0.231049, 9}};
+            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::BANNED);
+
+            assert(result_documents.size() == expected_documents.size());
+
+            for (int i = 0; i < result_documents.size(); i++) {
+                const Document& rd = result_documents[i];
+                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
+                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
+                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
+            }
+            TRACE_DEBUG&& cout << "test: [" << TAG << " | BANNED without stop_words] completed successfully" << endl;
+        }
+
+        // Even ids
+        {
+            const vector<Document> expected_documents{{2, 0.173287, -1}, {0, 0.138629, 2}};
+            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) {
+                return document_id % 2 == 0;
+            });
+
+            assert(result_documents.size() == expected_documents.size());
+
+            for (int i = 0; i < result_documents.size(); i++) {
+                const Document& rd = result_documents[i];
+                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
+                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
+                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
+            }
+            TRACE_DEBUG&& cout << "test: [" << TAG << " | Even ids without stop_words] completed successfully" << endl;
+        }
+
+        TRACE_DEBUG&& cout << "test: [" << TAG << " | without stop_words] completed successfully" << endl;
+    }
+
+    // WITH STOP WORDS:
+    {
+        /*
+         * Expected results [WITH STOP WORDS]:
+         * Expected results:
+         * ACTUAL by default:
+         * { document_id = 1, relevance = 0.866434, rating = 5 }
+         * { document_id = 0, relevance = 0.173287, rating = 2 }
+         * { document_id = 2, relevance = 0.173287, rating = -1 }
+         * BANNED:
+         * { document_id = 3, relevance = 0.231049, rating = 9 }
+         * Even ids:
+         * { document_id = 0, relevance = 0.173287, rating = 2 }
+         * { document_id = 2, relevance = 0.173287, rating = -1 }
+         */
+
+        // Documents from example
+        vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
+                                         {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
+                                         {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
+                                         {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}}};
+
+        SearchServer server;
+        server.SetStopWords("и в на"s);
+        for (const auto& [id, content, status, ratings] : documents) {
+            server.AddDocument(id, content, status, ratings);
+        }
+
+        // ACTUAL by default;
+        {
+            const vector<Document> expected_documents{{1, 0.866434, 5}, {0, 0.173287, 2}, {2, 0.173287, -1}};
+
+            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s);
+
+            assert(result_documents.size() == expected_documents.size());
+
+            for (int i = 0; i < result_documents.size(); i++) {
+                const Document& rd = result_documents[i];
+                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
+                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
+                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
+            }
+            TRACE_DEBUG&& cout << "test: [" << TAG << " | ACTUAL by default with stop_words] completed successfully" << endl;
+        }
+
+        // BANNED
+        {
+            const vector<Document> expected_documents{{3, 0.231049, 9}};
+            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s, DocumentStatus::BANNED);
+
+            assert(result_documents.size() == expected_documents.size());
+
+            for (int i = 0; i < result_documents.size(); i++) {
+                const Document& rd = result_documents[i];
+                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
+                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
+                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
+            }
+            TRACE_DEBUG&& cout << "test: [" << TAG << " | BANNED with stop_words] completed successfully" << endl;
+        }
+
+        // Even ids
+        {
+            const vector<Document> expected_documents{{0, 0.173287, 2}, {2, 0.173287, -1}};
+            const auto& result_documents = server.FindTopDocuments("пушистый ухоженный кот"s, [](int document_id, DocumentStatus status, int rating) {
+                return document_id % 2 == 0;
+            });
+
+            assert(result_documents.size() == expected_documents.size());
+
+            for (int i = 0; i < result_documents.size(); i++) {
+                const Document& rd = result_documents[i];
+                const shared_ptr<Document> ed_ptr = getDocumentById(rd.id, expected_documents);
+                assert(ed_ptr != nullptr && equalDocuments(rd, *ed_ptr));  // Not strict order matching
+                assert(equalDocuments(rd, expected_documents[i]));         // Strict order matching
+            }
+            TRACE_DEBUG&& cout << "test: [" << TAG << " | Even ids with stop_words] completed successfully" << endl;
+        }
+
+        TRACE_DEBUG&& cout << "test: [" << TAG << " | with stop_words] completed successfully" << endl;
+    }
 }
 
 void TestSearchServer() {
@@ -719,6 +892,8 @@ void TestSearchServer() {
     ExpectTest(TestFindDocumentsBySpecifiedStatus, test_number, TRACE_DEBUG);
 
     ExpectTest(TestFindTopDocuments, test_number, TRACE_DEBUG);
+    
+    ExpectTest(TestCommon, test_number, TRACE_DEBUG);
 
     TRACE_DEBUG&& cout << endl << "+++ All SearchServer testings completed successfully." << endl;
     TRACE_DEBUG&& cout << "================================================================" << endl;
