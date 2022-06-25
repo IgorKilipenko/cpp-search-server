@@ -1,10 +1,7 @@
 #include <algorithm>
-#include <cassert>
 #include <cmath>
-#include <functional>
 #include <iostream>
 #include <map>
-#include <memory>
 #include <numeric>
 #include <set>
 #include <string>
