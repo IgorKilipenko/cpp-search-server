@@ -799,10 +799,6 @@ void TestFindDocumentsBySpecifiedStatus() {
     vector<RawDocument> documents = {
         {static_cast<int>(DocumentStatus::ACTUAL), shared_word + " белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
         {static_cast<int>(DocumentStatus::BANNED), shared_word + " пушистый кот пушистый хвост"s, DocumentStatus::BANNED, {7, 2, 7}},
-        {static_cast<int>(DocumentStatus::IRRELEVANT),
-         shared_word + " ухоженный пёс выразительные глаза"s,
-         DocumentStatus::IRRELEVANT,
-         {5, -12, 2, 1}},
         {static_cast<int>(DocumentStatus::REMOVED), shared_word + " ухоженный скворец евгений"s, DocumentStatus::REMOVED, {9}}};
 
     SearchServer server;
@@ -815,45 +811,34 @@ void TestFindDocumentsBySpecifiedStatus() {
         ASSERT_EQUAL(matched_documents.size(), 1);
         ASSERT_EQUAL(matched_documents.front().id, raw_doc.id);
     }
+
+    // Expect search failure (empty result)
+    const auto& matched_documents = server.FindTopDocuments(query, DocumentStatus::IRRELEVANT);
+    ASSERT(matched_documents.empty());
 }
 
 void TestFindTopDocuments() {
-    // Max top count (sort by rating) documents test
-    {
-        const double threshold = 1e-6;
-        const int documents_size = 10;
-        const int expected_top_documents_count = MAX_RESULT_DOCUMENT_COUNT;
+    const int documents_size = 10;
+    const int expected_top_documents_count = MAX_RESULT_DOCUMENT_COUNT;
 
-        SearchServer server;
+    SearchServer server;
 
-        const string word = "word";
-        vector<RawDocument> raw_documents;
-        raw_documents.reserve(documents_size);
+    const string word = "word";
+    vector<RawDocument> raw_documents;
+    raw_documents.reserve(documents_size);
 
-        for (int i = 0; i < documents_size; i++) {
-            string content = word;
-            for (int j = 0; j < min(i, 10); j++) {
-                content += " " + word;
-            }
-            const RawDocument doc = {i, content, DocumentStatus::ACTUAL, {i, i - 1, i + 1}};
-            raw_documents.push_back(doc);
-            server.AddDocument(doc.id, doc.content, doc.status, doc.ratings);
+    for (int i = 0; i < documents_size; i++) {
+        string content = word;
+        for (int j = 0; j < min(i, 10); j++) {
+            content += " " + word;
         }
-
-        const auto& matched_documents = server.FindTopDocuments(word);
-        ASSERT_EQUAL(matched_documents.size(), expected_top_documents_count);
-
-        vector<RawDocument> expected_documents(raw_documents.end() - expected_top_documents_count, raw_documents.end());
-        reverse(expected_documents.begin(), expected_documents.end());
-
-        for (int i = 0; i < expected_top_documents_count; i++) {
-            ASSERT_EQUAL(expected_documents[i].id, matched_documents[i].id);
-        }
-        for (int i = 0; i < expected_top_documents_count - 1; i++) {
-            const double relevance_order = matched_documents[i].relevance - matched_documents[i + 1].relevance;
-            ASSERT(relevance_order > 0 || (abs(relevance_order) < threshold && matched_documents[i].rating >= matched_documents[i + 1].rating));
-        }
+        const RawDocument doc = {i, content, DocumentStatus::ACTUAL, {i, i - 1, i + 1}};
+        raw_documents.push_back(doc);
+        server.AddDocument(doc.id, doc.content, doc.status, doc.ratings);
     }
+
+    const auto& matched_documents = server.FindTopDocuments(word);
+    ASSERT_EQUAL(matched_documents.size(), expected_top_documents_count);
 }
 
 void TestSearchServer() {
