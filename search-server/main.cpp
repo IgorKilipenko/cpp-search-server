@@ -719,6 +719,16 @@ void TestRelevanceSortOrder() {
  * Рейтинг добавленного документа равен среднему арифметическому оценок документа.
  */
 void TestRatingSortOrder() {
+    const auto culcAvgRating = [](const vector<int>& ratings) -> int {
+        if (ratings.empty()) return 0;
+        const double n = static_cast<double>(ratings.size());
+        const double avg = accumulate(ratings.begin(), ratings.end(), 0.0, [n](double curr, int v) {
+            curr += v / n;
+            return curr;
+        });
+        return static_cast<int>(avg);
+    };
+
     const DocumentStatus status = DocumentStatus::ACTUAL;
     const string content = "word1 word2 word3"s;
     const string query = content;
@@ -728,21 +738,23 @@ void TestRatingSortOrder() {
                                      {2, content, status, {5, -12, 2, 1}},
                                      {3, content, status, {9}},
                                      {4, content, status, {19, 2}}};
-    vector<Document> expected_top_documents{
-        {4, 0.0, 10}, {3, 0.0, 9}, {1, 0.0, 5}, {0, 0.0, 2}, {2, 0.0, -1},
-    };
 
     SearchServer server;
     for (const auto& [id, content, status, ratings] : documents) {
         server.AddDocument(id, content, status, ratings);
     }
 
-    const auto& matching_documents = server.FindTopDocuments(query);
-    ASSERT(matching_documents.size() >= expected_top_documents.size());
+    map<int,int> expected_rating_values{};
+    for (const auto& raw_doc : documents) {
+        expected_rating_values.insert({raw_doc.id, culcAvgRating(raw_doc.ratings)});
+    }
 
-    for (int i = 0; i < expected_top_documents.size(); i++) {
-        ASSERT_EQUAL(matching_documents[i].id, expected_top_documents[i].id);
-        ASSERT_EQUAL(matching_documents[i].rating, expected_top_documents[i].rating);
+
+    const auto& matching_documents = server.FindTopDocuments(query);
+    ASSERT_HINT(matching_documents.size(), "No matching documents found."s);
+
+    for (const auto& doc : matching_documents) {
+        ASSERT_EQUAL(doc.rating, expected_rating_values[doc.id]);
     }
 }
 
