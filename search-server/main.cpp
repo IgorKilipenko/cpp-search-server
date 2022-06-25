@@ -744,11 +744,10 @@ void TestRatingCulculation() {
         server.AddDocument(id, content, status, ratings);
     }
 
-    map<int,int> expected_rating_values{};
+    map<int, int> expected_rating_values{};
     for (const auto& raw_doc : documents) {
         expected_rating_values.insert({raw_doc.id, culcAvgRating(raw_doc.ratings)});
     }
-
 
     const auto& matching_documents = server.FindTopDocuments(query);
     ASSERT_HINT(matching_documents.size(), "No matching documents found."s);
@@ -770,91 +769,24 @@ void TestFilteringWihtPredicate() {
                                      {1, shared_word + " пушистый кот пушистый хвост"s, DocumentStatus::BANNED, {7, 2, 7}},
                                      {2, shared_word + " ухоженный пёс выразительные глаза"s, DocumentStatus::IRRELEVANT, {5, -12, 2, 1}},
                                      {3, shared_word + " ухоженный скворец евгений"s, DocumentStatus::REMOVED, {9}}};
+
     SearchServer server;
     for (const auto& [id, content, status, ratings] : documents) {
         server.AddDocument(id, content, status, ratings);
     }
 
+    const int request_id = 2;
     const string query = shared_word;
-    // Strict requests
-    {// Test ACTUAL
-     {const int request_id = 0;
-    const auto request_status = DocumentStatus::ACTUAL;
-    const int request_rating = 2;
+    const auto request_status = DocumentStatus::IRRELEVANT;
 
     const auto& matched_documents = server.FindTopDocuments(query, [](int id, DocumentStatus status, int rating) -> bool {
-        return id == request_id && status == request_status && rating == request_rating;
+        return id == request_id && status == request_status && rating < 0;
     });
-    ASSERT_EQUAL(matched_documents.size(), 1);
+
+    ASSERT_HINT(matched_documents.size(), "No matching documents found."s);
 
     const auto& matched_doc = matched_documents.front();
     ASSERT_EQUAL(matched_doc.id, request_id);
-    ASSERT_EQUAL(matched_doc.rating, request_rating);
-}
-
-// Test REMOVED
-{
-    const int request_id = 3;
-    const auto request_status = DocumentStatus::REMOVED;
-    const int request_rating = 9;
-
-    const auto& matched_documents = server.FindTopDocuments(query, [](int id, DocumentStatus status, int rating) -> bool {
-        return id == request_id && status == request_status && rating == request_rating;
-    });
-    ASSERT_EQUAL(matched_documents.size(), 1);
-
-    const auto& matched_doc = matched_documents.front();
-    ASSERT_EQUAL(matched_doc.id, request_id);
-    ASSERT_EQUAL(matched_doc.rating, request_rating);
-}
-}
-
-// Not Strict requests
-{
-    // Test ACTUAL
-    {
-        // Expect success
-        {
-            const auto request_status = DocumentStatus::ACTUAL;
-            const int request_min_rating = 1;
-            const int expected_id = 0;
-            const int expected_rating = 2;
-
-            const auto& matched_documents = server.FindTopDocuments(query, []([[maybe_unused]] int id, DocumentStatus status, int rating) -> bool {
-                return status == request_status && rating > request_min_rating;
-            });
-            ASSERT_EQUAL(matched_documents.size(), 1);
-
-            const auto& matched_doc = matched_documents.front();
-            ASSERT_EQUAL(matched_doc.id, expected_id);
-            ASSERT_EQUAL(matched_doc.rating, expected_rating);
-        }
-
-        // Expect failure
-        {
-            {
-                const auto request_status = DocumentStatus::ACTUAL;
-                const int request_min_rating = 3;
-
-                const auto& matched_documents =
-                    server.FindTopDocuments(query, []([[maybe_unused]] int id, DocumentStatus status, int rating) -> bool {
-                        return status == request_status && rating > request_min_rating;
-                    });
-                ASSERT_EQUAL(matched_documents.size(), 0);
-            }
-            {
-                const auto request_status = DocumentStatus::REMOVED;
-                const int request_id = 0;
-
-                const auto& matched_documents =
-                    server.FindTopDocuments(query, [](int id, DocumentStatus status, [[maybe_unused]] int rating) -> bool {
-                        return status == request_status && id == request_id;
-                    });
-                ASSERT_EQUAL(matched_documents.size(), 0);
-            }
-        }
-    }
-}
 }
 
 /**
