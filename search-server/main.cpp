@@ -413,19 +413,6 @@ struct RawDocument {
     vector<int> ratings;
 };
 
-/*
-static shared_ptr<Document> getDocumentById(int id, vector<Document> documents) {
-    const shared_ptr<Document> result =
-        accumulate(documents.begin(), documents.end(), shared_ptr<Document>{nullptr}, [id](shared_ptr<Document> curr, const Document& doc) {
-            if (doc.id == id) {
-                curr = make_shared<Document>(doc);
-            }
-            return curr;
-        });
-    return result;
-}
-*/
-
 template <typename T>
 static set<T> toSet(const vector<T>& values) {
     set<T> result(values.begin(), values.end());
@@ -653,9 +640,11 @@ void TestMatchDocuments() {
         {
             const string query = initial_content;
             const auto& [matched_words, _] = server.MatchDocument(query, raw_doc.id);
-            ASSERT_HINT(!matched_words.empty() && none_of(matched_words.begin(), matched_words.end(), [stop_word](const string& word) { 
-                return word == stop_word;
-            }), "Document contains stop_word:"s + stop_word + "."s);
+            ASSERT_HINT(!matched_words.empty() && none_of(matched_words.begin(), matched_words.end(),
+                                                          [stop_word](const string& word) {
+                                                              return word == stop_word;
+                                                          }),
+                        "Document contains stop_word:"s + stop_word + "."s);
         }
     }
 }
