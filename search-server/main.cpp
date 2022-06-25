@@ -718,7 +718,7 @@ void TestRelevanceSortOrder() {
  * @brief Вычисление рейтинга документов.
  * Рейтинг добавленного документа равен среднему арифметическому оценок документа.
  */
-void TestRatingSortOrder() {
+void TestRatingCulculation() {
     const auto culcAvgRating = [](const vector<int>& ratings) -> int {
         if (ratings.empty()) return 0;
         const double n = static_cast<double>(ratings.size());
@@ -937,7 +937,7 @@ void TestSearchServer() {
 
     RUN_TEST(TestRelevanceSortOrder);
 
-    RUN_TEST(TestRatingSortOrder);
+    RUN_TEST(TestRatingCulculation);
 
     RUN_TEST(TestFilteringWihtPredicate);
 
