@@ -32,7 +32,7 @@
 *.app
 
 build
-.vscode/**
-.clang-format
-CMakeLists.txt
+#.vscode/**
+#.clang-format
+#CMakeLists.txt
 .cache
