@@ -608,12 +608,12 @@ void TestMatchDocuments() {
         for (const auto& doc : documents) {
             const auto& [matched_words, status] = server.MatchDocument(raw_query, doc.id);
 
-            ASSERT_EQUAL(status, doc.status);  // Check status
+            ASSERT_EQUAL_HINT(status, doc.status, "Document status is not as expected."s);
 
             auto query_words = SplitIntoWords(raw_query);
             const int mathed_words_count = count_if(matched_words.begin(), matched_words.end(), [&query_words](const auto& mw) {
                 int _count = count(query_words.begin(), query_words.end(), mw);
-                ASSERT(_count > 0);  // Mathed word must contained in query
+                ASSERT_HINT(_count > 0, "Word \""s + mw + "\" not contained in query."s);
                 return _count ? 1 : 0;
             });
 
@@ -627,57 +627,35 @@ void TestMatchDocuments() {
         }
     }
 
-    // Simple with minus_words test
+    // With minus_words an stop words test
     {
         const string initial_content = "белый кот и модный ошейник"s;
         RawDocument raw_doc = {0, initial_content, DocumentStatus::ACTUAL, {8, -3}};
         vector<RawDocument> raw_documents = {raw_doc};
+        string minus_word = "кот"s;
+        string stop_word = "белый"s;
+
         SearchServer server;
+        server.SetStopWords(stop_word);
+
         for (const auto& [id, content, status, ratings] : raw_documents) {
             server.AddDocument(id, content, status, ratings);
         }
-        string expected_minus_word = "кот"s;
-        string raw_query = initial_content + " -" + expected_minus_word;
 
-        const auto& [matched_words, status] = server.MatchDocument(raw_query, raw_doc.id);
-        ASSERT_EQUAL(status, DocumentStatus::ACTUAL);
-        ASSERT(matched_words.empty());
-    }
-
-    // With minus_words test
-    {
-        vector<RawDocument> documents = initial_documents;
-        SearchServer server;
-        for (const auto& [id, content, status, ratings] : documents) {
-            server.AddDocument(id, content, status, ratings);
+        // Empty content check (for minus_words)
+        {
+            const string query = initial_content + " -" + minus_word;
+            const auto& [matched_words, _] = server.MatchDocument(query, raw_doc.id);
+            ASSERT_HINT(matched_words.empty(), "Document content for the minus_words query is not empty.");
         }
-        string expected_minus_word = "кот"s;
-        string raw_query = "пушистый ухоженный кот"s + " -" + expected_minus_word;
 
-        for (const auto& doc : documents) {
-            const auto& [matched_words, status] = server.MatchDocument(raw_query, doc.id);
-
-            ASSERT_EQUAL(status, doc.status);  // Check status
-            ASSERT_HINT(!count(matched_words.begin(), matched_words.end(), expected_minus_word), "Matched_words contained minus_words");
-
-            auto query_words = SplitIntoWords(raw_query);
-            query_words.erase(query_words.end() - 1);  // Remove minus_word
-
-            const int mathed_words_count = count_if(matched_words.begin(), matched_words.end(), [&query_words](const auto& mw) {
-                int _count = count(query_words.begin(), query_words.end(), mw);
-                ASSERT_HINT(_count > 0, "Mathed word not contained in query."s);
-                return _count ? 1 : 0;
-            });
-
-            auto doc_words = SplitIntoWords(doc.content);
-            bool is_contained_minus_words = count(doc_words.begin(), doc_words.end(), expected_minus_word);
-            const int expected_mathed_words_count =
-                is_contained_minus_words ? 0 : count_if(query_words.begin(), query_words.end(), [&doc_words](const auto& qw) {
-                    int _count = count(doc_words.begin(), doc_words.end(), qw);
-                    return _count ? 1 : 0;
-                });
-
-            ASSERT_EQUAL(expected_mathed_words_count, mathed_words_count);
+        // Matching does not contain minus_words
+        {
+            const string query = initial_content;
+            const auto& [matched_words, _] = server.MatchDocument(query, raw_doc.id);
+            ASSERT_HINT(!matched_words.empty() && none_of(matched_words.begin(), matched_words.end(), [stop_word](const string& word) { 
+                return word == stop_word;
+            }), "Document contains stop_word:"s + stop_word + "."s);
         }
     }
 }
