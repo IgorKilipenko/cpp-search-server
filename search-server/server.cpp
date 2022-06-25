@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+static const double THRESHOLD = 1e-6;
+
 extern vector<string> SplitIntoWords(const string& text) {
     vector<string> words;
     string word;
@@ -49,10 +51,9 @@ void SearchServer::AddDocument(int document_id, const string& document, Document
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate) const {
     const Query query = ParseQuery(raw_query);
     auto matched_documents = FindAllDocuments(query, predicate);
-    const double threshold = 1e-6;
 
-    sort(matched_documents.begin(), matched_documents.end(), [threshold](const Document& lhs, const Document& rhs) {
-        if (abs(lhs.relevance - rhs.relevance) < threshold) {
+    sort(matched_documents.begin(), matched_documents.end(), [](const Document& lhs, const Document& rhs) {
+        if (abs(lhs.relevance - rhs.relevance) < THRESHOLD) {
             return lhs.rating > rhs.rating;
         } else {
             return lhs.relevance > rhs.relevance;
