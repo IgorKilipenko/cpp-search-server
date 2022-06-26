@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -15,6 +16,8 @@ struct Document {
     int id;
     double relevance;
     int rating;
+    Document() : id{0}, relevance{0.0}, rating{0} {}
+    Document(int id, double relevance, int rating) : id{id}, relevance{relevance}, rating{rating} {}
 };
 
 enum class DocumentStatus {
@@ -51,22 +54,22 @@ class SearchServer {
     [[nodiscard]] bool AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
 
     // template <typename T>
-    [[nodiscard]] bool FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate, vector<Document>& result) const;
+    optional<vector<Document>> FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate) const;
 
-    [[nodiscard]] bool FindTopDocuments(const string& raw_query, vector<Document>& result) const;
+    optional<vector<Document>> FindTopDocuments(const string& raw_query) const;
 
-    [[nodiscard]] bool FindTopDocuments(const string& raw_query, DocumentStatus status, vector<Document>& result) const;
+    optional<vector<Document>> FindTopDocuments(const string& raw_query, DocumentStatus status) const;
 
     int GetDocumentCount() const;
 
     int GetDocumentId(int index) const;
 
-    [[nodiscard]] bool MatchDocument(const string& raw_query, int document_id, tuple<vector<string>, DocumentStatus>& result) const;
+    optional<tuple<vector<string>, DocumentStatus>> MatchDocument(const string& raw_query, int document_id) const;
 
     set<std::string> GetStopWords() const;
 
     inline static constexpr int INVALID_DOCUMENT_ID = -1;
-    
+
    private:
     struct DocumentData {
         int rating;

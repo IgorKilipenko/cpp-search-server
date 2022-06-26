@@ -6,6 +6,7 @@
 #include <functional>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <regex>
 #include <set>
 #include <string>
@@ -35,7 +36,7 @@ extern vector<string> SplitIntoWords(const string& text) {
 
 [[nodiscard]] bool SearchServer::AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings) {
     if (!IsValidDocumentId(document_id)) return false;
-    if (documents_.count(document_id)) return false;    // Check if document with this id already exists
+    if (documents_.count(document_id)) return false;  // Check if document with this id already exists
 
     const vector<string> words = SplitIntoWordsNoStop(document);
     if (!IsValidContent(words)) return false;
@@ -50,11 +51,10 @@ extern vector<string> SplitIntoWords(const string& text) {
 }
 
 // template <typename T>
-[[nodiscard]] bool SearchServer::FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate,
-                                                  vector<Document>& result) const {
+optional<vector<Document>> SearchServer::FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate) const {
     const Query query = ParseQuery(raw_query);
-    if (!IsValidContent(query.plus_words)) return false;
-    if (!IsValidMinusWords(query.minus_words))  return false;
+    if (!IsValidContent(query.plus_words)) return nullopt;
+    if (!IsValidMinusWords(query.minus_words)) return nullopt;
 
     auto matched_documents = FindAllDocuments(query, predicate);
 
@@ -69,26 +69,19 @@ extern vector<string> SplitIntoWords(const string& text) {
         matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
     }
 
-    result = matched_documents;
-    return true;
+    return matched_documents;
 }
 
-[[nodiscard]] bool SearchServer::FindTopDocuments(const string& raw_query, vector<Document>& result) const {
-    return FindTopDocuments(
-        raw_query,
-        [](int id, DocumentStatus status, [[maybe_unused]] int rating) -> bool {
-            return status == DocumentStatus::ACTUAL;
-        },
-        result);
+optional<vector<Document>> SearchServer::FindTopDocuments(const string& raw_query) const {
+    return FindTopDocuments(raw_query, [](int id, DocumentStatus status, [[maybe_unused]] int rating) -> bool {
+        return status == DocumentStatus::ACTUAL;
+    });
 }
 
-[[nodiscard]] bool SearchServer::FindTopDocuments(const string& raw_query, DocumentStatus status, vector<Document>& result) const {
-    return FindTopDocuments(
-        raw_query,
-        [status](int id, DocumentStatus doc_status, [[maybe_unused]] int rating) -> bool {
-            return (doc_status == status);
-        },
-        result);
+optional<vector<Document>> SearchServer::FindTopDocuments(const string& raw_query, DocumentStatus status) const {
+    return FindTopDocuments(raw_query, [status](int id, DocumentStatus doc_status, [[maybe_unused]] int rating) -> bool {
+        return (doc_status == status);
+    });
 }
 
 int SearchServer::GetDocumentCount() const {
@@ -113,12 +106,12 @@ set<std::string> SearchServer::GetStopWords() const {
     return stop_words_;
 }
 
-[[nodiscard]] bool SearchServer::MatchDocument(const string& raw_query, int document_id, tuple<vector<string>, DocumentStatus>& result) const {
-    if (!IsValidDocumentId(document_id)) return false;
+optional<tuple<vector<string>, DocumentStatus>> SearchServer::MatchDocument(const string& raw_query, int document_id) const {
+    if (!IsValidDocumentId(document_id)) return nullopt;
 
     const Query query = ParseQuery(raw_query);
-    if (!IsValidContent(query.plus_words)) return false;
-    if (!IsValidMinusWords(query.minus_words)) return false;
+    if (!IsValidContent(query.plus_words)) return nullopt;
+    if (!IsValidMinusWords(query.minus_words)) return nullopt;
 
     vector<string> matched_words;
     for (const string& word : query.plus_words) {
@@ -139,8 +132,8 @@ set<std::string> SearchServer::GetStopWords() const {
         }
     }
 
-    result = {matched_words, documents_.at(document_id).status};
-    return true;
+    tuple<vector<string>, DocumentStatus> result = {matched_words, documents_.at(document_id).status};
+    return result;
 }
 
 bool SearchServer::IsStopWord(const string& word) const {
@@ -265,6 +258,6 @@ bool SearchServer::IsValidContent(const List& content) {
 }
 
 bool SearchServer::IsValidDocumentId(int document_id) const {
-    if (document_id < 0) return false;                // Check if ID is negative
+    if (document_id < 0) return false;  // Check if ID is negative
     return true;
 }
