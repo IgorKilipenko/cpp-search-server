@@ -9,6 +9,12 @@
 #include <string>
 #include <vector>
 
+#include "../massert.hpp"
+
+using namespace std;
+
+using MatchingDocument = tuple<vector<std::string>, DocumentStatus>;
+
 static const double THRESHOLD = 1e-6;
 
 /* OSTREAM operator<< overrides region -------------------------------------- */
@@ -89,46 +95,6 @@ void RunTestImpl(T func, const string& func_name) {
 
 #endif  // !RUN_TEST
 
-#if !defined(ASSERT)
-
-template <typename T, typename U>
-void AssertEqualImpl(const T& t, const U& u, const string& t_str, const string& u_str, const string& file, const string& func, unsigned line,
-                     const string& hint) {
-    if (t != u) {
-        cerr << boolalpha;
-        cerr << file << "("s << line << "): "s << func << ": "s;
-        cerr << "ASSERT_EQUAL("s << t_str << ", "s << u_str << ") failed: "s;
-        cerr << t << " != "s << u << "."s;
-        if (!hint.empty()) {
-            cout << " Hint: "s << hint;
-        }
-        cerr << endl;
-        abort();
-    }
-}
-
-#define ASSERT_EQUAL(a, b) AssertEqualImpl((a), (b), #a, #b, __FILE__, __FUNCTION__, __LINE__, ""s)
-
-#define ASSERT_EQUAL_HINT(a, b, hint) AssertEqualImpl((a), (b), #a, #b, __FILE__, __FUNCTION__, __LINE__, (hint))
-
-void AssertImpl(bool value, const string& expr_str, const string& file, const string& func, unsigned line, const string& hint) {
-    if (!value) {
-        cerr << file << "("s << line << "): "s << func << ": "s;
-        cerr << "ASSERT("s << expr_str << ") failed."s;
-        if (!hint.empty()) {
-            cerr << " Hint: "s << hint;
-        }
-        cerr << endl;
-        abort();
-    }
-}
-
-#define ASSERT(expr) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, ""s)
-
-#define ASSERT_HINT(expr, hint) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, (hint))
-
-#endif  // !ASSERT
-
 /* HELPERS region ---------------------------------------------------------------- */
 
 struct RawDocument {
@@ -146,11 +112,15 @@ static set<T> toSet(const vector<T>& values) {
 
 /* ---------------------------------------------------------------- */
 
+static const string ADD_DOCUMENT_FAILURE_MSG = "Document has not been added to the server. Invalid content or document ID."s;
+static const string SEARCH_DOCUMENT_FAILURE_MSG = "Serch documents failure. Invalid query."s;
+static const string MATCH_DOCUMENT_FAILURE_MSG = "Matching document failure. Invalid arguments."s;
+
 static const vector<RawDocument> initial_documents{{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
                                                    {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
                                                    {2, "ухоженный пёс выразительные глаза"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
                                                    {3, "ухоженный скворец евгений"s, DocumentStatus::BANNED, {9}},
-                                                   {4, ""s, DocumentStatus::ACTUAL, {0}}};
+                                                   {4, "word"s, DocumentStatus::ACTUAL, {0}}};
 
 void TestSplitWords() {
     const string stop_words = "   word   word1  word2    "s;
@@ -168,8 +138,7 @@ void TestStopWords() {
     {
         const string stop_words = "word word1 word2"s;
         const set<string> stop_words_set = toSet(SplitIntoWords(stop_words));
-        SearchServer server;
-        server.SetStopWords(stop_words);
+        SearchServer server(stop_words);
         vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
                                          {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
                                          {2, "ухоженный пёс выразительные глаза word"s, DocumentStatus::ACTUAL, {5, -12, 2, 1}},
@@ -181,11 +150,12 @@ void TestStopWords() {
                                          {8, ""s, DocumentStatus::ACTUAL, {0}}};
 
         for (const auto& [id, content, status, ratings] : documents) {
-            server.AddDocument(id, content, status, ratings);
+            ASSERT_HINT(server.AddDocument(id, content, status, ratings), ADD_DOCUMENT_FAILURE_MSG);
         }
 
         {
-            const auto found_docs = server.FindTopDocuments(" "s);
+            vector<Document> found_docs;
+            ASSERT_HINT(server.FindTopDocuments(" "s, found_docs), SEARCH_DOCUMENT_FAILURE_MSG);
             ASSERT_EQUAL(found_docs.size(), 0);
         }
 
@@ -193,10 +163,13 @@ void TestStopWords() {
             const vector<string> queries{"евгений word", "глаза", "ухоженный"};
             const map<string, int> expected_mathed_docs_count = {{queries[0], 4}, {queries[1], 1}, {queries[2], 5}};
             for (auto& query : queries) {
-                const auto found_docs = server.FindTopDocuments(query);
+                vector<Document> found_docs;
+                ASSERT_HINT(server.FindTopDocuments(query, found_docs), SEARCH_DOCUMENT_FAILURE_MSG);
                 ASSERT_EQUAL(found_docs.size(), expected_mathed_docs_count.at(query));
                 for (const auto& doc : found_docs) {
-                    const auto& [words, status] = server.MatchDocument(query, doc.id);
+                    MatchingDocument matching_doc;
+                    ASSERT_HINT(server.MatchDocument(query, doc.id, matching_doc), MATCH_DOCUMENT_FAILURE_MSG);
+                    const auto& [words, status] = matching_doc;
                     ASSERT_EQUAL(status, DocumentStatus::ACTUAL);
                     for (const auto& w : words) {
                         ASSERT(!stop_words_set.count(w));
@@ -207,10 +180,13 @@ void TestStopWords() {
 
         // Loop for all stop words
         {
-            for (const auto& sw : stop_words_set) {
-                const auto& found_docs = server.FindTopDocuments(sw);
+            for (const auto& stop_word : stop_words_set) {
+                vector<Document> found_docs;
+                ASSERT_HINT(server.FindTopDocuments(stop_word, found_docs), SEARCH_DOCUMENT_FAILURE_MSG);
                 for (const auto& doc : found_docs) {
-                    const auto& [words, status] = server.MatchDocument(sw, doc.id);
+                    MatchingDocument matching_doc;
+                    ASSERT_HINT(server.MatchDocument(stop_word, doc.id, matching_doc), MATCH_DOCUMENT_FAILURE_MSG);
+                    const auto& [words, status] = matching_doc;
                     ASSERT_EQUAL(status, DocumentStatus::ACTUAL);
                     for (const auto& w : words) {
                         ASSERT(!stop_words_set.count(w));
@@ -235,16 +211,17 @@ void TestMinusWords() {
                                      {6, "ухоженный скворец евгений"s, DocumentStatus::ACTUAL, {9}}};
     SearchServer server;
     for (const auto& [id, content, status, ratings] : documents) {
-        server.AddDocument(id, content, status, ratings);
+        ASSERT_HINT(server.AddDocument(id, content, status, ratings), ADD_DOCUMENT_FAILURE_MSG);
     }
     {
         int expected_count = 1;
         int expected_id = 2;
         const string query = "ухоженный белый -ошейник -евгений"s;
-        const auto& top_documents = server.FindTopDocuments(query);
-        ASSERT_EQUAL(top_documents.size(), expected_count);
-        ASSERT_EQUAL(top_documents[0].id, expected_id);
-        ASSERT(!count_if(top_documents.begin(), top_documents.end(), [](const auto& doc) {
+        vector<Document> found_docs;
+        ASSERT_HINT(server.FindTopDocuments(query, found_docs), SEARCH_DOCUMENT_FAILURE_MSG);
+        ASSERT_EQUAL(found_docs.size(), expected_count);
+        ASSERT_EQUAL(found_docs[0].id, expected_id);
+        ASSERT(!count_if(found_docs.begin(), found_docs.end(), [](const auto& doc) {
             return doc.id == 0 || doc.id > 2;
         }));
     }
@@ -252,15 +229,15 @@ void TestMinusWords() {
     {
         const string query = "ухоженный белый кот пёс -ошейник -евгений"s;
         {
-            const auto& [words, _] = server.MatchDocument(query, 0);
+            MatchingDocument matching_doc;
+            ASSERT_HINT(server.MatchDocument(query, 0, matching_doc), MATCH_DOCUMENT_FAILURE_MSG);
+            const auto& [words, _] = matching_doc;
             ASSERT(words.empty());
         }
-        {
-            const auto& [words, _] = server.MatchDocument(query, 2);
-            ASSERT(!words.empty());
-        }
         for (int i = 3; i <= 6; i++) {
-            const auto& [words, _] = server.MatchDocument(query, i);
+            MatchingDocument matching_doc;
+            ASSERT_HINT(server.MatchDocument(query, i, matching_doc), MATCH_DOCUMENT_FAILURE_MSG);
+            const auto& [words, _] = matching_doc;
             ASSERT(words.empty());
         }
     }
@@ -278,14 +255,16 @@ void TestAddDocument() {
     ASSERT_EQUAL(server.GetDocumentCount(), expected_count);
 
     for (const auto& [id, content, status, ratings] : documents) {
-        server.AddDocument(id, content, status, ratings);
+        ASSERT_HINT(server.AddDocument(id, content, status, ratings), ADD_DOCUMENT_FAILURE_MSG);
         ASSERT_EQUAL(server.GetDocumentCount(), ++expected_count);
     }
 
     // Test for document is matching
     {
         for (const auto& [id, content, status, ratings] : documents) {
-            const auto& [words, mathed_status] = server.MatchDocument(content, id);
+            MatchingDocument matching_doc;
+            ASSERT_HINT(server.MatchDocument(content, id, matching_doc), MATCH_DOCUMENT_FAILURE_MSG);
+            const auto& [words, mathed_status] = matching_doc;
             ASSERT_EQUAL(mathed_status, status);
             ASSERT(!words.empty() || (content.empty() && words.empty()));
         }
@@ -294,7 +273,9 @@ void TestAddDocument() {
     // Test for document in tops
     {
         for (const auto& raw_doc : documents) {
-            const auto& mathed_documents = server.FindTopDocuments(raw_doc.content, raw_doc.status);
+            vector<Document> found_docs;
+            ASSERT_HINT(server.FindTopDocuments(raw_doc.content, raw_doc.status, found_docs), SEARCH_DOCUMENT_FAILURE_MSG);
+            const auto& mathed_documents = found_docs;
             const int tops_count = count_if(mathed_documents.begin(), mathed_documents.end(), [&raw_doc](const auto& document) {
                 return document.id == raw_doc.id;
             });
@@ -314,11 +295,13 @@ void TestMatchDocuments() {
         vector<RawDocument> documents = initial_documents;
         SearchServer server;
         for (const auto& [id, content, status, ratings] : documents) {
-            server.AddDocument(id, content, status, ratings);
+            ASSERT_HINT(server.AddDocument(id, content, status, ratings), ADD_DOCUMENT_FAILURE_MSG);
         }
         string raw_query = "пушистый ухоженный кот"s;
         for (const auto& doc : documents) {
-            const auto& [matched_words, status] = server.MatchDocument(raw_query, doc.id);
+            MatchingDocument matching_doc;
+            ASSERT_HINT(server.MatchDocument(raw_query, doc.id, matching_doc), MATCH_DOCUMENT_FAILURE_MSG);
+            const auto& [matched_words, status] = matching_doc;
 
             ASSERT_EQUAL_HINT(status, doc.status, "Document status is not as expected."s);
 
@@ -347,24 +330,27 @@ void TestMatchDocuments() {
         string minus_word = "кот"s;
         string stop_word = "белый"s;
 
-        SearchServer server;
-        server.SetStopWords(stop_word);
+        SearchServer server(stop_word);
 
         for (const auto& [id, content, status, ratings] : raw_documents) {
-            server.AddDocument(id, content, status, ratings);
+            ASSERT_HINT(server.AddDocument(id, content, status, ratings), ADD_DOCUMENT_FAILURE_MSG);
         }
 
         // Empty content check (for minus_words)
         {
             const string query = initial_content + " -" + minus_word;
-            const auto& [matched_words, _] = server.MatchDocument(query, raw_doc.id);
+            MatchingDocument matching_doc;
+            ASSERT_HINT(server.MatchDocument(query, raw_doc.id, matching_doc), MATCH_DOCUMENT_FAILURE_MSG);
+            const auto& [matched_words, _] = matching_doc;
             ASSERT_HINT(matched_words.empty(), "Document content for the minus_words query is not empty.");
         }
 
         // Matching does not contain minus_words
         {
             const string query = initial_content;
-            const auto& [matched_words, _] = server.MatchDocument(query, raw_doc.id);
+            MatchingDocument matching_doc;
+            ASSERT_HINT(server.MatchDocument(query, raw_doc.id, matching_doc), MATCH_DOCUMENT_FAILURE_MSG);
+            const auto& [matched_words, _] = matching_doc;
             ASSERT_HINT(!matched_words.empty() && none_of(matched_words.begin(), matched_words.end(),
                                                           [stop_word](const string& word) {
                                                               return word == stop_word;
@@ -391,16 +377,17 @@ void TestRelevanceSortOrder() {
 
     SearchServer server;
     for (const auto& [id, content, status, ratings] : documents) {
-        server.AddDocument(id, content, status, ratings);
+        ASSERT_HINT(server.AddDocument(id, content, status, ratings), ADD_DOCUMENT_FAILURE_MSG);
     }
 
-    const auto& result_documents = server.FindTopDocuments(query, status);
+    vector<Document> found_docs;
+    ASSERT_HINT(server.FindTopDocuments(query, status, found_docs), SEARCH_DOCUMENT_FAILURE_MSG);
 
-    ASSERT_EQUAL(result_documents.size(), expected_top_documents_count);
+    ASSERT_EQUAL(found_docs.size(), expected_top_documents_count);
 
-    for (int i = 0; i < result_documents.size() - 1; i++) {
-        const auto& curr_doc = result_documents[i];
-        const auto& next_doc = result_documents[i + 1];
+    for (int i = 0; i < found_docs.size() - 1; i++) {
+        const auto& curr_doc = found_docs[i];
+        const auto& next_doc = found_docs[i + 1];
         ASSERT(curr_doc.relevance > next_doc.relevance ||
                (abs(curr_doc.relevance - next_doc.relevance) < THRESHOLD && curr_doc.rating >= next_doc.rating));
     }
@@ -433,7 +420,7 @@ void TestRatingCulculation() {
 
     SearchServer server;
     for (const auto& [id, content, status, ratings] : documents) {
-        server.AddDocument(id, content, status, ratings);
+        ASSERT_HINT(server.AddDocument(id, content, status, ratings), ADD_DOCUMENT_FAILURE_MSG);
     }
 
     map<int, int> expected_rating_values{};
@@ -441,10 +428,11 @@ void TestRatingCulculation() {
         expected_rating_values.insert({raw_doc.id, culcAvgRating(raw_doc.ratings)});
     }
 
-    const auto& matching_documents = server.FindTopDocuments(query);
-    ASSERT_HINT(matching_documents.size(), "No matching documents found."s);
+    vector<Document> found_docs;
+    ASSERT_HINT(server.FindTopDocuments(query, found_docs), SEARCH_DOCUMENT_FAILURE_MSG);
+    ASSERT_HINT(!found_docs.empty(), "Documents not found."s);
 
-    for (const auto& doc : matching_documents) {
+    for (const auto& doc : found_docs) {
         ASSERT_EQUAL(doc.rating, expected_rating_values[doc.id]);
     }
 }
@@ -464,18 +452,22 @@ void TestFilteringWihtPredicate() {
 
     SearchServer server;
     for (const auto& [id, content, status, ratings] : documents) {
-        server.AddDocument(id, content, status, ratings);
+        ASSERT_HINT(server.AddDocument(id, content, status, ratings), ADD_DOCUMENT_FAILURE_MSG);
     }
 
     const int request_id = 2;
     const string query = shared_word;
     const auto request_status = DocumentStatus::IRRELEVANT;
 
-    const auto& matched_documents = server.FindTopDocuments(query, [](int id, DocumentStatus status, int rating) -> bool {
-        return id == request_id && status == request_status && rating < 0;
-    });
+    vector<Document> matched_documents;
+    ASSERT_HINT(server.FindTopDocuments(
+        query,
+        [](int id, DocumentStatus status, int rating) -> bool {
+            return id == request_id && status == request_status && rating < 0;
+        },
+        matched_documents), SEARCH_DOCUMENT_FAILURE_MSG);
 
-    ASSERT_HINT(matched_documents.size(), "No matching documents found."s);
+    ASSERT_HINT(!matched_documents.empty(), "No matching documents found."s);
 
     const auto& matched_doc = matched_documents.front();
     ASSERT_EQUAL(matched_doc.id, request_id);
@@ -495,18 +487,20 @@ void TestFindDocumentsBySpecifiedStatus() {
 
     SearchServer server;
     for (const auto& [id, content, status, ratings] : documents) {
-        server.AddDocument(id, content, status, ratings);
+        ASSERT_HINT(server.AddDocument(id, content, status, ratings), ADD_DOCUMENT_FAILURE_MSG);
     }
 
     for (const auto& raw_doc : documents) {
-        const auto& matched_documents = server.FindTopDocuments(query, static_cast<DocumentStatus>(raw_doc.id));
+        vector<Document> matched_documents;
+        ASSERT_HINT(server.FindTopDocuments(query, static_cast<DocumentStatus>(raw_doc.id), matched_documents), SEARCH_DOCUMENT_FAILURE_MSG);
         ASSERT_EQUAL(matched_documents.size(), 1);
         ASSERT_EQUAL(matched_documents.front().id, raw_doc.id);
     }
 
     // Expect search failure (empty result)
-    const auto& matched_documents = server.FindTopDocuments(query, DocumentStatus::IRRELEVANT);
-    ASSERT(matched_documents.empty());
+    vector<Document> found_docs;
+    ASSERT_HINT(server.FindTopDocuments(query, DocumentStatus::IRRELEVANT, found_docs), SEARCH_DOCUMENT_FAILURE_MSG);
+    ASSERT_HINT(found_docs.empty(), "Search result must be empty.");
 }
 
 void TestFindTopDocuments() {
@@ -526,11 +520,12 @@ void TestFindTopDocuments() {
         }
         const RawDocument doc = {i, content, DocumentStatus::ACTUAL, {i, i - 1, i + 1}};
         raw_documents.push_back(doc);
-        server.AddDocument(doc.id, doc.content, doc.status, doc.ratings);
+        ASSERT_HINT(server.AddDocument(doc.id, doc.content, doc.status, doc.ratings), ADD_DOCUMENT_FAILURE_MSG);
     }
 
-    const auto& matched_documents = server.FindTopDocuments(word);
-    ASSERT_EQUAL(matched_documents.size(), expected_top_documents_count);
+    vector<Document> found_docs;
+    ASSERT_HINT(server.FindTopDocuments(word, found_docs), SEARCH_DOCUMENT_FAILURE_MSG);
+    ASSERT_EQUAL(found_docs.size(), expected_top_documents_count);
 }
 
 void TestSearchServer() {
