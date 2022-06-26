@@ -233,20 +233,13 @@ vector<Document> SearchServer::FindAllDocuments(const Query& query, function<boo
 
 bool SearchServer::IsValidWord(const string& word) {
     const auto containMinusChars = [](const string& word) -> bool {
-        std::regex self_regex(".*\\s+\\-+.*", std::regex_constants::ECMAScript);
+        std::regex self_regex("^[\\-]*.*\\s+\\-+.*", std::regex_constants::ECMAScript);
         return std::regex_search(word, self_regex);
     };
     const auto containSpecialChars = [](const string& word) -> bool {
         std::regex self_regex("[\\u0000-\\u001F]+", std::regex_constants::ECMAScript);
         return std::regex_search(word, self_regex);
     };
-
-    /*
-    // A valid word must not contain special characters
-    return none_of(word.begin(), word.end(), [](char c) {
-        return c >= '\0' && c < ' ';
-    });
-    */
 
     return !containMinusChars(word) && !containSpecialChars(word);
 }
