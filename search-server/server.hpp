@@ -3,8 +3,8 @@
 
 #include <functional>
 #include <map>
-#include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -45,30 +45,26 @@ class SearchServer {
     SearchServer() = default;
 
     template <typename StringContainer>
-    explicit SearchServer(const StringContainer& stop_words) : stop_words_(MakeUniqueNonEmptyStrings(stop_words)) {}
+    explicit SearchServer(const StringContainer& stop_words);
 
-    explicit SearchServer(const string& stop_words_text)
-        : SearchServer(SplitIntoWords(stop_words_text))  // Invoke delegating constructor from string container
-    {}
+    explicit SearchServer(const string& stop_words_text);
 
-    [[nodiscard]] bool AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
+    void AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
 
     // template <typename T>
-    optional<vector<Document>> FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate) const;
+    vector<Document> FindTopDocuments(const string& raw_query, function<bool(int, DocumentStatus, int)> predicate) const;
 
-    optional<vector<Document>> FindTopDocuments(const string& raw_query) const;
+    vector<Document> FindTopDocuments(const string& raw_query) const;
 
-    optional<vector<Document>> FindTopDocuments(const string& raw_query, DocumentStatus status) const;
+    vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus status) const;
 
     int GetDocumentCount() const;
 
     int GetDocumentId(int index) const;
 
-    optional<tuple<vector<string>, DocumentStatus>> MatchDocument(const string& raw_query, int document_id) const;
+    tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const;
 
     set<std::string> GetStopWords() const;
-
-    inline static constexpr int INVALID_DOCUMENT_ID = -1;
 
    private:
     struct DocumentData {
@@ -88,6 +84,7 @@ class SearchServer {
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
+    vector<int> documents_ids_queue_;
 
     bool IsStopWord(const string& word) const;
 
@@ -108,6 +105,9 @@ class SearchServer {
 
     template <typename List>
     static bool IsValidContent(const List& content);
+
+    template <typename List>
+    static bool IsValidStopWords(const List& stop_words);
 
     static bool IsValidMinusWords(const string& word);
 
