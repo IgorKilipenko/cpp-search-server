@@ -670,11 +670,13 @@ void TestRelevanceSortOrder() {
 
     ASSERT_EQUAL(result_documents.size(), expected_top_documents_count);
 
-    for (int i = 0; i < result_documents.size() - 1; i++) {
-        const auto& curr_doc = result_documents[i];
-        const auto& next_doc = result_documents[i + 1];
-        ASSERT(curr_doc.relevance > next_doc.relevance ||
-               (abs(curr_doc.relevance - next_doc.relevance) < THRESHOLD && curr_doc.rating >= next_doc.rating));
+    if (const int size = max(static_cast<int>(result_documents.size()) - 1, 0); size > 0) {
+        for (int i = 0; i < size; i++) {
+            const auto& curr_doc = result_documents[i];
+            const auto& next_doc = result_documents[i + 1];
+            ASSERT(curr_doc.relevance > next_doc.relevance ||
+                   (abs(curr_doc.relevance - next_doc.relevance) < THRESHOLD && curr_doc.rating >= next_doc.rating));
+        }
     }
 }
 
@@ -685,12 +687,12 @@ void TestRelevanceSortOrder() {
 void TestRatingCulculation() {
     const auto culcAvgRating = [](const vector<int>& ratings) -> int {
         if (ratings.empty()) return 0;
-        const double n = static_cast<double>(ratings.size());
-        const double avg = accumulate(ratings.begin(), ratings.end(), 0.0, [n](double curr, int v) {
-            curr += v / n;
-            return curr;
+
+        const int rating_sum = accumulate(ratings.begin(), ratings.end(), 0, [](int summ, int rating) {
+            return summ + rating;
         });
-        return static_cast<int>(avg);
+
+        return rating_sum / static_cast<int>(ratings.size());
     };
 
     const DocumentStatus status = DocumentStatus::ACTUAL;
