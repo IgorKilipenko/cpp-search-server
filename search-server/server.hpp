@@ -2,7 +2,9 @@
 #define SERVER_HPP
 
 #include <functional>
+#include <iterator>
 #include <map>
+#include <ostream>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -18,6 +20,10 @@ struct Document {
     int rating;
     Document() : id{0}, relevance{0.0}, rating{0} {}
     Document(int id, double relevance, int rating) : id{id}, relevance{relevance}, rating{rating} {}
+    friend ostream& operator<<(ostream& os, const Document& doc) {
+        os << "{ document_id = " << doc.id << " relevance = " << doc.relevance << " rating = " << doc.rating << " }";
+        return os;
+    }
 };
 
 enum class DocumentStatus {
@@ -114,6 +120,40 @@ class SearchServer {
     static bool IsValidMinusWords(const set<string>& words);
 
     bool IsValidDocumentId(int id) const;
+};
+
+class Page : public vector<Document> {
+   public:
+    Page() : vector<Document>() {}
+    explicit Page(int count) : vector<Document>(count) {}
+    Page(int count, const Document& doc) : vector<Document>(count, doc) {}
+    Page(iterator begin, iterator end) : vector<Document>(begin, end) {}
+
+   public:
+    typedef vector<Document>::iterator iterator;
+    friend ostream& operator<<(ostream& os, Page page) {
+        for (auto ptr = page.begin(); ptr != page.end(); ptr++) {
+            os << *ptr;
+        }
+        return os;
+    }
+};
+
+//template <class Iterator>
+class Paginator : public vector<Page> {
+   public:
+    typedef vector<Document>::const_iterator Iterator;
+    //Paginator(Iterator begin, Iterator end, int page_size);
+    Paginator(Iterator begin, Iterator end, int page_size);
+    /*Page::iterator begin();
+    Page::iterator end();
+    int size() const;*/
+
+   private:
+    //Page::iterator begin_;
+    //Page::iterator end_;
+    int page_size_;
+    //vector<Page> pages_;
 };
 
 #endif /* SERVER_HPP */

@@ -266,3 +266,25 @@ bool SearchServer::IsValidDocumentId(int document_id) const {
     if (document_id < 0) return false;  // Check if ID is negative
     return true;
 }
+
+// Paginator class
+//template <class Iterator>
+Paginator/*<Iterator>*/::Paginator(Iterator begin, Iterator end, int page_size) : page_size_{page_size} {
+    //vector<typename Iterator::value_type> buffer(begin, end);
+    Page curr_page{};
+    curr_page.reserve(page_size);
+    //const int size = distance(begin, end);
+    int i = 0;
+    for (auto ptr = begin; ptr != end; ptr++) {
+        curr_page.push_back(*ptr);
+        if (++i > 0 && i % page_size_ == 0) {
+            this->push_back(curr_page);
+            curr_page.clear();
+        }
+    }
+    if (!curr_page.empty()) {
+        curr_page.resize(curr_page.size());
+        this->push_back(curr_page);
+    }
+}
+
