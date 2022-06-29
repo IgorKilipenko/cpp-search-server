@@ -70,13 +70,13 @@ class SearchServer {
 
    private:
     struct DocumentData {
-        int rating;
-        DocumentStatus status;
+        int rating = 0;
+        DocumentStatus status = DocumentStatus::ACTUAL;
     };
     struct QueryWord {
         string data;
-        bool is_minus;
-        bool is_stop;
+        bool is_minus = false;
+        bool is_stop = false;
     };
     struct Query {
         set<string> plus_words;
@@ -151,11 +151,17 @@ SearchServer::SearchServer(const string& stop_words_text)
 {}
 
 void SearchServer::AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings) {
-    if (!IsValidDocumentId(document_id)) throw invalid_argument("Invalid document ID."s);
-    if (documents_.count(document_id)) throw invalid_argument("Document with this ID already exists."s);
+    if (!IsValidDocumentId(document_id)) {
+        throw invalid_argument("Invalid document ID."s);
+    }
+    if (documents_.count(document_id)) {
+        throw invalid_argument("Document with this ID already exists."s);
+    }
 
     const vector<string> words = SplitIntoWordsNoStop(document);
-    if (!IsValidContent(words)) throw invalid_argument("Invalid document content."s);
+    if (!IsValidContent(words)) {
+        throw invalid_argument("Invalid document content."s);
+    }
 
     const double inv_word_count = 1.0 / words.size();
     for (const string& word : words) {
@@ -186,9 +192,7 @@ vector<Document> SearchServer::FindTopDocuments(const string& raw_query, T predi
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const {
-    return FindTopDocuments(raw_query, [](int id, DocumentStatus status, [[maybe_unused]] int rating) -> bool {
-        return status == DocumentStatus::ACTUAL;
-    });
+    return FindTopDocuments(raw_query, DocumentStatus::ACTUAL);
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query, DocumentStatus status) const {
@@ -202,7 +206,9 @@ int SearchServer::GetDocumentCount() const {
 }
 
 int SearchServer::GetDocumentId(int index) const {
-    if (documents_ids_queue_.size() <= index) throw out_of_range("Invalid document index. " + "Index: "s + to_string(index) + " out of range."s);
+    if (index < 0 || documents_ids_queue_.size() <= index) {
+        throw out_of_range("Invalid document index. " + "Index: "s + to_string(index) + " out of range."s);
+    }
     return documents_ids_queue_[index];
 }
 
@@ -211,7 +217,9 @@ set<std::string> SearchServer::GetStopWords() const {
 }
 
 tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& raw_query, int document_id) const {
-    if (!IsValidDocumentId(document_id)) throw invalid_argument("Invalid document ID."s);
+    if (!IsValidDocumentId(document_id)) {
+        throw invalid_argument("Invalid document ID."s);
+    }
 
     const Query query = ParseQuery(raw_query);
 
@@ -279,10 +287,14 @@ SearchServer::Query SearchServer::ParseQuery(const string& text) const {
         const QueryWord query_word = ParseQueryWord(word);
         if (!query_word.is_stop) {
             if (query_word.is_minus) {
-                if (!IsValidMinusWords(query_word.data)) throw invalid_argument("Invalid minus-word.");
+                if (!IsValidMinusWords(query_word.data)) {
+                    throw invalid_argument("Invalid minus-word.");
+                }
                 query.minus_words.insert(query_word.data);
             } else {
-                if (!IsValidWord(query_word.data)) throw invalid_argument("Invalid minus-word.");
+                if (!IsValidWord(query_word.data)) {
+                    throw invalid_argument("Invalid minus-word.");
+                }
                 query.plus_words.insert(query_word.data);
             }
         }
@@ -303,7 +315,9 @@ vector<Document> SearchServer::FindAllDocuments(const Query& query, T predicate)
         }
         const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
         for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word)) {
-            if (!documents_.count(document_id)) continue;
+            if (!documents_.count(document_id)) {
+                continue;
+            }
             const auto& document = documents_.at(document_id);
             if (predicate(document_id, document.status, document.rating)) {
                 document_to_relevance[document_id] += term_freq * inverse_document_freq;
@@ -347,7 +361,9 @@ bool SearchServer::IsValidMinusWords(const string& word) {
 
 bool SearchServer::IsValidMinusWords(const set<string>& words) {
     for (const auto& word : words) {
-        if (!IsValidMinusWords(word)) return false;
+        if (!IsValidMinusWords(word)) {
+            return false;
+        }
     }
     return true;
 }
@@ -366,7 +382,9 @@ bool SearchServer::IsValidStopWords(const List& stop_words) {
 }
 
 bool SearchServer::IsValidDocumentId(int document_id) const {
-    if (document_id < 0) return false;  // Check if ID is negative
+    if (document_id < 0) {
+        return false;  // Check if ID is negative
+    }
     return true;
 }
 
