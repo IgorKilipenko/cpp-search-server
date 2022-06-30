@@ -156,8 +156,13 @@ class Paginator : protected vector<Page> {
     using super = vector<Page>;
     Paginator(typename vector<Document>::const_iterator begin, typename vector<Document>::const_iterator end, size_t page_size);
     Paginator(typename set<Document>::const_iterator begin, typename set<Document>::const_iterator end, size_t page_size);
+    
     template <class Iterator>
-    Paginator Create(Iterator begin, Iterator end, size_t page_size);
+    static Paginator Create(Iterator begin, Iterator end, size_t page_size) {
+        Paginator result(begin, end, page_size);
+        return result;
+    }
+    
     void AddPage(Page page);
 
     // Iterator interface
