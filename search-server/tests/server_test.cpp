@@ -428,8 +428,8 @@ void TestRelevanceSortOrder() {
  * @brief Вычисление рейтинга документов.
  * Рейтинг добавленного документа равен среднему арифметическому оценок документа.
  */
-void TestRatingCulculation() {
-    const auto culcAvgRating = [](const vector<int>& ratings) -> int {
+void TestRatingCalculation() {
+    const auto calcAvgRating = [](const vector<int>& ratings) -> int {
         if (ratings.empty()) return 0;
         const double n = static_cast<double>(ratings.size());
         const double avg = accumulate(ratings.begin(), ratings.end(), 0.0, [n](double curr, int v) {
@@ -456,7 +456,7 @@ void TestRatingCulculation() {
 
     map<int, int> expected_rating_values{};
     for (const auto& raw_doc : documents) {
-        expected_rating_values.insert({raw_doc.id, culcAvgRating(raw_doc.ratings)});
+        expected_rating_values.insert({raw_doc.id, calcAvgRating(raw_doc.ratings)});
     }
 
     vector<Document> found_docs;
@@ -573,7 +573,7 @@ void TestSearchServer() {
 
     RUN_TEST(TestRelevanceSortOrder);
 
-    RUN_TEST(TestRatingCulculation);
+    RUN_TEST(TestRatingCalculation);
 
     RUN_TEST(TestFilteringWihtPredicate);
 
