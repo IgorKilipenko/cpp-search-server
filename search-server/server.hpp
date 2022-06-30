@@ -121,7 +121,7 @@ class SearchServer {
     bool IsValidDocumentId(int id) const;
 };
 
-template <typename TDocument, typename iterator>
+template <typename TDocument, typename iterator = decltype(std::vector<TDocument>::const_iterator)>
 class Page : protected vector<TDocument> {
    public:
     using super = vector<Document>;
@@ -154,17 +154,17 @@ class Page : protected vector<TDocument> {
 template <typename TDocument = Document, typename iterator = decltype(std::vector<TDocument>::const_iterator)>
 class Paginator : protected vector<Page<TDocument, iterator>> {
    public:
-    using super = vector<Page<TDocument,iterator>>;
+    using super = vector<Page<TDocument, iterator>>;
     Paginator(typename vector<Document>::const_iterator begin, typename vector<Document>::const_iterator end, size_t page_size);
     Paginator(typename set<Document>::const_iterator begin, typename set<Document>::const_iterator end, size_t page_size);
-    
+
     template <class Iterator>
     static Paginator Create(Iterator begin, Iterator end, size_t page_size) {
         Paginator result(begin, end, page_size);
         return result;
     }
-    
-    void AddPage(Page<TDocument,iterator> page);
+
+    void AddPage(Page<TDocument, iterator> page);
 
     // Iterator interface
     auto begin() const;
@@ -180,41 +180,42 @@ class Paginator : protected vector<Page<TDocument, iterator>> {
 };
 
 template <typename TDocument, typename iterator>
-Paginator<TDocument,iterator>::Paginator(typename vector<Document>::const_iterator begin, typename vector<Document>::const_iterator end, size_t page_size)
+Paginator<TDocument, iterator>::Paginator(typename vector<Document>::const_iterator begin, typename vector<Document>::const_iterator end,
+                                          size_t page_size)
     : page_size_{page_size} {
     inintialize(begin, end, page_size);
 }
 
 template <typename TDocument, typename iterator>
-Paginator<TDocument,iterator>::Paginator(typename set<Document>::const_iterator begin, typename set<Document>::const_iterator end, size_t page_size)
+Paginator<TDocument, iterator>::Paginator(typename set<Document>::const_iterator begin, typename set<Document>::const_iterator end, size_t page_size)
     : page_size_{page_size} {
     inintialize(begin, end, page_size);
 }
 
 template <typename TDocument, typename iterator>
-void Paginator<TDocument,iterator>::AddPage(Page<TDocument,iterator> page) {
+void Paginator<TDocument, iterator>::AddPage(Page<TDocument, iterator> page) {
     this->push_back(page);
 }
 
 template <typename TDocument, typename iterator>
-auto Paginator<TDocument,iterator>::begin() const {
+auto Paginator<TDocument, iterator>::begin() const {
     return super::begin();
 }
 
 template <typename TDocument, typename iterator>
-auto Paginator<TDocument,iterator>::end() const {
+auto Paginator<TDocument, iterator>::end() const {
     return super::end();
 }
 
 template <typename TDocument, typename iterator>
-size_t Paginator<TDocument,iterator>::size() const {
+size_t Paginator<TDocument, iterator>::size() const {
     return super::size();
 }
 
 template <typename TDocument, typename iterator>
 template <class Iterator>
-void Paginator<TDocument,iterator>::inintialize(Iterator begin, Iterator end, size_t page_size) {
-    Page<TDocument,iterator> curr_page{};
+void Paginator<TDocument, iterator>::inintialize(Iterator begin, Iterator end, size_t page_size) {
+    Page<TDocument, iterator> curr_page{};
     curr_page.Reserve(page_size);
     int i = 0;
     for (auto ptr = begin; ptr != end; ptr++) {
@@ -231,42 +232,42 @@ void Paginator<TDocument,iterator>::inintialize(Iterator begin, Iterator end, si
 }
 
 template <typename TDocument, typename iterator>
-void Page<TDocument,iterator>::AddDocument(const Document& document) {
+void Page<TDocument, iterator>::AddDocument(const Document& document) {
     super::push_back(document);
 }
 
 template <typename TDocument, typename iterator>
-void Page<TDocument,iterator>::Resize(size_t new_size) {
+void Page<TDocument, iterator>::Resize(size_t new_size) {
     super::resize(new_size);
 }
 
 template <typename TDocument, typename iterator>
-void Page<TDocument,iterator>::Reserve(size_t n) {
+void Page<TDocument, iterator>::Reserve(size_t n) {
     super::reserve(n);
 }
 
 template <typename TDocument, typename iterator>
-bool Page<TDocument,iterator>::IsEmpty() const {
+bool Page<TDocument, iterator>::IsEmpty() const {
     return super::empty();
 }
 
 template <typename TDocument, typename iterator>
-size_t Page<TDocument,iterator>::Size() const {
+size_t Page<TDocument, iterator>::Size() const {
     return super::size();
 }
 
 template <typename TDocument, typename iterator>
-void Page<TDocument,iterator>::Clear() {
+void Page<TDocument, iterator>::Clear() {
     super::clear();
 }
 
 template <typename TDocument, typename iterator>
-iterator Page<TDocument,iterator>::begin() const {
+iterator Page<TDocument, iterator>::begin() const {
     return super::begin();
 }
 
 template <typename TDocument, typename iterator>
-iterator Page<TDocument,iterator>::end() const {
+iterator Page<TDocument, iterator>::end() const {
     return super::end();
 }
 
