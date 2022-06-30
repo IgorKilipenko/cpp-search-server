@@ -54,8 +54,4 @@ class RequestQueue {
     constexpr const static chrono::minutes min_in_day_{chrono::hours(24)};
     const SearchServer& server_;
     chrono::minutes server_time_;
-
-    static bool IsEmptyResult(const vector<Document>& docs) {
-        return docs.empty();
-    }
 };
