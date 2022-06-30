@@ -68,9 +68,9 @@ void MatchDocuments(const SearchServer& search_server, const string& query) {
     }
 }
 
-template <typename Container>
-auto Paginate(const Container& c, size_t page_size) {
-    return Paginator(begin(c), end(c), page_size);
+template <template <typename...> class Container, typename T>
+auto Paginate(const Container<T>& c, size_t page_size) {
+    return Paginator(c.begin(), c.end(), page_size);
 }
 
 int main() {
@@ -99,4 +99,6 @@ int main() {
         cout << *page << endl;
         cout << "Page break"s << endl;
     }
-} 
+
+    return 0;
+}

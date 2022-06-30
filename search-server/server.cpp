@@ -3,10 +3,8 @@
 
 #include <algorithm>
 #include <cmath>
-#include <functional>
 #include <map>
 #include <numeric>
-#include <optional>
 #include <regex>
 #include <set>
 #include <stdexcept>
@@ -267,24 +265,79 @@ bool SearchServer::IsValidDocumentId(int document_id) const {
     return true;
 }
 
-// Paginator class
-//template <class Iterator>
-Paginator/*<Iterator>*/::Paginator(Iterator begin, Iterator end, int page_size) : page_size_{page_size} {
-    //vector<typename Iterator::value_type> buffer(begin, end);
+Paginator::Paginator(typename vector<Document>::const_iterator begin, typename vector<Document>::const_iterator end, size_t page_size)
+    : page_size_{page_size} {
+    inintialize(begin, end, page_size);
+}
+
+Paginator::Paginator(typename set<Document>::const_iterator begin, typename set<Document>::const_iterator end, size_t page_size)
+    : page_size_{page_size} {
+    inintialize(begin, end, page_size);
+}
+
+void Paginator::AddPage(Page page) {
+    this->push_back(page);
+}
+
+Paginator::super::const_iterator Paginator::begin() const {
+    return super::begin();
+}
+
+Paginator::super::const_iterator Paginator::end() const {
+    return super::end();
+}
+
+size_t Paginator::size() const {
+    return super::size();
+}
+
+template <class Iterator>
+void Paginator::inintialize(Iterator begin, Iterator end, size_t page_size) {
     Page curr_page{};
-    curr_page.reserve(page_size);
-    //const int size = distance(begin, end);
+    curr_page.Reserve(page_size);
     int i = 0;
     for (auto ptr = begin; ptr != end; ptr++) {
-        curr_page.push_back(*ptr);
+        curr_page.AddDocument(*ptr);
         if (++i > 0 && i % page_size_ == 0) {
-            this->push_back(curr_page);
-            curr_page.clear();
+            this->AddPage(curr_page);
+            curr_page.Clear();
         }
     }
-    if (!curr_page.empty()) {
-        curr_page.resize(curr_page.size());
-        this->push_back(curr_page);
+    if (!curr_page.IsEmpty()) {
+        curr_page.Resize(curr_page.Size());
+        this->AddPage(curr_page);
     }
 }
 
+
+void Page::AddDocument(const Document& document) {
+    super::push_back(document);
+}
+
+void Page::Resize(size_t new_size) {
+    super::resize(new_size);
+}
+
+void Page::Reserve(size_t n) {
+    super::reserve(n);
+}
+
+bool Page::IsEmpty() const {
+    return super::empty();
+}
+
+size_t Page::Size() const {
+    return super::size();
+}
+
+void Page::Clear() {
+    super::clear();
+}
+
+Page::super::const_iterator Page::begin() const {
+    return super::begin();
+}
+
+Page::super::const_iterator Page::end() const {
+    return super::end();
+}

@@ -2,7 +2,6 @@
 #define SERVER_HPP
 
 #include <functional>
-#include <iterator>
 #include <map>
 #include <ostream>
 #include <set>
@@ -122,38 +121,56 @@ class SearchServer {
     bool IsValidDocumentId(int id) const;
 };
 
-class Page : public vector<Document> {
+class Page : protected vector<Document> {
    public:
+    using super = vector<Document>;
     Page() : vector<Document>() {}
     explicit Page(int count) : vector<Document>(count) {}
     Page(int count, const Document& doc) : vector<Document>(count, doc) {}
     Page(iterator begin, iterator end) : vector<Document>(begin, end) {}
 
-   public:
-    typedef vector<Document>::iterator iterator;
     friend ostream& operator<<(ostream& os, Page page) {
         for (auto ptr = page.begin(); ptr != page.end(); ptr++) {
             os << *ptr;
         }
         return os;
     }
+
+    void AddDocument(const Document& document);
+
+    // Container interface
+    void Resize(size_t new_size);
+    void Reserve(size_t n);
+    bool IsEmpty() const;
+    size_t Size() const;
+    void Clear();
+
+    // Iterator interface
+    super::const_iterator begin() const;
+    super::const_iterator end() const;
 };
 
-//template <class Iterator>
-class Paginator : public vector<Page> {
+// template <template <typename...> class Container = vector, typename T = Page>
+class Paginator : protected vector<Page> {
    public:
-    typedef vector<Document>::const_iterator Iterator;
-    //Paginator(Iterator begin, Iterator end, int page_size);
-    Paginator(Iterator begin, Iterator end, int page_size);
-    /*Page::iterator begin();
-    Page::iterator end();
-    int size() const;*/
+    using super = vector<Page>;
+    Paginator(typename vector<Document>::const_iterator begin, typename vector<Document>::const_iterator end, size_t page_size);
+    Paginator(typename set<Document>::const_iterator begin, typename set<Document>::const_iterator end, size_t page_size);
+    template <class Iterator>
+    Paginator Create(Iterator begin, Iterator end, size_t page_size);
+    void AddPage(Page page);
+
+    // Iterator interface
+    super::const_iterator begin() const;
+    super::const_iterator end() const;
+
+    size_t size() const;
 
    private:
-    //Page::iterator begin_;
-    //Page::iterator end_;
-    int page_size_;
-    //vector<Page> pages_;
+    size_t page_size_;
+
+    template <class Iterator>
+    void inintialize(Iterator begin, Iterator end, size_t page_size);
 };
 
 #endif /* SERVER_HPP */
