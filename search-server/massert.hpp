@@ -1,5 +1,4 @@
-#ifndef __MASSERT_H__
-#define __MASSERT_H__
+#pragma once
 
 #include <iostream>
 #include <string>
@@ -45,6 +44,3 @@ inline void AssertImpl(bool value, const string& expr_str, const string& file, c
 #define ASSERT_HINT(expr, hint) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, (hint))
 
 #endif  // !ASSERT
-
-
-#endif // __MASSERT_H__

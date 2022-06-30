@@ -1,5 +1,4 @@
-#ifndef SERVER_HPP
-#define SERVER_HPP
+#pragma once
 
 #include <cstddef>
 #include <functional>
@@ -13,6 +12,7 @@
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
+constexpr const double THRESHOLD = 1e-6;
 
 struct Document {
     int id;
@@ -285,5 +285,3 @@ template <typename TDocument>
 auto Page<TDocument>::end() const {
     return super::end();
 }
-
-#endif /* SERVER_HPP */

@@ -1,5 +1,4 @@
-
-#include "./server.hpp"
+#include "server.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -10,8 +9,6 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-static const double THRESHOLD = 1e-6;
 
 extern vector<string> SplitIntoWords(const string& text) {
     vector<string> words;
