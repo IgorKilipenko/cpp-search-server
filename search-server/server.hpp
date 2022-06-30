@@ -162,22 +162,7 @@ class Paginator : protected vector<TPage> {
     using super = vector<TPage>;
     using DocIterator = typename TPage::InIterator;
 
-    Paginator(DocIterator begin, DocIterator end, size_t page_size) {
-        TPage curr_page{};
-        curr_page.Reserve(page_size);
-        int i = 0;
-        for (auto ptr = begin; ptr != end; ptr++) {
-            curr_page.AddDocument(*ptr);
-            if (++i > 0 && i % page_size_ == 0) {
-                this->AddPage(curr_page);
-                curr_page.Clear();
-            }
-        }
-        if (!curr_page.IsEmpty()) {
-            curr_page.Resize(curr_page.Size());
-            this->AddPage(curr_page);
-        }
-    }
+    Paginator(DocIterator begin, DocIterator end, size_t page_size);
 
     void AddPage(TPage page);
 
@@ -190,6 +175,24 @@ class Paginator : protected vector<TPage> {
    private:
     size_t page_size_;
 };
+
+template <class TPage>
+Paginator<TPage>::Paginator(DocIterator begin, DocIterator end, size_t page_size) : page_size_{page_size} {
+    TPage curr_page{};
+    curr_page.Reserve(page_size);
+    int i = 0;
+    for (auto ptr = begin; ptr != end; ptr++) {
+        curr_page.AddDocument(*ptr);
+        if (++i > 0 && i % page_size_ == 0) {
+            this->AddPage(curr_page);
+            curr_page.Clear();
+        }
+    }
+    if (!curr_page.IsEmpty()) {
+        curr_page.Resize(curr_page.Size());
+        this->AddPage(curr_page);
+    }
+}
 
 template <class TPage>
 void Paginator<TPage>::AddPage(TPage page) {
