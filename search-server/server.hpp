@@ -1,6 +1,7 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <ostream>
@@ -162,22 +163,43 @@ class Paginator : protected vector<TPage> {
     using super = vector<TPage>;
     using DocIterator = typename TPage::InIterator;
 
+    explicit Paginator(size_t page_size) : page_size_{page_size} {}
     Paginator(DocIterator begin, DocIterator end, size_t page_size);
 
+    /// Add new page
     void AddPage(TPage page);
 
-    // Iterator interface
+    /// Get page by index.
+    /// This function provides for safer data access.
+    TPage& GetPage(size_t index);
+
+    /// Get page by index.
+    /// This function provides for safer data access.
+    const TPage& GetPage(size_t index) const;
+
+    /// Get page by index
+    TPage& operator[](size_t index) {
+        return super::operator[](index);
+    }
+
+    /// First iteration element
     auto begin() const;
+
+    /// Last iteration element
     auto end() const;
 
+    /// Total page count
     size_t size() const;
+
+    /// Get size of page
+    size_t PageSize() const;
 
    private:
     size_t page_size_;
 };
 
 template <class TPage>
-Paginator<TPage>::Paginator(DocIterator begin, DocIterator end, size_t page_size) : page_size_{page_size} {
+Paginator<TPage>::Paginator(DocIterator begin, DocIterator end, size_t page_size) : Paginator(page_size) {
     TPage curr_page{};
     curr_page.Reserve(page_size);
     int i = 0;
@@ -197,6 +219,16 @@ Paginator<TPage>::Paginator(DocIterator begin, DocIterator end, size_t page_size
 template <class TPage>
 void Paginator<TPage>::AddPage(TPage page) {
     this->push_back(page);
+}
+
+template <class TPage>
+TPage& Paginator<TPage>::GetPage(size_t index) {
+    return super::at(index);
+}
+
+template <class TPage>
+const TPage& Paginator<TPage>::GetPage(size_t index) const {
+    return super::at(index);
 }
 
 template <class TPage>
