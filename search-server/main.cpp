@@ -71,8 +71,7 @@ void MatchDocuments(const SearchServer& search_server, const string& query) {
 
 template <template <typename...> class Container, typename T>
 auto Paginate(const Container<T>& c, size_t page_size) {
-    return Paginator<T, typename Container<T>::const_iterator>(c.begin(), c.end(), page_size);
-    // return Paginator<T, typename Container<T>::const_iterator>::Create(c.begin(), c.end(), page_size);
+    return Paginator(c.begin(), c.end(), page_size);
 }
 
 int main() {

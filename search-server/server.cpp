@@ -264,36 +264,3 @@ bool SearchServer::IsValidDocumentId(int document_id) const {
     if (document_id < 0) return false;  // Check if ID is negative
     return true;
 }
-
-template <>
-Paginator<Document, vector<Document>::const_iterator>::Paginator(vector<Document>::const_iterator begin, vector<Document>::const_iterator end,
-                                                                 size_t page_size)
-    : page_size_{page_size} {
-    inintialize(begin, end, page_size);
-}
-
-template <>
-Paginator<Document, set<Document>::const_iterator>::Paginator(set<Document>::const_iterator begin, set<Document>::const_iterator end,
-                                                              size_t page_size)
-    : page_size_{page_size} {
-    inintialize(begin, end, page_size);
-}
-
-template <typename TDocument, typename iterator>
-template <class Iterator>
-void Paginator<TDocument, iterator>::inintialize(Iterator begin, Iterator end, size_t page_size) {
-    Page<TDocument, iterator> curr_page{};
-    curr_page.Reserve(page_size);
-    int i = 0;
-    for (auto ptr = begin; ptr != end; ptr++) {
-        curr_page.AddDocument(*ptr);
-        if (++i > 0 && i % page_size_ == 0) {
-            this->AddPage(curr_page);
-            curr_page.Clear();
-        }
-    }
-    if (!curr_page.IsEmpty()) {
-        curr_page.Resize(curr_page.Size());
-        this->AddPage(curr_page);
-    }
-}
