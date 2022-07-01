@@ -1,7 +1,6 @@
-#ifndef __SERVER_TEST_H__
-#define __SERVER_TEST_H__
+#pragma once
 
-#include "../server.hpp"
+#include "../search_server.h"
 
 // -------- Начало модульных тестов поисковой системы ----------
 
@@ -13,4 +12,3 @@ void TestSearchServer();
 
 // --------- Окончание модульных тестов поисковой системы -----------
 
-#endif // __SERVER_TEST_H__
