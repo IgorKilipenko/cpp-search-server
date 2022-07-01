@@ -2,6 +2,7 @@
 
 #include <ostream>
 #include <vector>
+
 #include "document.h"
 
 using namespace std;
@@ -9,7 +10,6 @@ using namespace std;
 template <typename TDocument = Document>
 class Page : protected vector<TDocument> {
    public:
-    using super = vector<TDocument>;
     using InIterator = typename Page::const_iterator;
 
     Page() : vector<TDocument>() {}
@@ -39,12 +39,14 @@ class Page : protected vector<TDocument> {
     // Iterator interface
     auto begin() const;
     auto end() const;
+
+   private:
+    using super = vector<TDocument>;
 };
 
 template <class TPage = Page<Document>>
 class Paginator : protected vector<TPage> {
    public:
-    using super = vector<TPage>;
     using DocIterator = typename TPage::InIterator;
 
     explicit Paginator(size_t page_size) : page_size_{page_size} {}
@@ -79,8 +81,14 @@ class Paginator : protected vector<TPage> {
     size_t PageSize() const;
 
    private:
+    using super = vector<TPage>;
+
     size_t page_size_;
 };
+
+// ----------------------------------------------------------------
+// Paginator implementation
+// ----------------------------------------------------------------
 
 template <class TPage>
 Paginator<TPage>::Paginator(DocIterator begin, DocIterator end, size_t page_size) : Paginator(page_size) {
@@ -129,6 +137,10 @@ template <class TPage>
 size_t Paginator<TPage>::size() const {
     return super::size();
 }
+
+// ----------------------------------------------------------------
+// Page implementation
+// ----------------------------------------------------------------
 
 template <typename TDocument>
 void Page<TDocument>::AddDocument(const TDocument& document) {
