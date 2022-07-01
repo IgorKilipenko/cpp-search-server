@@ -3,10 +3,11 @@
 #include <string>
 #include <vector>
 
-#include "server.hpp"
-#include "request_queue.hpp"
-#include "read_input_functions.h"
 #include "document.h"
+#include "paginator.h"
+#include "read_input_functions.h"
+#include "request_queue.hpp"
+#include "server.hpp"
 
 void AddDocument(SearchServer& search_server, int document_id, const string& document, DocumentStatus status, const vector<int>& ratings) {
     try {
@@ -41,7 +42,6 @@ void MatchDocuments(const SearchServer& search_server, const string& query) {
     }
 }
 
-
 int main() {
     SearchServer search_server("and in at"s);
     RequestQueue request_queue(search_server);
@@ -64,4 +64,4 @@ int main() {
     request_queue.AddFindRequest("sparrow"s);
     cout << "Total empty requests: "s << request_queue.GetNoResultRequests() << endl;
     return 0;
-} 
+}
