@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "../massert.hpp"
+#include "../string_processing.h"
 
 using namespace std;
 
