@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <functional>
 #include <map>
 #include <ostream>
@@ -34,35 +33,14 @@ class SearchServer {
     SearchServer() = default;
 
     template <typename StringContainer>
-    SearchServer(const StringContainer& stop_words) : stop_words_(MakeUniqueNonEmptyStrings(stop_words)) {
-        if (!all_of(stop_words_.begin(), stop_words_.end(), IsValidWord)) {
-            throw invalid_argument("Some of stop words are invalid"s);
-        }
-    }
+    SearchServer(const StringContainer& stop_words);
 
     explicit SearchServer(const string& stop_words_text);
 
     void AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
 
     template <typename T = function<bool(int, DocumentStatus, int)>>
-    vector<Document> FindTopDocuments(const string& raw_query, T predicate) const {
-        const auto query = ParseQuery(raw_query);
-
-        auto matched_documents = FindAllDocuments(query, predicate);
-
-        sort(matched_documents.begin(), matched_documents.end(), [](const Document& lhs, const Document& rhs) {
-            if (abs(lhs.relevance - rhs.relevance) < THRESHOLD) {
-                return lhs.rating > rhs.rating;
-            } else {
-                return lhs.relevance > rhs.relevance;
-            }
-        });
-        if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
-            matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
-        }
-
-        return matched_documents;
-    }
+    vector<Document> FindTopDocuments(const string& raw_query, T predicate) const;
 
     vector<Document> FindTopDocuments(const string& raw_query) const;
 
@@ -109,36 +87,70 @@ class SearchServer {
     double ComputeWordInverseDocumentFreq(const string& word) const;
 
     template <typename T = function<bool(int, DocumentStatus, int)>>
-    vector<Document> FindAllDocuments(const Query& query, T predicate) const {
-        map<int, double> document_to_relevance;
-        for (const string& word : query.plus_words) {
-            if (word_to_document_freqs_.count(word) == 0) {
-                continue;
-            }
-            const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
-            for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word)) {
-                const auto& document_data = documents_.at(document_id);
-                if (predicate(document_id, document_data.status, document_data.rating)) {
-                    document_to_relevance[document_id] += term_freq * inverse_document_freq;
-                }
-            }
-        }
-
-        for (const string& word : query.minus_words) {
-            if (word_to_document_freqs_.count(word) == 0) {
-                continue;
-            }
-            for (const auto [document_id, _] : word_to_document_freqs_.at(word)) {
-                document_to_relevance.erase(document_id);
-            }
-        }
-
-        vector<Document> matched_documents;
-        for (const auto [document_id, relevance] : document_to_relevance) {
-            matched_documents.push_back({document_id, relevance, documents_.at(document_id).rating});
-        }
-        return matched_documents;
-    }
+    vector<Document> FindAllDocuments(const Query& query, T predicate) const;
 
     static bool IsValidWord(const string& word);
 };
+
+// ----------------------------------------------------------------
+// Implementation template members
+// ----------------------------------------------------------------
+
+template <typename StringContainer>
+SearchServer::SearchServer(const StringContainer& stop_words) : stop_words_(MakeUniqueNonEmptyStrings(stop_words)) {
+    if (!all_of(stop_words_.begin(), stop_words_.end(), IsValidWord)) {
+        throw invalid_argument("Some of stop words are invalid"s);
+    }
+}
+
+template <typename T>
+vector<Document> SearchServer::FindTopDocuments(const string& raw_query, T predicate) const {
+    const auto query = ParseQuery(raw_query);
+
+    auto matched_documents = FindAllDocuments(query, predicate);
+
+    sort(matched_documents.begin(), matched_documents.end(), [](const Document& lhs, const Document& rhs) {
+        if (abs(lhs.relevance - rhs.relevance) < THRESHOLD) {
+            return lhs.rating > rhs.rating;
+        } else {
+            return lhs.relevance > rhs.relevance;
+        }
+    });
+    if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
+        matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
+    }
+
+    return matched_documents;
+}
+
+template <typename T>
+vector<Document> SearchServer::FindAllDocuments(const Query& query, T predicate) const {
+    map<int, double> document_to_relevance;
+    for (const string& word : query.plus_words) {
+        if (word_to_document_freqs_.count(word) == 0) {
+            continue;
+        }
+        const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
+        for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word)) {
+            const auto& document_data = documents_.at(document_id);
+            if (predicate(document_id, document_data.status, document_data.rating)) {
+                document_to_relevance[document_id] += term_freq * inverse_document_freq;
+            }
+        }
+    }
+
+    for (const string& word : query.minus_words) {
+        if (word_to_document_freqs_.count(word) == 0) {
+            continue;
+        }
+        for (const auto [document_id, _] : word_to_document_freqs_.at(word)) {
+            document_to_relevance.erase(document_id);
+        }
+    }
+
+    vector<Document> matched_documents;
+    for (const auto [document_id, relevance] : document_to_relevance) {
+        matched_documents.push_back({document_id, relevance, documents_.at(document_id).rating});
+    }
+    return matched_documents;
+}
