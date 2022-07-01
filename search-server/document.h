@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ostream>
+#include <vector>
 
 using namespace std;
 
@@ -25,3 +26,7 @@ enum class DocumentStatus {
     BANNED,
     REMOVED,
 };
+
+void PrintDocument(const Document& document);
+
+void PrintMatchDocumentResult(int document_id, const vector<string>& words, DocumentStatus status);

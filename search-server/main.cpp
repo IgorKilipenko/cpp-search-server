@@ -5,37 +5,8 @@
 
 #include "server.hpp"
 #include "request_queue.hpp"
-
-string ReadLine() {
-    string s;
-    getline(cin, s);
-    return s;
-}
-
-int ReadLineWithNumber() {
-    int result;
-    cin >> result;
-    ReadLine();
-    return result;
-}
-
-void PrintDocument(const Document& document) {
-    cout << "{ "s
-         << "document_id = "s << document.id << ", "s
-         << "relevance = "s << document.relevance << ", "s
-         << "rating = "s << document.rating << " }"s << endl;
-}
-
-void PrintMatchDocumentResult(int document_id, const vector<string>& words, DocumentStatus status) {
-    cout << "{ "s
-         << "document_id = "s << document_id << ", "s
-         << "status = "s << static_cast<int>(status) << ", "s
-         << "words ="s;
-    for (const string& word : words) {
-        cout << ' ' << word;
-    }
-    cout << "}"s << endl;
-}
+#include "read_input_functions.h"
+#include "document.h"
 
 void AddDocument(SearchServer& search_server, int document_id, const string& document, DocumentStatus status, const vector<int>& ratings) {
     try {
@@ -70,10 +41,6 @@ void MatchDocuments(const SearchServer& search_server, const string& query) {
     }
 }
 
-template <template <typename...> class Container, typename T>
-auto Paginate(const Container<T>& c, size_t page_size) {
-    return Paginator(c.begin(), c.end(), page_size);
-}
 
 int main() {
     SearchServer search_server("and in at"s);
