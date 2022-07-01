@@ -15,7 +15,6 @@ using namespace std;
 
 using MatchingDocument = tuple<vector<std::string>, DocumentStatus>;
 
-static const double THRESHOLD = 1e-6;
 
 /* OSTREAM operator<< overrides region -------------------------------------- */
 

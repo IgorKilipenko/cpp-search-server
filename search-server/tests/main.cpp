@@ -2,7 +2,7 @@
 #include <string>
 
 #include "server_test.hpp"
-#include "../server.hpp"
+#include "../search_server.h"
 
 int main() {
     TestSearchServer();
