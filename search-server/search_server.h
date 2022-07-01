@@ -44,7 +44,7 @@ class SearchServer {
 
     void AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
 
-    template <typename T>
+    template <typename T = function<bool(int, DocumentStatus, int)>>
     vector<Document> FindTopDocuments(const string& raw_query, T predicate) const {
         const auto query = ParseQuery(raw_query);
 
@@ -108,7 +108,7 @@ class SearchServer {
 
     double ComputeWordInverseDocumentFreq(const string& word) const;
 
-    template <typename T>
+    template <typename T = function<bool(int, DocumentStatus, int)>>
     vector<Document> FindAllDocuments(const Query& query, T predicate) const {
         map<int, double> document_to_relevance;
         for (const string& word : query.plus_words) {

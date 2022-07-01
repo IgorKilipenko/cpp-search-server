@@ -13,7 +13,7 @@ endif()
 
 set(LIBS 
     ${MAIN_FILE}
-    ${SRC_DIR}/server.cpp
+    ${SRC_DIR}/search_server.cpp
     ${SRC_DIR}/document.cpp
     ${SRC_DIR}/read_input_functions.cpp
 )
