@@ -16,6 +16,7 @@ set(LIBS
     ${SRC_DIR}/search_server.cpp
     ${SRC_DIR}/document.cpp
     ${SRC_DIR}/read_input_functions.cpp
+    ${SRC_DIR}/string_processing.cpp
 )
 
 if (DEFINED TESTS AND TESTS)

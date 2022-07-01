@@ -9,24 +9,12 @@
 #include <vector>
 
 #include "document.h"
+#include "string_processing.h"
 
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
 constexpr const double THRESHOLD = 1e-6;
-
-template <typename StringContainer>
-set<string> MakeUniqueNonEmptyStrings(const StringContainer& strings) {
-    set<string> non_empty_strings;
-    for (const string& str : strings) {
-        if (!str.empty()) {
-            non_empty_strings.insert(str);
-        }
-    }
-    return non_empty_strings;
-}
-
-vector<string> SplitIntoWords(const string& text);
 
 class SearchServer {
    public:
@@ -37,8 +25,10 @@ class SearchServer {
 
     explicit SearchServer(const string& stop_words_text);
 
+    /// Add new document to the search server's internal database
     void AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
 
+    /// Find most matched documents for request
     template <typename T = function<bool(int, DocumentStatus, int)>>
     vector<Document> FindTopDocuments(const string& raw_query, T predicate) const;
 
@@ -46,6 +36,7 @@ class SearchServer {
 
     vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus status) const;
 
+    /// Get total number of documents in internal database
     int GetDocumentCount() const;
 
     int GetDocumentId(int index) const;
@@ -93,7 +84,20 @@ class SearchServer {
 };
 
 // ----------------------------------------------------------------
-// Implementation template members
+// Helper methods
+// ----------------------------------------------------------------
+
+/// Exceptions safety version of AddDocument
+void AddDocument(SearchServer& search_server, int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
+
+/// Exceptions safety version of FindTopDocuments
+void FindTopDocuments(const SearchServer& search_server, const string& raw_query);
+
+/// Exceptions safety version of FindTopDocuments
+void MatchDocuments(const SearchServer& search_server, const string& query);
+
+// ----------------------------------------------------------------
+// SearchServer template members implementation
 // ----------------------------------------------------------------
 
 template <typename StringContainer>
