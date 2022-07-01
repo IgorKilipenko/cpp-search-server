@@ -1,0 +1,21 @@
+{
+    "cmake.configureSettings": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "TESTS": "0",
+        "WARNINGS_AS_ERRORS" : "ON",
+        //"TRANSPORT_CURL" : "OFF",
+        "UNIT_TESTING" : "ON",
+        //"UNIT_TESTING_MOCKS" : "OFF",
+        //"TRANSPORT_PAHO" : "ON",
+        //"PRECONDITIONS" : "ON",
+        "LOGGING" : "ON"
+    },
+    "[cpp]": {
+        "editor.suggestSelection": "recentlyUsedByPrefix",
+        "editor.tabCompletion": "on",
+        "editor.suggest.shareSuggestSelections": true,
+        "editor.inlayHints.enabled": "offUnlessPressed",
+        "editor.suggest.showSnippets": true
+    }
+    //"C_Cpp.errorSquiggles": "Disabled"
+}
