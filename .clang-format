@@ -9,5 +9,7 @@
     ColumnLimit: 150, #0, 
     #AccessModifierOffset: -4, 
     #NamespaceIndentation: All, 
-    #FixNamespaceComments: false 
+    #FixNamespaceComments: false,
+    AllowShortFunctionsOnASingleLine: Empty, #InlineOnly,
+    AllowShortLambdasOnASingleLine: Empty,
 }

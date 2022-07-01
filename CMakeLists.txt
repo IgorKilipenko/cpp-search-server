@@ -4,14 +4,26 @@ set(PROJECT_NAME "search-server")
 project(${PROJECT_NAME} CXX)
 
 set(SRC_DIR ./search-server)
-set(TRAINING_DIR ./training)
+set(MAIN_FILE ${SRC_DIR}/main.cpp )
+
+if (DEFINED TESTS AND TESTS)
+    set(TESTS_DIR ./search-server/tests)
+    set(MAIN_FILE ${TESTS_DIR}/main.cpp )
+endif()
+
 set(LIBS 
-    ${SRC_DIR}/main.cpp 
-    #${TRAINING_DIR}/s1_t_4_6.cpp 
-    #${TRAINING_DIR}/section_1/topic_6/s1_t_6.cpp
-    #${TRAINING_DIR}/section_1/topic_7/s1_t_7.cpp
-    ${TRAINING_DIR}/section_1/topic_8/s1_t_8_p_6.cpp
+    ${MAIN_FILE}
+    ${SRC_DIR}/server.cpp
+    ${SRC_DIR}/document.cpp
+    ${SRC_DIR}/read_input_functions.cpp
 )
+
+if (DEFINED TESTS AND TESTS)
+    list(APPEND LIBS ${TESTS_DIR}/server_test.cpp)
+endif()
+
+set(CFLAGS -Wall -Werror -pedantic)
 
 add_executable(${PROJECT_NAME} ${LIBS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+target_compile_options(${PROJECT_NAME} PRIVATE ${CFLAGS})
