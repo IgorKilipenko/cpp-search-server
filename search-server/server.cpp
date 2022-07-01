@@ -101,6 +101,9 @@ bool SearchServer::IsStopWord(const string& word) const {
 vector<string> SearchServer::SplitIntoWordsNoStop(const string& text) const {
     vector<string> words;
     for (const string& word : SplitIntoWords(text)) {
+        if (!IsValidWord(word)) {
+            throw invalid_argument("Word "s + word + " is invalid"s);
+        }
         if (!IsStopWord(word)) {
             words.push_back(word);
         }
