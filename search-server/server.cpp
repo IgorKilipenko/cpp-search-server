@@ -35,24 +35,17 @@ SearchServer::SearchServer(const string& stop_words_text)
 {}
 
 void SearchServer::AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings) {
-    if (!IsValidDocumentId(document_id)) {
-        throw invalid_argument("Invalid document ID."s);
+    if ((document_id < 0) || (documents_.count(document_id) > 0)) {
+        throw invalid_argument("Invalid document_id"s);
     }
-    if (documents_.count(document_id)) {
-        throw invalid_argument("Document with this ID already exists."s);
-    }
-
-    const vector<string> words = SplitIntoWordsNoStop(document);
-    if (!IsValidContent(words)) {
-        throw invalid_argument("Invalid document content."s);
-    }
+    const auto words = SplitIntoWordsNoStop(document);
 
     const double inv_word_count = 1.0 / words.size();
     for (const string& word : words) {
         word_to_document_freqs_[word][document_id] += inv_word_count;
     }
     documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
-    documents_ids_queue_.push_back(document_id);
+    document_ids_.push_back(document_id);
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const {
@@ -70,10 +63,7 @@ int SearchServer::GetDocumentCount() const {
 }
 
 int SearchServer::GetDocumentId(int index) const {
-    if (index < 0 || documents_ids_queue_.size() <= index) {
-        throw out_of_range("Invalid document index. " + "Index: "s + to_string(index) + " out of range."s);
-    }
-    return documents_ids_queue_[index];
+    return document_ids_.at(index);
 }
 
 set<std::string> SearchServer::GetStopWords() const {
@@ -81,11 +71,7 @@ set<std::string> SearchServer::GetStopWords() const {
 }
 
 tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& raw_query, int document_id) const {
-    if (!IsValidDocumentId(document_id)) {
-        throw invalid_argument("Invalid document ID."s);
-    }
-
-    const Query query = ParseQuery(raw_query);
+    const auto query = ParseQuery(raw_query);
 
     vector<string> matched_words;
     for (const string& word : query.plus_words) {
@@ -105,7 +91,6 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& 
             break;
         }
     }
-
     return {matched_words, documents_.at(document_id).status};
 }
 
@@ -136,34 +121,35 @@ int SearchServer::ComputeAverageRating(const vector<int>& ratings) {
 }
 
 SearchServer::QueryWord SearchServer::ParseQueryWord(string text) const {
-    bool is_minus = false;
-    // Word shouldn't be empty
-    if (text[0] == '-') {
-        is_minus = true;
-        text = text.substr(1);
+    if (text.empty()) {
+        throw invalid_argument("Query word is empty"s);
     }
-    return {text, is_minus, IsStopWord(text)};
+    string word = text;
+    bool is_minus = false;
+    if (word[0] == '-') {
+        is_minus = true;
+        word = word.substr(1);
+    }
+    if (word.empty() || word[0] == '-' || !IsValidWord(word)) {
+        throw invalid_argument("Query word "s + text + " is invalid");
+    }
+
+    return {word, is_minus, IsStopWord(word)};
 }
 
 SearchServer::Query SearchServer::ParseQuery(const string& text) const {
-    Query query;
+    Query result;
     for (const string& word : SplitIntoWords(text)) {
-        const QueryWord query_word = ParseQueryWord(word);
+        const auto query_word = ParseQueryWord(word);
         if (!query_word.is_stop) {
             if (query_word.is_minus) {
-                if (!IsValidMinusWords(query_word.data)) {
-                    throw invalid_argument("Invalid minus-word.");
-                }
-                query.minus_words.insert(query_word.data);
+                result.minus_words.insert(query_word.data);
             } else {
-                if (!IsValidWord(query_word.data)) {
-                    throw invalid_argument("Invalid minus-word.");
-                }
-                query.plus_words.insert(query_word.data);
+                result.plus_words.insert(query_word.data);
             }
         }
     }
-    return query;
+    return result;
 }
 
 double SearchServer::ComputeWordInverseDocumentFreq(const string& word) const {
@@ -171,36 +157,8 @@ double SearchServer::ComputeWordInverseDocumentFreq(const string& word) const {
 }
 
 bool SearchServer::IsValidWord(const string& word) {
-    const auto containMinusChars = [](const string& word) -> bool {
-        std::regex self_regex("^[\\-]*.*\\s+\\-+.*", std::regex_constants::ECMAScript);
-        return std::regex_search(word, self_regex);
-    };
-    const auto containSpecialChars = [](const string& word) -> bool {
-        std::regex self_regex("[\\u0000-\\u001F]+", std::regex_constants::ECMAScript);
-        return std::regex_search(word, self_regex);
-    };
-
-    return !containMinusChars(word) && !containSpecialChars(word);
+    // A valid word must not contain special characters
+    return none_of(word.begin(), word.end(), [](char c) {
+        return c >= '\0' && c < ' ';
+    });
 }
-
-bool SearchServer::IsValidMinusWords(const string& word) {
-    std::regex self_regex("^[^\\-\\s]+", std::regex_constants::ECMAScript);
-    return std::regex_search(word, self_regex) && IsValidWord(word);
-}
-
-bool SearchServer::IsValidMinusWords(const set<string>& words) {
-    for (const auto& word : words) {
-        if (!IsValidMinusWords(word)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool SearchServer::IsValidDocumentId(int document_id) const {
-    if (document_id < 0) {
-        return false;  // Check if ID is negative
-    }
-    return true;
-}
-

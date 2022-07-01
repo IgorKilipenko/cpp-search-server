@@ -35,9 +35,8 @@ class SearchServer {
 
     template <typename StringContainer>
     SearchServer(const StringContainer& stop_words) : stop_words_(MakeUniqueNonEmptyStrings(stop_words)) {
-        if (!IsValidStopWords(stop_words_)) {
-            stop_words_.clear();
-            throw invalid_argument("Invalid stop-words.");
+        if (!all_of(stop_words_.begin(), stop_words_.end(), IsValidWord)) {
+            throw invalid_argument("Some of stop words are invalid"s);
         }
     }
 
@@ -47,7 +46,7 @@ class SearchServer {
 
     template <typename T>
     vector<Document> FindTopDocuments(const string& raw_query, T predicate) const {
-        const Query query = ParseQuery(raw_query);
+        const auto query = ParseQuery(raw_query);
 
         auto matched_documents = FindAllDocuments(query, predicate);
 
@@ -95,7 +94,7 @@ class SearchServer {
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
-    vector<int> documents_ids_queue_;
+    vector<int> document_ids_;
 
     bool IsStopWord(const string& word) const;
 
@@ -118,11 +117,8 @@ class SearchServer {
             }
             const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
             for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word)) {
-                if (!documents_.count(document_id)) {
-                    continue;
-                }
-                const auto& document = documents_.at(document_id);
-                if (predicate(document_id, document.status, document.rating)) {
+                const auto& document_data = documents_.at(document_id);
+                if (predicate(document_id, document_data.status, document_data.rating)) {
                     document_to_relevance[document_id] += term_freq * inverse_document_freq;
                 }
             }
@@ -145,23 +141,4 @@ class SearchServer {
     }
 
     static bool IsValidWord(const string& word);
-
-    template <typename List>
-    bool IsValidContent(const List& content) {
-        bool result = none_of(content.begin(), content.end(), [](const string& w) {
-            return !IsValidWord(w);
-        });
-        return result;
-    }
-
-    template <typename List>
-    bool IsValidStopWords(const List& stop_words) {
-        return IsValidContent(stop_words);
-    }
-
-    static bool IsValidMinusWords(const string& word);
-
-    static bool IsValidMinusWords(const set<string>& words);
-
-    bool IsValidDocumentId(int id) const;
 };
