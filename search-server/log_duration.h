@@ -13,7 +13,7 @@ using namespace std;
 
 class LogDuration {
    public:
-    LogDuration(string name, ostream& os = cerr) : name_{name}, os_{os}, timer_{chrono::steady_clock::now()} {}
+    LogDuration(string name = "Operation time"s, ostream& os = cerr) : name_{name}, os_{os}, timer_{chrono::steady_clock::now()} {}
     ~LogDuration() {
         const auto duration = chrono::steady_clock::now() - timer_;
         os_ << name_ << ": "s << chrono::duration_cast<chrono::milliseconds>(duration).count() << " ms"s << endl;
