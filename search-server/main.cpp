@@ -1,83 +1,55 @@
 #include <algorithm>
-#include <deque>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <iostream>
-#include <string>
+#include <random>
+#include <vector>
 
 using namespace std;
 
-struct Ticket {
-    int id = 0;
-    string name;
-};
+int EffectiveCount(const vector<int>& v, int n, int i)  {
+    // место для вашего решения
+    const int expected_result_count = (v.size())*(i + 1)/(n + 1);
+    const bool use_find_method = expected_result_count <= log2(v.size());
 
-class TicketOffice {
-   public:
-    // добавить билет в систему
-    void PushTicket(const string& name) {
-        // реализуйте метод
-        if (first_id_ < 0) first_id_ = 0;
-        ++last_id_;
-        ++size_;
-        tickets_.push_back({last_id_, name});
-    }
-
-    // получить количество доступных билетов
-    int GetAvailable() const {
-        // реализуйте метод
-        return size_;
-    }
-
-    // получить количество доступных билетов определённого типа
-    int GetAvailable(const string& name) const {
-        // реализуйте метод
-        int result = count_if(tickets_.begin(), tickets_.end(), [&name](const Ticket& t) {
-            return t.name == name;
+    int result = 0;
+    if (use_find_method) {
+        auto ptr = find_if(v.begin(), v.end(), [i](int val) {
+            return val > i;
         });
-        return result;
-    }
-
-    // отозвать старые билеты (до определённого id)
-    void Invalidate(int minimum) {
-        // реализуйте метод
-        int size = min(minimum, last_id_ + 1);
-        for (int i = first_id_; i < size; ++i) {
-            tickets_.pop_front();
-            --size_;
-            first_id_++;
+        cout << "Using find_if"s << endl;
+        if (ptr == v.end()) {
+            return v.size();
         }
+        result = ptr - v.begin();
+    } else {
+        auto ptr = upper_bound(v.begin(), v.end(), i);
+        cout << "Using upper_bound"s << endl;
+        if (ptr == v.end()) {
+            return v.size();
+        }
+        result = ptr - v.begin();
     }
-
-   private:
-    int last_id_ = -1;
-    int first_id_ = -1;
-    int size_ = 0;
-    deque<Ticket> tickets_;
-};
+    return result;
+}
 
 int main() {
-    TicketOffice tickets;
+    static const int NUMBERS = 1'000'000;
+    static const int MAX = 1'000'000'000;
 
-    tickets.PushTicket("Swan Lake");      // id - 0
-    tickets.PushTicket("Swan Lake");      // id - 1
-    tickets.PushTicket("Boris Godunov");  // id - 2
-    tickets.PushTicket("Boris Godunov");  // id - 3
-    tickets.PushTicket("Swan Lake");      // id - 4
-    tickets.PushTicket("Boris Godunov");  // id - 5
-    tickets.PushTicket("Boris Godunov");  // id - 6
+    mt19937 r;
+    uniform_int_distribution<int> uniform_dist(0, MAX);
 
-    cout << tickets.GetAvailable() << endl;                 // Вывод: 7
-    cout << tickets.GetAvailable("Swan Lake") << endl;      // Вывод: 3
-    cout << tickets.GetAvailable("Boris Godunov") << endl;  // Вывод: 4
+    vector<int> nums;
+    for (int i = 0; i < NUMBERS; ++i) {
+        int random_number = uniform_dist(r);
+        nums.push_back(random_number);
+    }
+    sort(nums.begin(), nums.end());
 
-    // Invalidate удалит билеты с номерами 0, 1, 2:
-    tickets.Invalidate(3);
-
-    cout << tickets.GetAvailable() << endl;                 // Вывод: 4
-    cout << tickets.GetAvailable("Swan Lake") << endl;      // Вывод: 1
-    cout << tickets.GetAvailable("Boris Godunov") << endl;  // Вывод: 3
-
-    tickets.PushTicket("Swan Lake");  // id - 7
-    tickets.PushTicket("Swan Lake");  // id - 8
-
-    cout << tickets.GetAvailable("Swan Lake") << endl;  // Вывод: 3
+    int i;
+    cin >> i;
+    int result = EffectiveCount(nums, MAX, i);
+    cout << "Total numbers before "s << i << ": "s << result << endl;
 }
