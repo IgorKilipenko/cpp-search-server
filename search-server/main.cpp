@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -8,46 +9,46 @@
 
 using namespace std;
 
-
+template <typename TestFunc = function<bool(const string&)>>
 class Bruteforce {
    public:
-    template <typename F>
-    const string& generate(const string& input, F check) {
-        result_ = ""s;
+    Bruteforce(TestFunc check) : custom_check_function_{check} {}
+    string Generate(const string& input) {
+        password_ = ""s;
         string result(input.size(), input[0]);
         vector<int> index(input.size(), 0);
 
-        // loop over the output lengths.
         for (int length = 1; length <= input.size(); length++) {
             int updateIndex = 0;
             do {
-                if (element(result, 0, length, check)) {
-                    return result_;
+                if (Test(result, 0, length)) {
+                    return password_;
                 }
-                // update values that need to reset.
-                for (updateIndex = length - 1; updateIndex != -1 && ++index[updateIndex] == input.size();
-                     result[updateIndex] = input[0], index[updateIndex] = 0, updateIndex--)
-                    ;
 
-                // update the character that is not resetting, if valid
+                for (updateIndex = length - 1; updateIndex != -1 && ++index[updateIndex] == input.size();
+                     result[updateIndex] = input[0], index[updateIndex] = 0, updateIndex--) {
+                }
+
                 if (updateIndex != -1) result[updateIndex] = input[index[updateIndex]];
             } while (updateIndex != -1);
         }
-        return result_;
+        return password_;
     }
-    template <typename F>
-    bool element(const string& result, int offset, int length, F check) {
+    string GetPassword() const {
+        return password_;
+    }
+
+   private:
+    string password_;
+    TestFunc custom_check_function_;
+    bool Test(const string& result, int offset, int length) {
         string text = result.substr(offset, length);
-        //cout << text << endl;
-        if (check(text)) {
-            result_ = text;
+        if (custom_check_function_(text)) {
+            password_ = text;
             return true;
         }
         return false;
     }
-
-   private:
-    string result_;
 };
 
 template <typename F>
@@ -60,8 +61,8 @@ string BruteForce(F check) {
     for (int i = start_ch; i < end_ch; i++) {
         chars.push_back(static_cast<char>(i));
     }
-    Bruteforce bruteforce;
-    const string password = bruteforce.generate(chars, check);
+    Bruteforce bruteforce(check);
+    const string password = bruteforce.Generate(chars);
     return password;
 }
 
