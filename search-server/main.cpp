@@ -1,55 +1,34 @@
 #include <algorithm>
 #include <cmath>
-#include <cstddef>
-#include <cstdint>
 #include <iostream>
-#include <random>
-#include <vector>
+#include <string>
+
+#include "document.h"
+#include "request_queue.h"
+#include "search_server.h"
 
 using namespace std;
 
-int EffectiveCount(const vector<int>& v, int n, int i)  {
-    // место для вашего решения
-    const int expected_result_count = (v.size())*(i + 1)/(n + 1);
-    const bool use_find_method = expected_result_count <= log2(v.size());
-
-    int result = 0;
-    if (use_find_method) {
-        auto ptr = find_if(v.begin(), v.end(), [i](int val) {
-            return val > i;
-        });
-        cout << "Using find_if"s << endl;
-        if (ptr == v.end()) {
-            return v.size();
-        }
-        result = ptr - v.begin();
-    } else {
-        auto ptr = upper_bound(v.begin(), v.end(), i);
-        cout << "Using upper_bound"s << endl;
-        if (ptr == v.end()) {
-            return v.size();
-        }
-        result = ptr - v.begin();
-    }
-    return result;
-}
-
 int main() {
-    static const int NUMBERS = 1'000'000;
-    static const int MAX = 1'000'000'000;
+    SearchServer search_server("and in at"s);
+    RequestQueue request_queue(search_server);
 
-    mt19937 r;
-    uniform_int_distribution<int> uniform_dist(0, MAX);
+    search_server.AddDocument(1, "curly cat curly tail"s, DocumentStatus::ACTUAL, {7, 2, 7});
+    search_server.AddDocument(2, "curly dog and fancy collar"s, DocumentStatus::ACTUAL, {1, 2, 3});
+    search_server.AddDocument(3, "big cat fancy collar "s, DocumentStatus::ACTUAL, {1, 2, 8});
+    search_server.AddDocument(4, "big dog sparrow Eugene"s, DocumentStatus::ACTUAL, {1, 3, 2});
+    search_server.AddDocument(5, "big dog sparrow Vasiliy"s, DocumentStatus::ACTUAL, {1, 1, 1});
 
-    vector<int> nums;
-    for (int i = 0; i < NUMBERS; ++i) {
-        int random_number = uniform_dist(r);
-        nums.push_back(random_number);
+    // 1439 запросов с нулевым результатом
+    for (int i = 0; i < 1439; ++i) {
+        request_queue.AddFindRequest("empty request"s);
     }
-    sort(nums.begin(), nums.end());
-
-    int i;
-    cin >> i;
-    int result = EffectiveCount(nums, MAX, i);
-    cout << "Total numbers before "s << i << ": "s << result << endl;
+    // все еще 1439 запросов с нулевым результатом
+    request_queue.AddFindRequest("curly dog"s);
+    // новые сутки, первый запрос удален, 1438 запросов с нулевым результатом
+    request_queue.AddFindRequest("big collar"s);
+    // первый запрос удален, 1437 запросов с нулевым результатом
+    request_queue.AddFindRequest("sparrow"s);
+    cout << "Total empty requests: "s << request_queue.GetNoResultRequests() << endl;
+    return 0;
 }
