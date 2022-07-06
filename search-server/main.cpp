@@ -1,44 +1,133 @@
 #include <algorithm>
-#include <cmath>
+#include <cassert>
+#include <cstddef>
 #include <iostream>
 #include <string>
-
-#include "document.h"
-#include "request_queue.h"
-#include "search_server.h"
+#include <vector>
 
 using namespace std;
 
+// Породы кошек
+enum class CatBreed { Bengal, Balinese, Persian, Siamese, Siberian, Sphynx, SuccessSuccess };
+
+// Пол
+enum class Gender {
+    Male,
+    Female,
+};
+
+struct Cat {
+    string name;
+    Gender gender;
+    CatBreed breed;
+    int age;
+};
+
+string CatBreedToString(CatBreed breed) {
+    switch (breed) {
+        case CatBreed::Bengal:
+            return "Bengal"s;
+        case CatBreed::Balinese:
+            return "Balinese"s;
+        case CatBreed::Persian:
+            return "Persian"s;
+        case CatBreed::Siamese:
+            return "Siamese"s;
+        case CatBreed::Siberian:
+            return "Siberian";
+        case CatBreed::Sphynx:
+            return "Sphynx"s;
+        default:
+            throw invalid_argument("Invalid cat breed"s);
+    }
+}
+
+ostream& operator<<(ostream& out, CatBreed breed) {
+    out << CatBreedToString(breed);
+    return out;
+}
+
+ostream& operator<<(ostream& out, Gender gender) {
+    out << (gender == Gender::Male ? "male"s : "female"s);
+    return out;
+}
+
+ostream& operator<<(ostream& out, const Cat& cat) {
+    out << '{' << cat.name << ", "s << cat.gender;
+    out << ", breed: "s << cat.breed << ", age:"s << cat.age << '}';
+    return out;
+}
+
+// Возвращает массив указателей на элементы вектора cats, отсортированные с использованием
+// компаратора comp. Компаратор comp - функция, принимающая два аргумента типа const Cat&
+// и возвращающая true, если значения упорядочены, и false в ином случае
+template <typename Comparator>
+vector<const Cat*> GetSortedCats(const vector<Cat>& cats, const Comparator& comp) {
+    /*
+    Напишите тело функции самостоятельно. Подсказка:
+    1) Поместите в массив sorted_cat_pointers адреса объектов из массива cats.
+    2) Отсортируйте массив sorted_cat_pointers с помощью переданного компаратора comp.
+       Так как comp сравнивает ссылки на объекты, а отсортировать нужно указатели,
+       передайте в sort лямбда функцию, принимающую указатели и сравнивающую объекты
+       при помощи компаратора comp:
+       [comp](const Cat* lhs, const Cat* rhs) {
+           return comp(*lhs, *rhs);
+       }
+    */
+    const int size = static_cast<int>(cats.size());
+    vector<const Cat*> sorted_cat_pointers(size);
+    for (int i = 0; i < size; i++) {
+        sorted_cat_pointers[i] = &cats[i];
+    }
+
+    sort(sorted_cat_pointers.begin(), sorted_cat_pointers.end(), [comp](const Cat* a, const Cat* b) {
+        return comp(*a, *b);
+    });
+
+    return sorted_cat_pointers;
+}
+
+// Выводит в поток out значения объектов, на который ссылаются указатели вектора cat_pointers.
+// Пример вывода элементов vector<const Cat*>:
+// {{Tom, male, breed: Bengal, age:2}, {Charlie, male, breed: Balinese, age:7}}
+void PrintCatPointerValues(const vector<const Cat*>& cat_pointers, ostream& out) {
+    // Напишите функцию самостоятельно
+    string sep = ""s;
+    out << '{';
+    for (const Cat* c: cat_pointers) {
+        out << sep << *c;
+        if (sep.empty()) {
+            sep = ", ";
+        }
+    }
+    out << '}';
+}
+
 int main() {
-    SearchServer search_server("and with"s);
+    const vector<Cat> cats = {
+        {"Tom"s, Gender::Male, CatBreed::Bengal, 2},      {"Leo"s, Gender::Male, CatBreed::Siberian, 3},
+        {"Luna"s, Gender::Female, CatBreed::Siamese, 1},  {"Charlie"s, Gender::Male, CatBreed::Balinese, 7},
+        {"Ginger"s, Gender::Female, CatBreed::Sphynx, 5}, {"Tom"s, Gender::Male, CatBreed::Siamese, 2},
+    };
 
-    AddDocument(search_server, 1, "funny pet and nasty rat"s, DocumentStatus::ACTUAL, {7, 2, 7});
-    AddDocument(search_server, 2, "funny pet with curly hair"s, DocumentStatus::ACTUAL, {1, 2});
+    {
+        auto sorted_cats = GetSortedCats(cats, [](const Cat& lhs, const Cat& rhs) {
+            return tie(lhs.breed, lhs.name) < tie(rhs.breed, rhs.name);
+        });
 
-    // дубликат документа 2, будет удалён
-    AddDocument(search_server, 3, "funny pet with curly hair"s, DocumentStatus::ACTUAL, {1, 2});
+        cout << "Cats sorted by breed and name:"s << endl;
+        PrintCatPointerValues(sorted_cats, cout);
+        cout << endl;
+    }
 
-    // отличие только в стоп-словах, считаем дубликатом
-    AddDocument(search_server, 4, "funny pet and curly hair"s, DocumentStatus::ACTUAL, {1, 2});
+    {
+        auto sorted_cats = GetSortedCats(cats, [](const Cat& lhs, const Cat& rhs) {
+            return tie(lhs.gender, lhs.breed) < tie(rhs.gender, rhs.breed);
+        });
 
-    // множество слов такое же, считаем дубликатом документа 1
-    AddDocument(search_server, 5, "funny funny pet and nasty nasty rat"s, DocumentStatus::ACTUAL, {1, 2});
-
-    // добавились новые слова, дубликатом не является
-    AddDocument(search_server, 6, "funny pet and not very nasty rat"s, DocumentStatus::ACTUAL, {1, 2});
-
-    // множество слов такое же, как в id 6, несмотря на другой порядок, считаем дубликатом
-    AddDocument(search_server, 7, "very nasty rat and not very funny pet"s, DocumentStatus::ACTUAL, {1, 2});
-
-    // есть не все слова, не является дубликатом
-    AddDocument(search_server, 8, "pet with rat and rat and rat"s, DocumentStatus::ACTUAL, {1, 2});
-
-    // слова из разных документов, не является дубликатом
-    AddDocument(search_server, 9, "nasty rat with curly hair"s, DocumentStatus::ACTUAL, {1, 2});
-    
-    cout << "Before duplicates removed: "s << search_server.GetDocumentCount() << endl;
-    RemoveDuplicates(search_server);
-    cout << "After duplicates removed: "s << search_server.GetDocumentCount() << endl;
-    
+        cout << "Cats sorted by gender and breed:"s << endl;
+        PrintCatPointerValues(sorted_cats, cout);
+        cout << endl;
+    }
     return 0;
 }
