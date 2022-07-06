@@ -18,6 +18,9 @@ constexpr const double THRESHOLD = 1e-6;
 
 class SearchServer {
    public:
+    using IdsConstIterator = vector<int>::const_iterator;
+    using IdsIterator = vector<int>::iterator;
+
     SearchServer() = default;
 
     template <typename StringContainer>
@@ -39,11 +42,19 @@ class SearchServer {
     /// Get total number of documents in internal database
     int GetDocumentCount() const;
 
-    int GetDocumentId(int index) const;
-
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const;
 
     set<std::string> GetStopWords() const;
+
+    IdsConstIterator begin() const;
+
+    IdsConstIterator end() const;
+
+    const map<string, double>& GetWordFrequencies(int document_id) const;
+
+    void RemoveDocument(int document_id);
+
+    void RemoveDuplicates();
 
    private:
     struct DocumentData {
@@ -62,8 +73,10 @@ class SearchServer {
 
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
+    map<int, map<string, double>> document_to_words_freqs_;
     map<int, DocumentData> documents_;
     vector<int> document_ids_;
+    map<size_t, set<int>> hash_content_;
 
     bool IsStopWord(const string& word) const;
 
@@ -81,6 +94,12 @@ class SearchServer {
     vector<Document> FindAllDocuments(const Query& query, T predicate) const;
 
     static bool IsValidWord(const string& word);
+
+    IdsIterator begin();
+
+    IdsIterator end();
+
+    int GetDocumentId(int index) const;
 };
 
 // ----------------------------------------------------------------
@@ -95,6 +114,27 @@ void FindTopDocuments(const SearchServer& search_server, const string& raw_query
 
 /// Exceptions safety version of FindTopDocuments
 void MatchDocuments(const SearchServer& search_server, const string& query);
+
+/// Remove all documents duplicates from database
+void RemoveDuplicates(SearchServer& search_server);
+
+template <typename TDict, typename TKey>
+static auto EraseFromContainer(TKey id, TDict& container) {
+    auto ptr = container.find(id);
+    if (ptr != container.end()) {
+        return container.erase(ptr);
+    }
+    return container.end();
+}
+
+template <typename T>
+static typename vector<T>::iterator EraseFromContainer(T id, vector<T>& container) {
+    auto ptr = find(container.begin(), container.end(), id);
+    if (ptr != container.end()) {
+        return container.erase(ptr);
+    }
+    return container.end();
+}
 
 // ----------------------------------------------------------------
 // SearchServer template members implementation
