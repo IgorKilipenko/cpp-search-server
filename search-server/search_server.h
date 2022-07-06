@@ -9,8 +9,8 @@
 #include <vector>
 
 #include "document.h"
-#include "string_processing.h"
 #include "paginator.h"
+#include "string_processing.h"
 
 using namespace std;
 
@@ -120,7 +120,7 @@ auto Paginate(const Container& c, size_t page_size) {
 void RemoveDuplicates(SearchServer& search_server);
 
 template <typename TDict, typename TKey>
-static auto EraseFromContainer(TKey id, TDict& container) {
+auto EraseFromContainer(TKey id, TDict& container) {
     auto ptr = container.find(id);
     if (ptr != container.end()) {
         return container.erase(ptr);
@@ -129,7 +129,7 @@ static auto EraseFromContainer(TKey id, TDict& container) {
 }
 
 template <typename T>
-static typename vector<T>::iterator EraseFromContainer(T id, vector<T>& container) {
+typename vector<T>::iterator EraseFromContainer(T id, vector<T>& container) {
     auto ptr = find(container.begin(), container.end(), id);
     if (ptr != container.end()) {
         return container.erase(ptr);
