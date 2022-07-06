@@ -10,6 +10,7 @@
 
 #include "document.h"
 #include "string_processing.h"
+#include "paginator.h"
 
 using namespace std;
 
@@ -94,12 +95,6 @@ class SearchServer {
     vector<Document> FindAllDocuments(const Query& query, T predicate) const;
 
     static bool IsValidWord(const string& word);
-
-    IdsIterator begin();
-
-    IdsIterator end();
-
-    int GetDocumentId(int index) const;
 };
 
 // ----------------------------------------------------------------
@@ -114,6 +109,12 @@ void FindTopDocuments(const SearchServer& search_server, const string& raw_query
 
 /// Exceptions safety version of FindTopDocuments
 void MatchDocuments(const SearchServer& search_server, const string& query);
+
+/// Pagenate mathing documents
+template <typename Container>
+auto Paginate(const Container& c, size_t page_size) {
+    return Paginator(begin(c), end(c), page_size);
+}
 
 /// Remove all documents duplicates from database
 void RemoveDuplicates(SearchServer& search_server);

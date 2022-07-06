@@ -36,7 +36,7 @@ size_t BuildHash(const set<string>& strings, const set<string>& exclude_words, s
 
 string JoinWithExclude(const set<string>& strings, const set<string>& exclude_words, string separator) {
     string result;
-    string sep = ""; 
+    string sep = "";
     const bool exclude_words_is_empty = exclude_words.empty();
     for (const string& str : strings) {
         if (exclude_words_is_empty || !exclude_words.count(str)) {

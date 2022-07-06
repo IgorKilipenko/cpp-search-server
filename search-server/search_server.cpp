@@ -111,11 +111,6 @@ const map<string, double>& SearchServer::GetWordFrequencies(int document_id) con
 }
 
 void SearchServer::RemoveDocument(int document_id) {
-    //// map<string, map<int, double>> word_to_document_freqs_;
-    //// map<int, map<string, double>> document_to_words_freqs_;
-    //// map<int, DocumentData> documents_;
-    //// vector<int> document_ids_;
-
     if (document_ids_.empty() || !documents_.count(document_id)) {
         return;
     }
@@ -127,7 +122,6 @@ void SearchServer::RemoveDocument(int document_id) {
         return;  // Empty document or empty word_to_document_freqs container
     }
 
-    // vector<map<const int, double>::const_iterator> ids_freq_for_erase;
     const map<string, double>& words = doc_words_ptr->second;
     for (auto& [cur_word, _] : words) {
         auto docs_ptr = word_to_document_freqs_.find(cur_word);
@@ -141,80 +135,33 @@ void SearchServer::RemoveDocument(int document_id) {
         if (ptr == ids_freq.end()) {
             continue;
         }
-        // ids_freq_for_erase.push_back(ptr);
         ids_freq.erase(ptr);
     }
 
-    // vector<vector<int>::const_iterator> ids_freq_for_erase;
     for (auto& [_, ids] : hash_content_) {
         if (ids.empty()) {
             continue;
         }
-        /*auto ptr = ids.begin();
-        while (ptr != ids.end()) {
-            ptr = find(ptr, ids.end(), document_id);
-            if (ptr != ids.end()) {
-                ids.erase(ptr);
-            }
-        }*/
         EraseFromContainer(document_id, ids);
     }
 }
 
-/*
-Дубликатами считаются документы, у которых наборы встречающихся слов совпадают. Совпадение частот необязательно.
-Порядок слов неважен, а стоп-слова игнорируются.
-Функция должна использовать только доступные к этому моменту методы поискового сервера.
-При обнаружении дублирующихся документов функция
-должна удалить документ с большим id из поискового сервера, и при этом сообщить id удалённого документа в
-соответствии с форматом выходных данных, приведённым ниже.
-*/
 void SearchServer::RemoveDuplicates() {
-    /*
-    vector<map<int, map<string, double>>::iterator> buffer;
-    for (const auto& word_freqs : document_to_words_freqs_) {
-        auto ptr = document_to_words_freqs_.begin();
-        while (ptr != document_to_words_freqs_.end()) {
-            ptr = find_if(ptr, document_to_words_freqs_.end(), [&word_freqs](const auto& item) {
-                auto ws = item.second;
-                return equal(ws.begin(), ws.end(), word_freqs.second.begin(), word_freqs.second.end());
-            });
-            if (ptr != document_to_words_freqs_.end()) {
-                buffer.push_back(ptr);
-                ++ptr;
-            }
-        }
-    }
-    for (auto ptr : buffer) {
-        document_to_words_freqs_.erase(ptr);
-    }*/
-
     for (const auto& [_, ids] : hash_content_) {
         if (ids.empty() || ids.size() == 1) {
             continue;
         }
-        /*for (int i = 1; i < ids.size(); ++i) {
-            RemoveDocument(ids[i]);
-        }*/
-        /*auto first = next(ids.begin());
-        auto last = ids.end();
-        for (auto prt = first; prt != last; prt++) {
-            cout << "Found duplicate document "s  << *prt << endl;
-            RemoveDocument(*prt);
-        }*/
         vector<int> ids_for_erase;
-        ids_for_erase.reserve(ids.size()-1);
+        ids_for_erase.reserve(ids.size() - 1);
         auto first = next(ids.begin());
         auto last = ids.end();
         for (auto ptr = first; ptr != last; ptr++) {
-            //cout << "Found duplicate document "s  << *prt << endl;
-            //RemoveDocument(*prt);
             ids_for_erase.push_back(*ptr);
         }
 
         for (int id : ids_for_erase) {
             RemoveDocument(id);
-            cout << "Found duplicate document "s  << id << endl;
+            cout << "Found duplicate document "s << id << endl;
         }
     }
 }
@@ -289,18 +236,6 @@ bool SearchServer::IsValidWord(const string& word) {
     return none_of(word.begin(), word.end(), [](char c) {
         return c >= '\0' && c < ' ';
     });
-}
-
-int SearchServer::GetDocumentId(int index) const {
-    return *(begin() + index);
-}
-
-SearchServer::IdsIterator SearchServer::begin() {
-    return document_ids_.begin();
-}
-
-SearchServer::IdsIterator SearchServer::end() {
-    return document_ids_.end();
 }
 
 // ----------------------------------------------------------------
