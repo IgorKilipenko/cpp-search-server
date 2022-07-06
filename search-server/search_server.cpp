@@ -29,11 +29,25 @@ void SearchServer::AddDocument(int document_id, const string& document, Document
     const auto words = SplitIntoWordsNoStop(document);
 
     const double inv_word_count = 1.0 / words.size();
+    auto& words_container = document_to_words_freqs_[document_id];
+    string hash_buffer_str;
+    string hash_sep = ""s;
     for (const string& word : words) {
-        word_to_document_freqs_[word][document_id] += inv_word_count;
+        if (stop_words_.empty() || !stop_words_.count(word)) {
+            hash_buffer_str += hash_sep + word;
+            if (hash_sep.empty()) {
+                hash_sep = ",";
+            }
+        }
+        double& curr_freq = word_to_document_freqs_[word][document_id];
+        curr_freq += inv_word_count;
+        words_container.insert({word, curr_freq});
     }
     documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
     document_ids_.push_back(document_id);
+
+    auto hash = BuildHash<double>(words_container, stop_words_, ","s);
+    hash_content_[hash].insert(document_id);
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string& raw_query) const {
@@ -50,11 +64,15 @@ int SearchServer::GetDocumentCount() const {
     return documents_.size();
 }
 
-int SearchServer::GetDocumentId(int index) const {
-    return document_ids_.at(index);
+SearchServer::IdsConstIterator SearchServer::begin() const {
+    return document_ids_.begin();
 }
 
-set<std::string> SearchServer::GetStopWords() const {
+SearchServer::IdsConstIterator SearchServer::end() const {
+    return document_ids_.end();
+}
+
+set<std::string> SearchServer::SearchServer::GetStopWords() const {
     return stop_words_;
 }
 
@@ -80,6 +98,72 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& 
         }
     }
     return {matched_words, documents_.at(document_id).status};
+}
+
+const map<string, double>& SearchServer::GetWordFrequencies(int document_id) const {
+    static const map<string, double> invalid_result{};
+    if (document_to_words_freqs_.empty() || !document_to_words_freqs_.count(document_id)) {
+        return invalid_result;
+    }
+
+    const auto& word_freqs = document_to_words_freqs_.at(document_id);
+    return word_freqs;
+}
+
+void SearchServer::RemoveDocument(int document_id) {
+    if (document_ids_.empty() || !documents_.count(document_id)) {
+        return;
+    }
+
+    EraseFromContainer(document_id, document_ids_);
+    EraseFromContainer(document_id, documents_);
+    auto doc_words_ptr = EraseFromContainer(document_id, document_to_words_freqs_);
+    if (doc_words_ptr == document_to_words_freqs_.end() || word_to_document_freqs_.empty()) {
+        return;  // Empty document or empty word_to_document_freqs container
+    }
+
+    const map<string, double>& words = doc_words_ptr->second;
+    for (auto& [cur_word, _] : words) {
+        auto docs_ptr = word_to_document_freqs_.find(cur_word);
+        if (docs_ptr == word_to_document_freqs_.end() || docs_ptr->second.empty()) {
+            continue;
+        }
+        auto& ids_freq = docs_ptr->second;
+        auto ptr = find_if(ids_freq.begin(), ids_freq.end(), [document_id](const pair<int, double>& item) {
+            return item.first == document_id;
+        });
+        if (ptr == ids_freq.end()) {
+            continue;
+        }
+        ids_freq.erase(ptr);
+    }
+
+    for (auto& [_, ids] : hash_content_) {
+        if (ids.empty()) {
+            continue;
+        }
+        EraseFromContainer(document_id, ids);
+    }
+}
+
+void SearchServer::RemoveDuplicates() {
+    for (const auto& [_, ids] : hash_content_) {
+        if (ids.empty() || ids.size() == 1) {
+            continue;
+        }
+        vector<int> ids_for_erase;
+        ids_for_erase.reserve(ids.size() - 1);
+        auto first = next(ids.begin());
+        auto last = ids.end();
+        for (auto ptr = first; ptr != last; ptr++) {
+            ids_for_erase.push_back(*ptr);
+        }
+
+        for (int id : ids_for_erase) {
+            RemoveDocument(id);
+            cout << "Found duplicate document "s << id << endl;
+        }
+    }
 }
 
 bool SearchServer::IsStopWord(const string& word) const {
@@ -182,11 +266,15 @@ void MatchDocuments(const SearchServer& search_server, const string& query) {
         cout << "Матчинг документов по запросу: "s << query << endl;
         const int document_count = search_server.GetDocumentCount();
         for (int index = 0; index < document_count; ++index) {
-            const int document_id = search_server.GetDocumentId(index);
+            const int document_id = *(search_server.begin() + index);
             const auto [words, status] = search_server.MatchDocument(query, document_id);
             PrintMatchDocumentResult(document_id, words, status);
         }
     } catch (const exception& e) {
         cout << "Ошибка матчинга документов на запрос "s << query << ": "s << e.what() << endl;
     }
+}
+
+void RemoveDuplicates(SearchServer& search_server) {
+    search_server.RemoveDuplicates();
 }
