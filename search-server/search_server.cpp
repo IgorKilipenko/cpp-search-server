@@ -117,7 +117,7 @@ void SearchServer::RemoveDocument(int document_id) {
 
     EraseFromContainer(document_id, document_ids_);
     EraseFromContainer(document_id, documents_);
-    auto doc_words_ptr = EraseFromContainer(document_id, document_to_words_freqs_);
+    auto doc_words_ptr = document_to_words_freqs_.find(document_id);
     if (doc_words_ptr == document_to_words_freqs_.end() || word_to_document_freqs_.empty()) {
         return;  // Empty document or empty word_to_document_freqs container
     }
@@ -138,6 +138,8 @@ void SearchServer::RemoveDocument(int document_id) {
         ids_freq.erase(ptr);
     }
 
+    document_to_words_freqs_.erase(doc_words_ptr);
+
     for (auto& [_, ids] : hash_content_) {
         if (ids.empty()) {
             continue;
@@ -147,19 +149,13 @@ void SearchServer::RemoveDocument(int document_id) {
 }
 
 void SearchServer::RemoveDuplicates() {
-    for (const auto& [_, ids] : hash_content_) {
+    for (auto& [_, ids] : hash_content_) {
         if (ids.empty() || ids.size() == 1) {
             continue;
         }
-        vector<int> ids_for_erase;
-        ids_for_erase.reserve(ids.size() - 1);
-        auto first = next(ids.begin());
-        auto last = ids.end();
-        for (auto ptr = first; ptr != last; ptr++) {
-            ids_for_erase.push_back(*ptr);
-        }
-
-        for (int id : ids_for_erase) {
+        for (auto ptr = next(ids.begin()), last = ids.end(); ptr != last;) {
+            int id = *ptr;
+            ptr = ids.erase(ptr);
             RemoveDocument(id);
             cout << "Found duplicate document "s << id << endl;
         }
