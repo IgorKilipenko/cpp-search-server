@@ -83,19 +83,33 @@ class PtrVector {
     // Создаёт вектор указателей на копии объектов из other
     PtrVector(const PtrVector& other) {
         // Реализуйте копирующий конструктор самостоятельно
+        if (other.items_.empty()) {
+            return;
+        }
         items_.reserve(other.items_.size());
         const auto& src_items = other.items_;
-        T* ptr = nullptr;
         try {
             for (const T* const src_item_ptr : src_items) {
-                ptr = src_item_ptr != nullptr ? new T(*src_item_ptr) : nullptr;
+                T* ptr = src_item_ptr != nullptr ? new T(*src_item_ptr) : nullptr;
                 items_.push_back(ptr);
             }
-        } catch (const std::bad_alloc& ex) {
-            delete ptr;
+        } catch (...) {
             FreeItems();
-            throw std::bad_alloc();
+            throw;
         }
+    }
+
+    PtrVector& operator=(const PtrVector& rhs) {
+        if (this == &rhs) {
+            return *this;
+        }
+        try {
+            auto rhs_copy(rhs);
+            swap(rhs_copy);
+        } catch (...) {
+            throw;
+        }
+        return *this;
     }
 
     // Деструктор удаляет объекты в куче, на которые ссылаются указатели,
@@ -125,6 +139,9 @@ class PtrVector {
         }
         items_.clear();
     }
+    void swap(PtrVector& other) noexcept {
+        items_.swap(other.items_);
+    }
 };
 
 class Tentacle {
@@ -133,10 +150,10 @@ class Tentacle {
     int GetId() const {
         return id_;
     }
-    const Tentacle* GetLinkedTentacle() const {
+    Tentacle* GetLinkedTentacle() const {
         return link_;
     }
-    void LinkTo(const Tentacle& tentacle) {
+    void LinkTo(Tentacle& tentacle) {
         link_ = &tentacle;
     }
     void Unlink() {
@@ -145,14 +162,14 @@ class Tentacle {
 
    private:
     size_t id_ = 0;
-    const Tentacle* link_;
+    Tentacle* link_;
 };
 
 class Octopus {
    public:
     explicit Octopus(size_t tentacle_count = 8) : tentaclesies_(tentacle_count) {
         auto& items = tentaclesies_.GetItems();
-        for (int i = 0; i < tentacle_count; i++) {
+        for (int i = 0; i < static_cast<int>(tentacle_count); i++) {
             items[i] = new Tentacle(i + 1);
         }
     }
@@ -173,78 +190,52 @@ class Octopus {
 };
 
 int main() {
-    // Проверка конструирования осьминогов
+    // Проверка присваивания осьминогов
     {
-        // По умолчанию осьминог имеет 8 щупалец
-        Octopus default_octopus;
-        assert(default_octopus.GetTentacleCount() == 8);
+        Octopus octopus1(3);
 
-        // Осьминог может иметь отличное от 8 количество щупалец
-        Octopus quadropus(4);
-        assert(quadropus.GetTentacleCount() == 4);
+        // Настраиваем состояние исходного осьминога
+        octopus1.GetTentacle(2).LinkTo(octopus1.GetTentacle(1));
 
-        // И даже вообще не иметь щупалец
-        Octopus coloboque(0);
-        assert(coloboque.GetTentacleCount() == 0);
+        // До присваивания octopus2 имеет своё собственное состояние
+        Octopus octopus2(10);
+
+        octopus2 = octopus1;
+
+        // После присваивания осьминогов щупальца копии имеют то же состояние,
+        // что и щупальца присваиваемого объекта
+        assert(octopus2.GetTentacleCount() == octopus1.GetTentacleCount());
+        for (int i = 0; i < octopus2.GetTentacleCount(); ++i) {
+            auto& tentacle1 = octopus1.GetTentacle(i);
+            auto& tentacle2 = octopus2.GetTentacle(i);
+            assert(&tentacle2 != &tentacle1);
+            assert(tentacle2.GetId() == tentacle1.GetId());
+            assert(tentacle2.GetLinkedTentacle() == tentacle1.GetLinkedTentacle());
+        }
     }
 
-    // Осьминогу можно добавлять щупальца
+    // Проверка самоприсваивания осьминогов
     {
-        Octopus octopus(1);
-        Tentacle* t0 = &octopus.GetTentacle(0);
-        Tentacle* t1 = &octopus.AddTentacle();
-        assert(octopus.GetTentacleCount() == 2);
-        Tentacle* t2 = &octopus.AddTentacle();
-        assert(octopus.GetTentacleCount() == 3);
+        Octopus octopus(3);
 
-        // После добавления щупалец ранее созданные щупальца не меняют своих адресов
-        assert(&octopus.GetTentacle(0) == t0);
-        assert(&octopus.GetTentacle(1) == t1);
-        assert(&octopus.GetTentacle(2) == t2);
+        // Настраиваем состояние осьминога
+        octopus.GetTentacle(0).LinkTo(octopus.GetTentacle(1));
 
+        vector<pair<Tentacle*, Tentacle*>> tentacles;
+        // Сохраняем информацию о щупальцах осьминога и его копии
         for (int i = 0; i < octopus.GetTentacleCount(); ++i) {
-            assert(octopus.GetTentacle(i).GetId() == i + 1);
+            tentacles.push_back({&octopus.GetTentacle(i), octopus.GetTentacle(i).GetLinkedTentacle()});
+        }
+
+        // Выполняем самоприсваивание
+        //// octopus = octopus;
+
+        // После самоприсваивания состояние осьминога не должно измениться
+        assert(octopus.GetTentacleCount() == static_cast<int>(tentacles.size()));
+        for (int i = 0; i < octopus.GetTentacleCount(); ++i) {
+            auto& tentacle_with_link = tentacles.at(i);
+            assert(&octopus.GetTentacle(i) == tentacle_with_link.first);
+            assert(octopus.GetTentacle(i).GetLinkedTentacle() == tentacle_with_link.second);
         }
     }
-
-    // Осьминоги могут прицепляться к щупальцам друг друга
-    {
-        Octopus male(2);
-        Octopus female(2);
-
-        assert(male.GetTentacle(0).GetLinkedTentacle() == nullptr);
-
-        male.GetTentacle(0).LinkTo(female.GetTentacle(1));
-        assert(male.GetTentacle(0).GetLinkedTentacle() == &female.GetTentacle(1));
-
-        male.GetTentacle(0).Unlink();
-        assert(male.GetTentacle(0).GetLinkedTentacle() == nullptr);
-    }
-
-    // Копия осьминога имеет свою собственную копию щупалец, которые
-    // копируют состояние щупалец оригинального осьминога
-    {
-        // Перебираем осьминогов с разным количеством щупалец
-        for (int num_tentacles = 0; num_tentacles < 10; ++num_tentacles) {
-            Octopus male(num_tentacles);
-            Octopus female(num_tentacles);
-            // Пусть они хватают друг друга за щупальца
-            for (int i = 0; i < num_tentacles; ++i) {
-                male.GetTentacle(i).LinkTo(female.GetTentacle(num_tentacles - 1 - i));
-            }
-
-            Octopus male_copy(male);
-            // Проверяем состояние щупалец копии
-            assert(male_copy.GetTentacleCount() == male.GetTentacleCount());
-            for (int i = 0; i < male_copy.GetTentacleCount(); ++i) {
-                // Каждое щупальце копии размещается по адресу, отличному от адреса оригинального щупальца
-                assert(&male_copy.GetTentacle(i) != &male.GetTentacle(i));
-                // Каждое щупальце копии прицепляется к тому же щупальцу, что и оригинальное
-                assert(male_copy.GetTentacle(i).GetLinkedTentacle() == male.GetTentacle(i).GetLinkedTentacle());
-            }
-        }
-        // Если вы видите эту надпись, то разрушение осьминогов, скорее всего,
-        // прошло без неопределённого поведения
-        cout << "Everything is OK"s << endl;
-    }
-}
+} 
