@@ -1,5 +1,10 @@
+#include <algorithm>
 #include <cassert>
+#include <new>
 #include <stdexcept>
+#include <vector>
+
+using namespace std;
 
 // Умный указатель, удаляющий связанный объект при своём разрушении.
 // Параметр шаблона T задаёт тип объекта, на который ссылается указатель
@@ -66,7 +71,59 @@ class ScopedPtr {
     T* ptr_ = nullptr;
 };
 
-// Этот main тестирует класс ScopedPtr
+template <typename T>
+class PtrVector {
+   public:
+    PtrVector() = default;
+
+    // Создаёт вектор указателей на копии объектов из other
+    PtrVector(const PtrVector& other) {
+        // Реализуйте копирующий конструктор самостоятельно
+        items_.reserve(other.items_.size());
+        const auto& src_items = other.items_;
+        T* ptr = nullptr;
+        try {
+            for (const T* const src_item_ptr : src_items) {
+                ptr = src_item_ptr != nullptr ? new T(*src_item_ptr) : nullptr;
+                items_.push_back(ptr);
+            }
+        } catch (const std::bad_alloc& ex) {
+            delete ptr;
+            FreeItems();
+            throw std::bad_alloc();
+        }
+    }
+
+    // Деструктор удаляет объекты в куче, на которые ссылаются указатели,
+    // в векторе items_
+    ~PtrVector() {
+        // Реализуйте тело деструктора самостоятельно
+        FreeItems();
+    }
+
+    // Возвращает ссылку на вектор указателей
+    vector<T*>& GetItems() noexcept {
+        // Реализуйте метод самостоятельно
+        return items_;
+    }
+
+    // Возвращает константную ссылку на вектор указателей
+    vector<T*> const& GetItems() const noexcept {
+        // Реализуйте метод самостоятельно
+        return items_;
+    }
+
+   private:
+    vector<T*> items_;
+    void FreeItems() {
+        for (T* item : items_) {
+            delete item;
+        }
+        items_.clear();
+    }
+};
+
+// Эта функция main тестирует шаблон класса PtrVector
 int main() {
     // Вспомогательный "шпион", позволяющий узнать о своём удалении
     struct DeletionSpy {
@@ -77,39 +134,61 @@ int main() {
         bool& is_deleted_;
     };
 
-    // Проверяем автоматическое удаление
+    // Проверяем удаление элементов
     {
-        bool is_deleted = false;
+        bool spy1_is_deleted = false;
+        DeletionSpy* ptr1 = new DeletionSpy(spy1_is_deleted);
         {
-            // настраиваем "шпион", чтобы при своём удалении он выставил is_deleted в true
-            DeletionSpy* raw_ptr = new DeletionSpy(is_deleted);
-            ScopedPtr<DeletionSpy> p(raw_ptr);
-            assert(p.GetRawPtr() == raw_ptr);
-            assert(!is_deleted);
-            // При выходе из блока деструктор p должен удалить "шпиона"
+            PtrVector<DeletionSpy> ptr_vector;
+            ptr_vector.GetItems().push_back(ptr1);
+            assert(!spy1_is_deleted);
+
+            // Константная ссылка на ptr_vector
+            const auto& const_ptr_vector_ref(ptr_vector);
+            // И константная, и неконстантная версия GetItems
+            // должны вернуть ссылку на один и тот же вектор
+            assert(&const_ptr_vector_ref.GetItems() == &ptr_vector.GetItems());
         }
-        // Если деструктор умного указателя работает правильно, шпион перед своей "смертью"
-        // должен выставить is_deleted в true
-        assert(is_deleted);
+        // При разрушении ptr_vector должен удалить все объекты, на которые
+        // ссылаются находящиеся внутри него указателели
+        assert(spy1_is_deleted);
     }
 
-    // Проверяем работу метода Release
-    {
-        bool is_deleted = false;
-        DeletionSpy* raw_ptr = new DeletionSpy(is_deleted);
+    // Вспомогательный «шпион», позволяющий узнать о своём копировании
+    struct CopyingSpy {
+        explicit CopyingSpy(int& copy_count) : copy_count_(copy_count) {}
+        CopyingSpy(const CopyingSpy& rhs)
+            : copy_count_(rhs.copy_count_)  //
         {
-            ScopedPtr<DeletionSpy> scoped_ptr(raw_ptr);
-            assert(scoped_ptr.Release() == raw_ptr);
-            assert(scoped_ptr.GetRawPtr() == nullptr);
-            // После Release умный указатель не ссылается на объект и не удаляет его при своём удалении
+            ++copy_count_;
         }
-        assert(!is_deleted);
-        delete raw_ptr;
-        assert(is_deleted);
-    }
+        int& copy_count_;
+    };
+
+    // Проверяем копирование элементов при копировании массива указателей
     {
-        int val = 28;
-        ScopedPtr ptr(&val);
-        assert(&(*ptr) == &val);
+        // 10 элементов
+        vector<int> copy_counters(10);
+
+        PtrVector<CopyingSpy> ptr_vector;
+        // Подготавливаем оригинальный массив указателей
+        for (auto& counter : copy_counters) {
+            ptr_vector.GetItems().push_back(new CopyingSpy(counter));
+        }
+        // Последний элемент содержит нулевой указатель
+        ptr_vector.GetItems().push_back(nullptr);
+
+        auto ptr_vector_copy(ptr_vector);
+        // Количество элементов в копии равно количеству элементов оригинального вектора
+        assert(ptr_vector_copy.GetItems().size() == ptr_vector.GetItems().size());
+
+        // копия должна хранить указатели на новые объекты
+        assert(ptr_vector_copy.GetItems() != ptr_vector.GetItems());
+        // Последний элемент исходного массива и его копии - нулевой указатель
+        assert(ptr_vector_copy.GetItems().back() == nullptr);
+        // Проверяем, что элементы были скопированы (копирующие шпионы увеличивают счётчики копий).
+        assert(all_of(copy_counters.begin(), copy_counters.end(), [](int counter) {
+            return counter == 1;
+        }));
     }
 }
