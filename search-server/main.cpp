@@ -1,241 +1,454 @@
-#include <algorithm>
 #include <cassert>
 #include <cstddef>
-#include <iostream>
-#include <new>
-#include <stdexcept>
-#include <vector>
+#include <iterator>
+#include <string>
+#include <utility>
 
 using namespace std;
 
-// Умный указатель, удаляющий связанный объект при своём разрушении.
-// Параметр шаблона T задаёт тип объекта, на который ссылается указатель
-template <typename T>
-class ScopedPtr {
+template <typename Type>
+class SingleLinkedList {
+    // Узел списка
+    struct Node {
+        Node() = default;
+        Node(const Type& val, Node* next) : value(val), next_node(next) {}
+        Type value;
+        Node* next_node = nullptr;
+    };
+
    public:
-    // Конструктор по умолчанию создаёт нулевой указатель,
-    // так как поле ptr_ имеет значение по умолчанию nullptr
-    ScopedPtr() = default;
+    template <typename ValueType>
+    class BasicIterator;
+    using value_type = Type;
+    using reference = value_type&;
+    using const_reference = const value_type&;
+    // Итератор, допускающий изменение элементов списка
+    using Iterator = BasicIterator<Type>;
+    // Константный итератор, предоставляющий доступ для чтения к элементам списка
+    using ConstIterator = BasicIterator<const Type>;
 
-    // Создаёт указатель, ссылающийся на переданный raw_ptr.
-    // raw_ptr ссылается либо на объект, созданный в куче при помощи new,
-    // либо является нулевым указателем
-    // Спецификатор noexcept обозначает, что метод не бросает исключений
-    explicit ScopedPtr(T* raw_ptr) noexcept {
-        // Реализуйте самостоятельно
-        ptr_ = raw_ptr;
+    SingleLinkedList() : head_{}, size_{0} {}
+
+    ~SingleLinkedList() {
+        Clear();
+    }
+    // Возвращает количество элементов в списке за время O(1)
+    [[nodiscard]] size_t GetSize() const noexcept {
+        return size_;
     }
 
-    // Удаляем у класса конструктор копирования
-    ScopedPtr(const ScopedPtr&) = delete;
-
-    // Деструктор. Удаляет объект, на который ссылается умный указатель.
-    ~ScopedPtr() {
-        // Реализуйте тело деструктора самостоятельно
-        delete ptr_;
-        ptr_ = nullptr;
+    // Сообщает, пустой ли список за время O(1)
+    [[nodiscard]] bool IsEmpty() const noexcept {
+        return size_ == 0;
     }
 
-    // Возвращает указатель, хранящийся внутри ScopedPtr
-    T* GetRawPtr() const noexcept {
-        // Напишите код метода самостоятельно
-        return ptr_;
+    // Вставляет элемент value в начало списка за время O(1)
+    void PushFront(const Type& value) {
+        head_.next_node = new Node(value, head_.next_node);
+        ++size_;
     }
 
-    // Прекращает владение объектом, на который ссылается умный указатель.
-    // Возвращает прежнее значение "сырого" указателя и устанавливает поле ptr_ в null
-    T* Release() noexcept {
-        // Реализуйте самостоятельно
-        T* result = ptr_;
-        ptr_ = nullptr;
-        return result;
-    }
-
-    T& operator*() {
-        if (ptr_ == nullptr) {
-            throw std::logic_error("Is null pointer.");
+    // Очищает список за время O(N)
+    void Clear() noexcept {
+        for (Node* node = head_.next_node; node != nullptr;) {
+            Node* for_delete = node;
+            node = node->next_node;
+            delete for_delete;
         }
-        return *ptr_;
+        head_.next_node = nullptr;
+        size_ = 0;
     }
 
-    T* operator->() {
-        if (ptr_ == nullptr) {
-            throw std::logic_error("Is null pointer.");
-        }
-        return ptr_;
-    }
+    // Возвращает итератор, ссылающийся на первый элемент
+    // Если список пустой, возвращённый итератор будет равен end()
+    [[nodiscard]] Iterator begin() noexcept;
 
-    operator bool() const {
-        return ptr_ != nullptr;
-    }
+    // Возвращает итератор, указывающий на позицию, следующую за последним элементом односвязного списка
+    // Разыменовывать этот итератор нельзя — попытка разыменования приведёт к неопределённому поведению
+    [[nodiscard]] Iterator end() noexcept;
+
+    // Возвращает константный итератор, ссылающийся на первый элемент
+    // Если список пустой, возвращённый итератор будет равен end()
+    // Результат вызова эквивалентен вызову метода cbegin()
+    [[nodiscard]] ConstIterator begin() const noexcept;
+
+    // Возвращает константный итератор, указывающий на позицию, следующую за последним элементом односвязного списка
+    // Разыменовывать этот итератор нельзя — попытка разыменования приведёт к неопределённому поведению
+    // Результат вызова эквивалентен вызову метода cend()
+    [[nodiscard]] ConstIterator end() const noexcept;
+
+    // Возвращает константный итератор, ссылающийся на первый элемент
+    // Если список пустой, возвращённый итератор будет равен cend()
+    [[nodiscard]] ConstIterator cbegin() const noexcept;
+
+    // Возвращает константный итератор, указывающий на позицию, следующую за последним элементом односвязного списка
+    // Разыменовывать этот итератор нельзя — попытка разыменования приведёт к неопределённому поведению
+    [[nodiscard]] ConstIterator cend() const noexcept;
 
    private:
-    T* ptr_ = nullptr;
+    // Фиктивный узел, используется для вставки "перед первым элементом"
+    Node head_;
+    size_t size_;
 };
 
-template <typename T>
-class PtrVector {
+// Шаблон класса «Базовый Итератор».
+// Определяет поведение итератора на элементы односвязного списка
+// ValueType — совпадает с Type (для Iterator) либо с const Type (для ConstIterator)
+template <typename Type>
+template <typename ValueType>
+class SingleLinkedList<Type>::BasicIterator {
+    // Класс списка объявляется дружественным, чтобы из методов списка
+    // был доступ к приватной области итератора
+    friend class SingleLinkedList;
+
+    // Конвертирующий конструктор итератора из указателя на узел списка
+    explicit BasicIterator(Node* node) : node_(node) {}
+
    public:
-    PtrVector() = default;
+    // Объявленные ниже типы сообщают стандартной библиотеке о свойствах этого итератора
 
-    explicit PtrVector(size_t size) : items_(size, nullptr) {}
+    // Категория итератора — forward iterator
+    // (итератор, который поддерживает операции инкремента и многократное разыменование)
+    using iterator_category = std::forward_iterator_tag;
+    // Тип элементов, по которым перемещается итератор
+    using value_type = Type;
+    // Тип, используемый для хранения смещения между итераторами
+    using difference_type = std::ptrdiff_t;
+    // Тип указателя на итерируемое значение
+    using pointer = ValueType*;
+    // Тип ссылки на итерируемое значение
+    using reference = ValueType&;
 
-    // Создаёт вектор указателей на копии объектов из other
-    PtrVector(const PtrVector& other) {
-        // Реализуйте копирующий конструктор самостоятельно
-        if (other.items_.empty()) {
-            return;
-        }
-        items_.reserve(other.items_.size());
-        const auto& src_items = other.items_;
-        try {
-            for (const T* const src_item_ptr : src_items) {
-                T* ptr = src_item_ptr != nullptr ? new T(*src_item_ptr) : nullptr;
-                items_.push_back(ptr);
-            }
-        } catch (...) {
-            FreeItems();
-            throw;
-        }
+    BasicIterator() = default;
+
+    // Конвертирующий конструктор/конструктор копирования
+    // При ValueType, совпадающем с Type, играет роль копирующего конструктора
+    // При ValueType, совпадающем с const Type, играет роль конвертирующего конструктора
+    BasicIterator(const BasicIterator<Type>& other) noexcept : node_{other.node_} {}
+
+    // Чтобы компилятор не выдавал предупреждение об отсутствии оператора = при наличии
+    // пользовательского конструктора копирования, явно объявим оператор = и
+    // попросим компилятор сгенерировать его за нас
+    BasicIterator& operator=(const BasicIterator& rhs) = default;
+
+    // Оператор сравнения итераторов (в роли второго аргумента выступает константный итератор)
+    // Два итератора равны, если они ссылаются на один и тот же элемент списка либо на end()
+    [[nodiscard]] bool operator==(const BasicIterator<const Type>& rhs) const noexcept {
+        return node_ == rhs.node_;
     }
 
-    PtrVector& operator=(const PtrVector& rhs) {
-        if (this == &rhs) {
-            return *this;
-        }
-        try {
-            auto rhs_copy(rhs);
-            swap(rhs_copy);
-        } catch (...) {
-            throw;
-        }
+    // Оператор проверки итераторов на неравенство
+    // Противоположен ==
+    [[nodiscard]] bool operator!=(const BasicIterator<const Type>& rhs) const noexcept {
+        return !(*this == rhs);
+    }
+
+    // Оператор сравнения итераторов (в роли второго аргумента итератор)
+    // Два итератора равны, если они ссылаются на один и тот же элемент списка либо на end()
+    [[nodiscard]] bool operator==(const BasicIterator<Type>& rhs) const noexcept {
+        return node_ == rhs.node_;
+    }
+
+    // Оператор проверки итераторов на неравенство
+    // Противоположен ==
+    [[nodiscard]] bool operator!=(const BasicIterator<Type>& rhs) const noexcept {
+        return !(*this == rhs);
+    }
+
+    // Оператор прединкремента. После его вызова итератор указывает на следующий элемент списка
+    // Возвращает ссылку на самого себя
+    // Инкремент итератора, не указывающего на существующий элемент списка, приводит к неопределённому поведению
+    BasicIterator& operator++() noexcept {
+        node_ = node_->next_node;
         return *this;
     }
 
-    // Деструктор удаляет объекты в куче, на которые ссылаются указатели,
-    // в векторе items_
-    ~PtrVector() {
-        // Реализуйте тело деструктора самостоятельно
-        FreeItems();
+    // Оператор постинкремента. После его вызова итератор указывает на следующий элемент списка
+    // Возвращает прежнее значение итератора
+    // Инкремент итератора, не указывающего на существующий элемент списка,
+    // приводит к неопределённому поведению
+    BasicIterator operator++(int) noexcept {
+        auto old_value(*this);
+        ++(*this);
+        return old_value;
     }
 
-    // Возвращает ссылку на вектор указателей
-    vector<T*>& GetItems() noexcept {
-        // Реализуйте метод самостоятельно
-        return items_;
+    // Операция разыменования. Возвращает ссылку на текущий элемент
+    // Вызов этого оператора у итератора, не указывающего на существующий элемент списка,
+    // приводит к неопределённому поведению
+    [[nodiscard]] reference operator*() const noexcept {
+        return node_->value;
     }
 
-    // Возвращает константную ссылку на вектор указателей
-    vector<T*> const& GetItems() const noexcept {
-        // Реализуйте метод самостоятельно
-        return items_;
+    // Операция доступа к члену класса. Возвращает указатель на текущий элемент списка
+    // Вызов этого оператора у итератора, не указывающего на существующий элемент списка,
+    // приводит к неопределённому поведению
+    [[nodiscard]] pointer operator->() const noexcept {
+        return &node_->value;
     }
 
    private:
-    vector<T*> items_;
-    void FreeItems() {
-        for (T* item : items_) {
-            delete item;
+    Node* node_ = nullptr;
+};
+
+#pragma region SingleLinkedList implementation
+// ----------------------------------------------------------------
+// SingleLinkedList template members implementation
+// ----------------------------------------------------------------
+
+template <typename Type>
+[[nodiscard]] typename SingleLinkedList<Type>::Iterator SingleLinkedList<Type>::begin() noexcept {
+    return Iterator{head_.next_node};
+}
+
+template <typename Type>
+[[nodiscard]] typename SingleLinkedList<Type>::Iterator SingleLinkedList<Type>::end() noexcept {
+    return Iterator{nullptr};
+}
+
+template <typename Type>
+[[nodiscard]] typename SingleLinkedList<Type>::ConstIterator SingleLinkedList<Type>::begin() const noexcept {
+    return ConstIterator{head_.next_node};
+}
+
+template <typename Type>
+[[nodiscard]] typename SingleLinkedList<Type>::ConstIterator SingleLinkedList<Type>::end() const noexcept {
+    return ConstIterator{nullptr};
+}
+
+template <typename Type>
+[[nodiscard]] typename SingleLinkedList<Type>::ConstIterator SingleLinkedList<Type>::cbegin() const noexcept {
+    return ConstIterator{head_.next_node};
+}
+
+template <typename Type>
+[[nodiscard]] typename SingleLinkedList<Type>::ConstIterator SingleLinkedList<Type>::cend() const noexcept {
+    return ConstIterator{nullptr};
+}
+
+#pragma endregion SingleLinkedList implementation
+
+#pragma region Test functions
+// Эта функция тестирует работу SingleLinkedList
+void Test1() {
+    // Шпион, следящий за своим удалением
+    struct DeletionSpy {
+        DeletionSpy() = default;
+        explicit DeletionSpy(int& instance_counter) noexcept
+            : instance_counter_ptr_(&instance_counter)  //
+        {
+            OnAddInstance();
         }
-        items_.clear();
-    }
-    void swap(PtrVector& other) noexcept {
-        items_.swap(other.items_);
-    }
-};
+        DeletionSpy(const DeletionSpy& other) noexcept
+            : instance_counter_ptr_(other.instance_counter_ptr_)  //
+        {
+            OnAddInstance();
+        }
+        DeletionSpy& operator=(const DeletionSpy& rhs) noexcept {
+            if (this != &rhs) {
+                auto rhs_copy(rhs);
+                std::swap(instance_counter_ptr_, rhs_copy.instance_counter_ptr_);
+            }
+            return *this;
+        }
+        ~DeletionSpy() {
+            OnDeleteInstance();
+        }
 
-class Tentacle {
-   public:
-    Tentacle(size_t id, Tentacle* link = nullptr) : id_{id}, link_{link} {}
-    int GetId() const {
-        return id_;
-    }
-    Tentacle* GetLinkedTentacle() const {
-        return link_;
-    }
-    void LinkTo(Tentacle& tentacle) {
-        link_ = &tentacle;
-    }
-    void Unlink() {
-        link_ = nullptr;
+       private:
+        void OnAddInstance() noexcept {
+            if (instance_counter_ptr_) {
+                ++(*instance_counter_ptr_);
+            }
+        }
+        void OnDeleteInstance() noexcept {
+            if (instance_counter_ptr_) {
+                assert(*instance_counter_ptr_ != 0);
+                --(*instance_counter_ptr_);
+            }
+        }
+
+        int* instance_counter_ptr_ = nullptr;
+    };
+
+    // Проверка вставки в начало
+    {
+        SingleLinkedList<int> l;
+        assert(l.IsEmpty());
+        assert(l.GetSize() == 0u);
+
+        l.PushFront(0);
+        l.PushFront(1);
+        assert(l.GetSize() == 2);
+        assert(!l.IsEmpty());
+
+        l.Clear();
+        assert(l.GetSize() == 0);
+        assert(l.IsEmpty());
     }
 
-   private:
-    size_t id_ = 0;
-    Tentacle* link_;
-};
+    // Проверка фактического удаления элементов
+    {
+        int item0_counter = 0;
+        int item1_counter = 0;
+        int item2_counter = 0;
+        {
+            SingleLinkedList<DeletionSpy> list;
+            list.PushFront(DeletionSpy{item0_counter});
+            list.PushFront(DeletionSpy{item1_counter});
+            list.PushFront(DeletionSpy{item2_counter});
 
-class Octopus {
-   public:
-    explicit Octopus(size_t tentacle_count = 8) : tentaclesies_(tentacle_count) {
-        auto& items = tentaclesies_.GetItems();
-        for (int i = 0; i < static_cast<int>(tentacle_count); i++) {
-            items[i] = new Tentacle(i + 1);
+            assert(item0_counter == 1);
+            assert(item1_counter == 1);
+            assert(item2_counter == 1);
+            list.Clear();
+            assert(item0_counter == 0);
+            assert(item1_counter == 0);
+            assert(item2_counter == 0);
+
+            list.PushFront(DeletionSpy{item0_counter});
+            list.PushFront(DeletionSpy{item1_counter});
+            list.PushFront(DeletionSpy{item2_counter});
+            assert(item0_counter == 1);
+            assert(item1_counter == 1);
+            assert(item2_counter == 1);
+        }
+        assert(item0_counter == 0);
+        assert(item1_counter == 0);
+        assert(item2_counter == 0);
+    }
+
+    // Вспомогательный класс, бросающий исключение после создания N-копии
+    struct ThrowOnCopy {
+        ThrowOnCopy() = default;
+        explicit ThrowOnCopy(int& copy_counter) noexcept : countdown_ptr(&copy_counter) {}
+        ThrowOnCopy(const ThrowOnCopy& other)
+            : countdown_ptr(other.countdown_ptr)  //
+        {
+            if (countdown_ptr) {
+                if (*countdown_ptr == 0) {
+                    throw std::bad_alloc();
+                } else {
+                    --(*countdown_ptr);
+                }
+            }
+        }
+        // Присваивание элементов этого типа не требуется
+        ThrowOnCopy& operator=(const ThrowOnCopy& rhs) = delete;
+        // Адрес счётчика обратного отсчёта. Если не равен nullptr, то уменьшается при каждом копировании.
+        // Как только обнулится, конструктор копирования выбросит исключение
+        int* countdown_ptr = nullptr;
+    };
+
+    {
+        bool exception_was_thrown = false;
+        // Последовательно уменьшаем счётчик копирований до нуля, пока не будет выброшено исключение
+        for (int max_copy_counter = 5; max_copy_counter >= 0; --max_copy_counter) {
+            // Создаём непустой список
+            SingleLinkedList<ThrowOnCopy> list;
+            list.PushFront(ThrowOnCopy{});
+            try {
+                int copy_counter = max_copy_counter;
+                list.PushFront(ThrowOnCopy(copy_counter));
+                // Если метод не выбросил исключение, список должен перейти в новое состояние
+                assert(list.GetSize() == 2);
+            } catch (const std::bad_alloc&) {
+                exception_was_thrown = true;
+                // После выбрасывания исключения состояние списка должно остаться прежним
+                assert(list.GetSize() == 1);
+                break;
+            }
+        }
+        assert(exception_was_thrown);
+    }
+}
+
+// Эта функция тестирует работу SingleLinkedList
+void Test2() {
+    // Итерирование по пустому списку
+    {
+        SingleLinkedList<int> list;
+        // Константная ссылка для доступа к константным версиям begin()/end()
+        const auto& const_list = list;
+
+        // Итераторы begin и end у пустого диапазона равны друг другу
+        assert(list.begin() == list.end());
+        assert(const_list.begin() == const_list.end());
+        assert(list.cbegin() == list.cend());
+        assert(list.cbegin() == const_list.begin());
+        assert(list.cend() == const_list.end());
+    }
+
+    // Итерирование по непустому списку
+    {
+        SingleLinkedList<int> list;
+        const auto& const_list = list;
+
+        list.PushFront(1);
+        assert(list.GetSize() == 1u);
+        assert(!list.IsEmpty());
+
+        assert(const_list.begin() != const_list.end());
+        assert(const_list.cbegin() != const_list.cend());
+        assert(list.begin() != list.end());
+
+        assert(const_list.begin() == const_list.cbegin());
+
+        assert(*list.cbegin() == 1);
+        *list.begin() = -1;
+        assert(*list.cbegin() == -1);
+
+        const auto old_begin = list.cbegin();
+        list.PushFront(2);
+        assert(list.GetSize() == 2);
+
+        const auto new_begin = list.cbegin();
+        assert(new_begin != old_begin);
+        // Проверка прединкремента
+        {
+            auto new_begin_copy(new_begin);
+            assert((++(new_begin_copy)) == old_begin);
+        }
+        // Проверка постинкремента
+        {
+            auto new_begin_copy(new_begin);
+            assert(((new_begin_copy)++) == new_begin);
+            assert(new_begin_copy == old_begin);
+        }
+        // Итератор, указывающий на позицию после последнего элемента, равен итератору end()
+        {
+            auto old_begin_copy(old_begin);
+            assert((++old_begin_copy) == list.end());
         }
     }
-    int GetTentacleCount() const {
-        return tentaclesies_.GetItems().size();
-    }
-    Tentacle& GetTentacle(int index) const {
-        return *tentaclesies_.GetItems().at(index);
-    }
-    Tentacle& AddTentacle() {
-        Tentacle* new_tentacle = new Tentacle(GetTentacleCount() + 1);
-        tentaclesies_.GetItems().push_back(new_tentacle);
-        return *new_tentacle;
-    }
+    // Преобразование итераторов
+    {
+        SingleLinkedList<int> list;
+        list.PushFront(1);
+        // Конструирование ConstIterator из Iterator
+        SingleLinkedList<int>::ConstIterator const_it(list.begin());
+        assert(const_it == list.cbegin());
+        assert(*const_it == *list.cbegin());
 
-   private:
-    PtrVector<Tentacle> tentaclesies_;
-};
+        SingleLinkedList<int>::ConstIterator const_it1;
+        // Присваивание ConstIterator'у значения Iterator
+        const_it1 = list.begin();
+        assert(const_it1 == const_it);
+    }
+    // Проверка оператора ->
+    {
+        using namespace std;
+        SingleLinkedList<std::string> string_list;
+
+        string_list.PushFront("one"s);
+        assert(string_list.cbegin()->length() == 3u);
+        string_list.begin()->push_back('!');
+        assert(*string_list.begin() == "one!"s);
+    }
+}
+#pragma endregion Test functions
 
 int main() {
-    // Проверка присваивания осьминогов
-    {
-        Octopus octopus1(3);
-
-        // Настраиваем состояние исходного осьминога
-        octopus1.GetTentacle(2).LinkTo(octopus1.GetTentacle(1));
-
-        // До присваивания octopus2 имеет своё собственное состояние
-        Octopus octopus2(10);
-
-        octopus2 = octopus1;
-
-        // После присваивания осьминогов щупальца копии имеют то же состояние,
-        // что и щупальца присваиваемого объекта
-        assert(octopus2.GetTentacleCount() == octopus1.GetTentacleCount());
-        for (int i = 0; i < octopus2.GetTentacleCount(); ++i) {
-            auto& tentacle1 = octopus1.GetTentacle(i);
-            auto& tentacle2 = octopus2.GetTentacle(i);
-            assert(&tentacle2 != &tentacle1);
-            assert(tentacle2.GetId() == tentacle1.GetId());
-            assert(tentacle2.GetLinkedTentacle() == tentacle1.GetLinkedTentacle());
-        }
-    }
-
-    // Проверка самоприсваивания осьминогов
-    {
-        Octopus octopus(3);
-
-        // Настраиваем состояние осьминога
-        octopus.GetTentacle(0).LinkTo(octopus.GetTentacle(1));
-
-        vector<pair<Tentacle*, Tentacle*>> tentacles;
-        // Сохраняем информацию о щупальцах осьминога и его копии
-        for (int i = 0; i < octopus.GetTentacleCount(); ++i) {
-            tentacles.push_back({&octopus.GetTentacle(i), octopus.GetTentacle(i).GetLinkedTentacle()});
-        }
-
-        // Выполняем самоприсваивание
-        //// octopus = octopus;
-
-        // После самоприсваивания состояние осьминога не должно измениться
-        assert(octopus.GetTentacleCount() == static_cast<int>(tentacles.size()));
-        for (int i = 0; i < octopus.GetTentacleCount(); ++i) {
-            auto& tentacle_with_link = tentacles.at(i);
-            assert(&octopus.GetTentacle(i) == tentacle_with_link.first);
-            assert(octopus.GetTentacle(i).GetLinkedTentacle() == tentacle_with_link.second);
-        }
-    }
-} 
+    Test1();
+    Test2();
+}
