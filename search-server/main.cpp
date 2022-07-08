@@ -42,7 +42,7 @@ class SingleLinkedList {
 
     SingleLinkedList(const SingleLinkedList& other) : SingleLinkedList() {
         assert(size_ == 0 && head_.next_node == nullptr);
-        
+
         *this = other;
     }
 
@@ -194,18 +194,6 @@ class SingleLinkedList {
     Node head_;
     size_t size_;
 
-    bool Compare(const SingleLinkedList& other) const {
-        return *this < other;
-    }
-    int CheckEqual(const Node& lhs, const Node& rhs) const {
-        if (lhs > rhs) {
-            return 1;
-        }
-        if (this->lhs < rhs) {
-            return -1;
-        }
-        return 0;  // Equal by default
-    }
     bool IsEqualByRefs(const SingleLinkedList& other) const {
         if (this->size_ != other.size_) {
             return false;
