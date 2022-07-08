@@ -42,19 +42,7 @@ class SingleLinkedList {
 
     SingleLinkedList(const SingleLinkedList& other) : SingleLinkedList() {
         assert(size_ == 0 && head_.next_node == nullptr);
-
-        /*if (this == &other || other.size_ == 0) {
-            return;
-        }
-
-        try {
-            vector<Type> buffer(other.begin(), other.end());
-            SingleLinkedList tmp{buffer.rbegin(), buffer.rend()};
-            swap(tmp);
-        } catch (...) {
-            throw;
-        }*/
-
+        
         *this = other;
     }
 
@@ -145,15 +133,6 @@ class SingleLinkedList {
         if (IsEqualByRefs(other)) {
             return true;
         }
-        /*
-        for (auto ptr = this->begin(), ptr_other = other.begin(), last = this->end(); ptr != last; ++ptr, ++ptr_other) {
-            if (*ptr != *ptr_other) {
-                return false;
-            }
-        }
-
-        return true;
-        */
 
         return std::equal(this->begin(), this->end(), other.begin());
     }
