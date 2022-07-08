@@ -115,7 +115,11 @@ class SingleLinkedList {
     }
 
     SingleLinkedList& operator=(const SingleLinkedList& other) {
-        if (this == &other || other.size_ == 0) {
+        if (this == &other) {
+            return *this;
+        }
+        if (other.size_ == 0) {
+            Clear();
             return *this;
         }
 
