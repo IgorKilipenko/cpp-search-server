@@ -29,7 +29,7 @@ class SingleLinkedList {
     // Константный итератор, предоставляющий доступ для чтения к элементам списка
     using ConstIterator = BasicIterator<const Type>;
 
-    SingleLinkedList() : head_{}, size_{0}, head_ptr_{&head_} {}
+    SingleLinkedList() : head_{}, size_{0} {}
 
     template <typename T>
     SingleLinkedList(T begin, T end) : SingleLinkedList() {
@@ -185,33 +185,30 @@ class SingleLinkedList {
     void swap(SingleLinkedList& other) noexcept {
         Node* tmp_next_node_ptr = this->head_.next_node;
         size_t tmp_size = this->size_;
-        Node* tmp_before_begin_node_ = this->head_ptr_;
 
         this->head_.next_node = other.head_.next_node;
         this->size_ = other.size_;
-        this->head_ptr_ = other.head_ptr_;
 
         other.head_.next_node = tmp_next_node_ptr;
         other.size_ = tmp_size;
-        other.head_ptr_ = tmp_before_begin_node_;
     }
 
     // Возвращает итератор, указывающий на позицию перед первым элементом односвязного списка.
     // Разыменовывать этот итератор нельзя - попытка разыменования приведёт к неопределённому поведению
     [[nodiscard]] Iterator before_begin() noexcept {
-        return Iterator{head_ptr_};
+        return Iterator{&head_};
     }
 
     // Возвращает константный итератор, указывающий на позицию перед первым элементом односвязного списка.
     // Разыменовывать этот итератор нельзя - попытка разыменования приведёт к неопределённому поведению
     [[nodiscard]] ConstIterator cbefore_begin() const noexcept {
-        return ConstIterator{head_ptr_};
+        return ConstIterator{const_cast<Node*>(&head_)};
     }
 
     // Возвращает константный итератор, указывающий на позицию перед первым элементом односвязного списка.
     // Разыменовывать этот итератор нельзя - попытка разыменования приведёт к неопределённому поведению
     [[nodiscard]] ConstIterator before_begin() const noexcept {
-        return ConstIterator{head_ptr_};
+        return ConstIterator{const_cast<Node*>(&head_)};
     }
 
     /*
@@ -255,7 +252,6 @@ class SingleLinkedList {
     // Фиктивный узел, используется для вставки "перед первым элементом"
     Node head_;
     size_t size_;
-    Node* head_ptr_;
 
     bool IsEqualByRefs(const SingleLinkedList& other) const {
         if (this->size_ != other.size_) {
