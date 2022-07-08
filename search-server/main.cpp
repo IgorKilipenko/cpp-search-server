@@ -29,7 +29,7 @@ class SingleLinkedList {
     // Константный итератор, предоставляющий доступ для чтения к элементам списка
     using ConstIterator = BasicIterator<const Type>;
 
-    SingleLinkedList() : head_{}, size_{0}, before_begin_node_{&head_} {}
+    SingleLinkedList() : head_{}, size_{0}, head_ptr_{&head_} {}
 
     template <typename T>
     SingleLinkedList(T begin, T end) : SingleLinkedList() {
@@ -48,7 +48,6 @@ class SingleLinkedList {
 
     ~SingleLinkedList() {
         Clear();
-        //delete before_begin_node_;
     }
     // Возвращает количество элементов в списке за время O(1)
     [[nodiscard]] size_t GetSize() const noexcept {
@@ -186,37 +185,33 @@ class SingleLinkedList {
     void swap(SingleLinkedList& other) noexcept {
         Node* tmp_next_node_ptr = this->head_.next_node;
         size_t tmp_size = this->size_;
-        Node* tmp_before_begin_node_ = this->before_begin_node_;
+        Node* tmp_before_begin_node_ = this->head_ptr_;
 
         this->head_.next_node = other.head_.next_node;
         this->size_ = other.size_;
-        this->before_begin_node_ = other.before_begin_node_;
+        this->head_ptr_ = other.head_ptr_;
 
         other.head_.next_node = tmp_next_node_ptr;
         other.size_ = tmp_size;
-        other.before_begin_node_ = tmp_before_begin_node_;
+        other.head_ptr_ = tmp_before_begin_node_;
     }
 
     // Возвращает итератор, указывающий на позицию перед первым элементом односвязного списка.
     // Разыменовывать этот итератор нельзя - попытка разыменования приведёт к неопределённому поведению
     [[nodiscard]] Iterator before_begin() noexcept {
-        // Реализуйте самостоятельно
-        return Iterator{before_begin_node_};
+        return Iterator{head_ptr_};
     }
 
     // Возвращает константный итератор, указывающий на позицию перед первым элементом односвязного списка.
     // Разыменовывать этот итератор нельзя - попытка разыменования приведёт к неопределённому поведению
     [[nodiscard]] ConstIterator cbefore_begin() const noexcept {
-        // Реализуйте самостоятельно
-        // const Node* const ptr = &head_;
-        return ConstIterator{before_begin_node_};
+        return ConstIterator{head_ptr_};
     }
 
     // Возвращает константный итератор, указывающий на позицию перед первым элементом односвязного списка.
     // Разыменовывать этот итератор нельзя - попытка разыменования приведёт к неопределённому поведению
     [[nodiscard]] ConstIterator before_begin() const noexcept {
-        // Реализуйте самостоятельно
-        return ConstIterator{before_begin_node_};
+        return ConstIterator{head_ptr_};
     }
 
     /*
@@ -260,7 +255,7 @@ class SingleLinkedList {
     // Фиктивный узел, используется для вставки "перед первым элементом"
     Node head_;
     size_t size_;
-    Node* before_begin_node_;
+    Node* head_ptr_;
 
     bool IsEqualByRefs(const SingleLinkedList& other) const {
         if (this->size_ != other.size_) {
@@ -307,16 +302,12 @@ class SingleLinkedList<Type>::BasicIterator {
     // Тип ссылки на итерируемое значение
     using reference = ValueType&;
 
-    BasicIterator() : node_{nullptr}/*, before_begin_node_(nullptr) */{}
+    BasicIterator() : node_{nullptr} /*, before_begin_node_(nullptr) */ {}
 
     // Конвертирующий конструктор/конструктор копирования
     // При ValueType, совпадающем с Type, играет роль копирующего конструктора
     // При ValueType, совпадающем с const Type, играет роль конвертирующего конструктора
     BasicIterator(const BasicIterator<Type>& other) noexcept : node_{other.node_} {}
-
-    ~BasicIterator() {
-        //delete before_begin_node_;
-    }
 
     // Чтобы компилятор не выдавал предупреждение об отсутствии оператора = при наличии
     // пользовательского конструктора копирования, явно объявим оператор = и
@@ -326,12 +317,10 @@ class SingleLinkedList<Type>::BasicIterator {
     // Оператор сравнения итераторов (в роли второго аргумента выступает константный итератор)
     // Два итератора равны, если они ссылаются на один и тот же элемент списка либо на end()
     [[nodiscard]] bool operator==(const BasicIterator<const Type>& rhs) const noexcept {
-        if (node_ == nullptr && rhs.node_ == nullptr) {
+        if ((node_ == nullptr && rhs.node_ == nullptr) || node_ == rhs.node_) {
             return true;
         }
-        if (node_ == rhs.node_) {
-            return true;
-        }
+
         return false;
     }
 
@@ -389,11 +378,7 @@ class SingleLinkedList<Type>::BasicIterator {
     /// Конвертирующий конструктор итератора из указателя на узел списка
     explicit BasicIterator(Node* node) : node_(node) {}
 
-    /// Конвертирующий конструктор итератора для before_begin
-    //explicit BasicIterator(const Node& node) : node_{new Node(node)}, before_begin_node_{node_} {}
-
     Node* node_ = nullptr;
-    //const Node* before_begin_node_ = nullptr;
 };
 
 // ----------------------------------------------------------------
