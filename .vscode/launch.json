@@ -48,10 +48,6 @@
                     "value": "$PATH:${command:cmake.launchTargetDirectory}"
                 },
                 {
-                    "name": "LSAN_OPTIONS",
-                    "value": "verbosity=1"
-                },
-                {
                     "name": "log_threads",
                     "value": "1"
                 }
