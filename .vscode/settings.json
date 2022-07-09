@@ -2,6 +2,7 @@
     "cmake.configureSettings": {
         "CMAKE_BUILD_TYPE": "Debug",
         "TESTS": "0",
+        "FSANITIZE_DEBUG": "1",
         "WARNINGS_AS_ERRORS" : "ON",
         //"TRANSPORT_CURL" : "OFF",
         "UNIT_TESTING" : "ON",
