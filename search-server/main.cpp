@@ -1,95 +1,69 @@
-#include <cassert>
-#include <cstddef>
-#include <cstdlib>
+#include <algorithm>
+#include <iostream>
+#include <numeric>
+#include <vector>
 
-template <typename Type>
-class ArrayPtr {
-   public:
-    // Инициализирует ArrayPtr нулевым указателем
-    ArrayPtr() = default;
+using namespace std;
 
-    // Создаёт в куче массив из size элементов типа Type.
-    // Если size == 0, поле raw_ptr_ должно быть равно nullptr
-    explicit ArrayPtr(size_t size) {
-        if (size != 0) {
-            raw_ptr_ = new Type[size];
+// функция выводит элементы контейнера через запятую
+template <typename It>
+void PrintRangeComma(It range_begin, It range_end) {
+    if (range_begin == range_end) {
+        return;
+    }
+    string sep = ""s;
+    for (auto it = range_begin; it != range_end; ++it) {
+        cout << sep << *it;
+        if (sep.empty()) {
+            sep = ", ";
         }
     }
+    cout << endl;
+}
 
-    // Конструктор из сырого указателя, хранящего адрес массива в куче либо nullptr
-    explicit ArrayPtr(Type* raw_ptr) noexcept {
-        raw_ptr_ = raw_ptr;
+template <typename RandomIt>
+void MergeSort(RandomIt range_begin, RandomIt range_end) {
+    // 1. Если диапазон содержит меньше 2 элементов, выходим из функции
+    int range_length = range_end - range_begin;
+    if (range_length < 2) {
+        return;
     }
 
-    // Запрещаем копирование
-    ArrayPtr(const ArrayPtr&) = delete;
+    // 2. Создаём вектор, содержащий все элементы текущего диапазона
+    vector<typename RandomIt::value_type> elements(range_begin, range_end);
 
-    ~ArrayPtr() {
-        delete[] raw_ptr_;
-    }
+    // 3. Разбиваем вектор на две равные части
+    auto mid = elements.begin() + (range_length / 2);
 
-    // Запрещаем присваивание
-    ArrayPtr& operator=(const ArrayPtr&) = delete;
+    // 4. Вызываем функцию MergeSort от каждой половины вектора
+    MergeSort(elements.begin(), mid);
+    MergeSort(mid, elements.end());
 
-    // Прекращает владением массивом в памяти, возвращает значение адреса массива
-    // После вызова метода указатель на массив должен обнулиться
-    [[nodiscard]] Type* Release() noexcept {
-        Type* data = raw_ptr_;
-        raw_ptr_ = nullptr;
-        return data;
-    }
-
-    // Возвращает ссылку на элемент массива с индексом index
-    Type& operator[](size_t index) noexcept {
-        return raw_ptr_[index];
-    }
-
-    // Возвращает константную ссылку на элемент массива с индексом index
-    const Type& operator[](size_t index) const noexcept {
-        return raw_ptr_[index];
-    }
-
-    // Возвращает true, если указатель ненулевой, и false в противном случае
-    explicit operator bool() const {
-        return raw_ptr_ != nullptr;
-    }
-
-    // Возвращает значение сырого указателя, хранящего адрес начала массива
-    Type* Get() const noexcept {
-        return raw_ptr_;
-    }
-
-    // Обменивается значениям указателя на массив с объектом other
-    void swap(ArrayPtr& other) noexcept {
-        ArrayPtr::swap(&raw_ptr_, &(other.raw_ptr_));
-    }
-
-    // Обменивается значениям указателя на массив с объектом other
-    static void swap(Type** ptr1, Type** ptr2) noexcept {
-        Type* tmp = *ptr1;
-        *ptr1 = *ptr2;
-        *ptr2 = tmp;
-    }
-
-   private:
-    Type* raw_ptr_ = nullptr;
-};
+    // 5. С помощью алгоритма merge сливаем отсортированные половины
+    // в исходный диапазон
+    // merge -> http://ru.cppreference.com/w/cpp/algorithm/merge
+    merge(elements.begin(), mid, mid, elements.end(), range_begin);
+}
 
 int main() {
-    ArrayPtr<int> numbers(10);
-    const auto& const_numbers = numbers;
+    vector<int> test_vector(10);
 
-    numbers[2] = 42;
-    assert(const_numbers[2] == 42);
-    assert(&const_numbers[2] == &numbers[2]);
+    // iota             -> http://ru.cppreference.com/w/cpp/algorithm/iota
+    // Заполняет диапазон последовательно возрастающими значениями
+    iota(test_vector.begin(), test_vector.end(), 1);
 
-    assert(numbers.Get() == &numbers[0]);
+    // random_shuffle   -> https://ru.cppreference.com/w/cpp/algorithm/random_shuffle
+    // Перемешивает элементы в случайном порядке
+    random_shuffle(test_vector.begin(), test_vector.end());
 
-    ArrayPtr<int> numbers_2(5);
-    numbers_2[2] = 43;
+    // Выводим вектор до сортировки
+    PrintRangeComma(test_vector.begin(), test_vector.end());
 
-    numbers.swap(numbers_2);
+    // Сортируем вектор с помощью сортировки слиянием
+    MergeSort(test_vector.begin(), test_vector.end());
 
-    assert(numbers_2[2] == 42);
-    assert(numbers[2] == 43);
+    // Выводим результат
+    PrintRangeComma(test_vector.begin(), test_vector.end());
+
+    return 0;
 }
