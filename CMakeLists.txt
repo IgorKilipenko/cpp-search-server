@@ -24,7 +24,15 @@ if (DEFINED TESTS AND TESTS)
 endif()
 
 set(CFLAGS -Wall -Werror -pedantic)
+set(DEFS)
+
+if (DEFINED CMAKE_BUILD_TYPE AND CMAKE_BUILD_TYPE STREQUAL "Debug") 
+    message("Debug mode.")
+    list(APPEND DEFS -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -D_LIBCPP_DEBUG=1)
+    message("Debug flags: " ${DEFS})
+endif()
 
 add_executable(${PROJECT_NAME} ${LIBS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 target_compile_options(${PROJECT_NAME} PRIVATE ${CFLAGS})
+target_compile_definitions(${PROJECT_NAME} PRIVATE ${DEFS})
