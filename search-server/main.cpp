@@ -2,7 +2,6 @@
 #include <cmath>
 #include <iostream>
 #include <list>
-#include <vector>
 
 using namespace std;
 
@@ -12,7 +11,6 @@ class Editor {
     Editor() : cursor_{text_.begin()} {}
     // сдвинуть курсор влево
     void Left() {
-        // assert(!text_.empty() && cursor_ != text_.begin());
         if (cursor_ == text_.begin()) {
             return;
         }
@@ -20,7 +18,6 @@ class Editor {
     }
     // сдвинуть курсор вправо
     void Right() {
-        // assert(!text_.empty() && cursor_ != text_.end());
         if (cursor_ == text_.end()) {
             return;
         }
@@ -57,8 +54,6 @@ class Editor {
             dest_ptr = text_.insert(dest_ptr, *src_ptr);
             dest_ptr++;
         }
-        // cursor_ = dest_ptr == text_.end() ? dest_ptr : next(dest_ptr);
-        // cursor_ = dest_ptr != cursor_ ? ++dest_ptr : dest_ptr;
         cursor_ = dest_ptr;
     }
     // получить текущее содержимое текстового редактора
