@@ -47,10 +47,26 @@
                     "name": "PATH",
                     "value": "$PATH:${command:cmake.launchTargetDirectory}"
                 },
-                {
+                /*{
+                    "name": "LSAN_OPTIONS",
+                    "value": "verbosity=1:log_threads=1"
+                },*/
+                /*{
                     "name": "log_threads",
                     "value": "1"
-                }
+                },*/
+                /*{
+                    "name": "ASAN_OPTIONS",
+                    "value": "sleep_before_dying=10"
+                },*/
+                {
+                    "name": "ASAN_OPTIONS",
+                    "value": "detect_stack_use_after_return=1:detect_leaks=0"
+                },
+                /*{
+                    "name": "ASAN_OPTIONS",
+                    "value": "detect_leaks=1"
+                }*/
             ],
             "externalConsole": true,
             "MIMode": "gdb",
