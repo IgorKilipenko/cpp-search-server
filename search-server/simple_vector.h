@@ -128,17 +128,15 @@ class SimpleVector {
     }
 
     SimpleVector& operator=(const SimpleVector& rhs) {
-        if (this == &rhs) {
+        if (*this == rhs) {
             return *this;
         }
         if (rhs.GetCapacity() == 0) {
             Clear();
         }
-        //try {
-            SimpleVector tmp(rhs.cbegin(), rhs.cend());
-            this->swap(tmp);
-        /*} catch (...) {
-        }*/
+        SimpleVector tmp(rhs.cbegin(), rhs.cend());
+        this->swap(tmp);
+
         return *this;
     }
 
@@ -166,20 +164,16 @@ class SimpleVector {
         size_t new_capacity = size_ == capacity_ ? std::max(capacity_, 1ul) * 2 : capacity_;
         size_t new_size = size_ + 1;
         size_t input_index = pos - cbegin();
-        ArrayPtr<Type> buffer{capacity_};
+        SimpleVector buffer{cbegin(), cend()};
+        buffer.Resize(new_capacity, false);
+        buffer.Resize(new_size, false);
 
-        Iterator first = &(buffer[0]);
-        Iterator last = &(buffer[new_size]);
-        std::copy(cbegin(), pos, first);
-        std::copy_backward(pos, cend(), last);
+        std::copy_backward(pos, cend(), buffer.end());
 
         buffer[input_index] = value;
-        array_.swap(buffer);
+        this->swap(buffer);
 
-        size_ = new_size;
-        capacity_ = new_capacity;
-
-        return &(array_[input_index]);
+        return begin()+input_index;
     }
 
     // "Удаляет" последний элемент вектора. Вектор не должен быть пустым
