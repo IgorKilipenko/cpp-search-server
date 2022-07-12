@@ -187,7 +187,7 @@ class SimpleVector {
         Iterator new_first = &(array_[erase_index]);
         std::copy(pos + 1, cend(), new_first);
         --size_;
-        return &(array_[erase_index]);
+        return begin() + erase_index;
     }
 
     // Обменивает значение с другим вектором
