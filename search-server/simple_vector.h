@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <initializer_list>
 #include <stdexcept>
@@ -22,12 +23,21 @@ class SimpleVector {
     // Создаёт вектор из size элементов, инициализированных значением value
     SimpleVector(size_t size, const Type& value) : array_(size, value), size_{size}, capacity_{size} {}
 
+    SimpleVector(ConstIterator begin, ConstIterator end) : SimpleVector() {
+        if (begin == end) {
+            return;
+        }
+        size_t size = end - begin;
+        Resize(size);
+        std::copy(begin, end, this->begin());
+    }
+
     // Создаёт вектор из std::initializer_list
-    SimpleVector(std::initializer_list<Type> init) : SimpleVector(init.size()) {
-        size_t cursor_ = 0;
+    SimpleVector(std::initializer_list<Type> init) : SimpleVector(init.begin(), init.end()) /*SimpleVector(init.size()) */ {
+        /*size_t cursor_ = 0;
         for (const Type& v : init) {
             array_[cursor_++] = v;
-        }
+        }*/
     }
 
     // Возвращает количество элементов в массиве
@@ -75,34 +85,16 @@ class SimpleVector {
 
     // Обнуляет размер массива, не изменяя его вместимость
     void Clear() noexcept {
-        ArrayPtr<Type> new_array(capacity_);
+        /*ArrayPtr<Type> new_array(capacity_);
         array_.swap(new_array);
-        size_ = 0;
+        size_ = 0;*/
+        Resize(0);
     }
 
     // Изменяет размер массива.
     // При увеличении размера новые элементы получают значение по умолчанию для типа Type
     void Resize(size_t new_size) {
-        if (new_size > size_ && new_size <= capacity_) {
-            for (size_t i = size_; i < new_size; ++i) {
-                array_[i] = Type();
-            }
-        }
-        if (new_size > capacity_) {
-            Type* buffer = new Type[new_size];
-            capacity_ = new_size;
-            Type* old_array = array_.Get();
-            for (size_t i = 0; i < size_; ++i) {
-                buffer[i] = old_array[i];
-            }
-            for (size_t i = size_; i < capacity_; ++i) {
-                buffer[i] = Type();
-            }
-            ArrayPtr<Type> new_array(buffer);
-            array_.swap(new_array);
-        }
-        size_ = new_size;
-        return;
+        Resize(new_size, true);
     }
 
     // Возвращает итератор на начало массива
@@ -141,8 +133,143 @@ class SimpleVector {
         return end();
     }
 
+    SimpleVector(const SimpleVector& other) {
+        *this = other;
+    }
+
+    SimpleVector& operator=(const SimpleVector& rhs) {
+        if (this == &rhs) {
+            return *this;
+        }
+        if (rhs.GetCapacity() == 0) {
+            Clear();
+        }
+
+        SimpleVector tmp(rhs.cbegin(), rhs.cend());
+        this->swap(tmp);
+        return *this;
+    }
+
+    // Добавляет элемент в конец вектора
+    // При нехватке места увеличивает вдвое вместимость вектора
+    void PushBack(const Type& item) {
+        size_t old_size = size_;
+        if (size_ == capacity_) {
+            capacity_ *= 2;
+            Resize(capacity_, false);
+        }
+        Resize(old_size + 1);
+        array_[old_size] = item;
+    }
+
+    // Вставляет значение value в позицию pos.
+    // Возвращает итератор на вставленное значение
+    // Если перед вставкой значения вектор был заполнен полностью,
+    // вместимость вектора должна увеличиться вдвое, а для вектора вместимостью 0 стать равной 1
+    Iterator Insert(ConstIterator pos, const Type& value) {
+        if (pos == end() && capacity_ > size_) {
+            array_[size_++] = value;
+            return end() - 1;
+        }
+        size_t new_capacity = size_ == capacity_ ? std::max(capacity_, 1ul) * 2 : capacity_;
+        size_t new_size = size_ + 1;
+        size_t input_index = pos - cbegin();
+        ArrayPtr<Type> buffer{capacity_};
+
+        Iterator first = &(buffer[0]);
+        Iterator last = &(buffer[new_size]);
+        std::copy(cbegin(), pos, first);
+        std::copy_backward(pos, cend(), last);
+
+        buffer[input_index] = value;
+        array_.swap(buffer);
+
+        size_ = new_size;
+        capacity_ = new_capacity;
+
+        return &(array_[input_index]);
+    }
+
+    // "Удаляет" последний элемент вектора. Вектор не должен быть пустым
+    void PopBack() noexcept {
+        --size_;
+    }
+
+    // Удаляет элемент вектора в указанной позиции
+    Iterator Erase(ConstIterator pos) {
+        size_t erase_index = pos - cbegin();
+        Iterator new_first = &(array_[erase_index]);
+        std::copy(pos + 1, cend(), new_first);
+        --size_;
+        return &(array_[erase_index]);
+    }
+
+    // Обменивает значение с другим вектором
+    void swap(SimpleVector& other) noexcept {
+        if (this == &other) {
+            return;
+        }
+        this->array_.swap(other.array_);
+        std::swap(this->size_, other.size_);
+        std::swap(this->capacity_, other.capacity_);
+    }
+
    private:
     ArrayPtr<Type> array_;
     size_t size_ = 0;
     size_t capacity_ = 0;
+
+    void Resize(size_t new_size, bool initial_all) {
+        if (new_size > size_ && new_size <= capacity_) {
+            for (size_t i = size_; i < new_size; ++i) {
+                array_[i] = Type();
+            }
+        }
+        if (new_size > capacity_) {
+            Type* buffer = new Type[new_size];
+            capacity_ = new_size;
+            Type* old_array = array_.Get();
+            for (size_t i = 0; i < size_; ++i) {
+                buffer[i] = old_array[i];
+            }
+            if (initial_all) {
+                for (size_t i = size_; i < capacity_; ++i) {
+                    buffer[i] = Type();
+                }
+            }
+            ArrayPtr<Type> new_array(buffer);
+            array_.swap(new_array);
+        }
+        size_ = new_size;
+    }
 };
+
+template <typename Type>
+inline bool operator==(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
+    return &lhs == &rhs || (lhs.GetSize() == rhs.GetSize() && std::equal(lhs.begin(), lhs.end(), rhs.begin()));
+}
+
+template <typename Type>
+inline bool operator!=(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
+    return !(lhs == rhs);
+}
+
+template <typename Type>
+inline bool operator<(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
+    return std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
+}
+
+template <typename Type>
+inline bool operator<=(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
+    return !(rhs < lhs);
+}
+
+template <typename Type>
+inline bool operator>(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
+    return rhs < lhs;
+}
+
+template <typename Type>
+inline bool operator>=(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
+    return !(lhs < rhs);
+}
