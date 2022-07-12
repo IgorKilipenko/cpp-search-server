@@ -1,8 +1,11 @@
 #pragma once
 #include <cassert>
+#include <iostream>
 #include <stdexcept>
 
 #include "simple_vector.h"
+
+using namespace std;
 
 // У функции, объявленной со спецификатором inline, может быть несколько
 // идентичных определений в разных единицах трансляции.
@@ -100,22 +103,24 @@ inline void Test1() {
     }
 
     // Итерирование по SimpleVector
-    {// Пустой вектор
-     {SimpleVector<int> v;
-    assert(v.begin() == nullptr);
-    assert(v.end() == nullptr);
-}
-
-// Непустой вектор
-{
-    SimpleVector<int> v(10, 42);
-    assert(v.begin());
-    assert(*v.begin() == 42);
-    assert(v.end() == v.begin() + v.GetSize());
-}
-}
-{
     {
+        // Пустой вектор
+        {
+            SimpleVector<int> v;
+            assert(v.begin() == nullptr);
+            assert(v.end() == nullptr);
+        }
+
+        // Непустой вектор
+        {
+            SimpleVector<int> v(10, 42);
+            assert(v.begin());
+            assert(*v.begin() == 42);
+            assert(v.end() == v.begin() + v.GetSize());
+        }
+    }
+    {
+        
         SimpleVector<int> v;
         v.Resize(3);
         std::fill(v.begin(), v.end(), 42);
@@ -130,8 +135,8 @@ inline void Test1() {
         assert(*v.begin() == v[0]);
         // assert(v.end() == nullptr);
         assert(std::equal(v.begin(), v.end(), expected_result.begin()));
+        
     }
-}
 }
 
 inline void Test2() {
@@ -267,4 +272,41 @@ inline void Test2() {
         assert(v.GetSize() == new_vector.GetSize());
         assert(v.GetCapacity() == new_vector.GetCapacity());
     }
+}
+
+inline void TestReserveConstructor() {
+    std::cout << "TestReserveConstructor"s << std::endl;
+    SimpleVector<int> v(Reserve(5));
+    assert(v.GetCapacity() == 5);
+    assert(v.IsEmpty());
+    std::cout << "Done!"s << std::endl;
+}
+
+inline void TestReserveMethod() {
+    std::cout << "TestReserveMethod"s << std::endl;
+    SimpleVector<int> v;
+    // зарезервируем 5 мест в векторе
+    v.Reserve(5);
+    assert(v.GetCapacity() == 5);
+    assert(v.IsEmpty());
+
+    // попытаемся уменьшить capacity до 1
+    v.Reserve(1);
+    // capacity должно остаться прежним
+    assert(v.GetCapacity() == 5);
+    // поместим 10 элементов в вектор
+    for (int i = 0; i < 10; ++i) {
+        v.PushBack(i);
+    }
+    assert(v.GetSize() == 10);
+    // увеличим capacity до 100
+    v.Reserve(100);
+    // проверим, что размер не поменялся
+    assert(v.GetSize() == 10);
+    assert(v.GetCapacity() == 100);
+    // проверим, что элементы на месте
+    for (int i = 0; i < 10; ++i) {
+        assert(v[i] == i);
+    }
+    std::cout << "Done!"s << std::endl;
 }

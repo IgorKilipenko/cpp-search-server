@@ -9,6 +9,17 @@
 
 #include "array_ptr.h"
 
+class ReserveProxyObj {
+   public:
+    explicit ReserveProxyObj(size_t size) : capacity_{size} {}
+    size_t GetSize() const {
+        return capacity_;
+    }
+
+   private:
+    size_t capacity_ = 0;
+};
+
 template <typename Type>
 class SimpleVector {
    public:
@@ -19,6 +30,10 @@ class SimpleVector {
 
     // Создаёт вектор из size элементов, инициализированных значением по умолчанию
     explicit SimpleVector(size_t size) : array_(size, Type()), size_{size}, capacity_{size} {}
+
+    explicit SimpleVector(ReserveProxyObj capacity) : SimpleVector() {
+        Reserve(capacity.GetSize());
+    }
 
     // Создаёт вектор из size элементов, инициализированных значением value
     SimpleVector(size_t size, const Type& value) : array_(size, value), size_{size}, capacity_{size} {}
@@ -173,7 +188,7 @@ class SimpleVector {
         buffer[input_index] = value;
         this->swap(buffer);
 
-        return begin()+input_index;
+        return begin() + input_index;
     }
 
     // "Удаляет" последний элемент вектора. Вектор не должен быть пустым
@@ -198,6 +213,16 @@ class SimpleVector {
         this->array_.swap(other.array_);
         std::swap(this->size_, other.size_);
         std::swap(this->capacity_, other.capacity_);
+    }
+
+    void Reserve(size_t new_capacity) {
+        if (new_capacity <= capacity_) {
+            return;
+        }
+        SimpleVector tmp(new_capacity);
+        tmp.size_ = size_;
+        std::copy(begin(),end(), tmp.begin());
+        this->swap(tmp);
     }
 
    private:
@@ -258,4 +283,8 @@ inline bool operator>(const SimpleVector<Type>& lhs, const SimpleVector<Type>& r
 template <typename Type>
 inline bool operator>=(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
     return !(lhs < rhs);
+}
+
+inline ReserveProxyObj Reserve(size_t capacity_to_reserve) {
+    return ReserveProxyObj(capacity_to_reserve);
 }
