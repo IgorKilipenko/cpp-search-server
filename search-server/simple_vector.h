@@ -23,21 +23,18 @@ class SimpleVector {
     // Создаёт вектор из size элементов, инициализированных значением value
     SimpleVector(size_t size, const Type& value) : array_(size, value), size_{size}, capacity_{size} {}
 
-    SimpleVector(ConstIterator begin, ConstIterator end) : SimpleVector() {
+    SimpleVector(ConstIterator begin, ConstIterator end) : SimpleVector((assert(end >= begin), end - begin)) {
         if (begin == end) {
             return;
         }
-        size_t size = end - begin;
-        Resize(size);
         std::copy(begin, end, this->begin());
     }
 
     // Создаёт вектор из std::initializer_list
-    SimpleVector(std::initializer_list<Type> init) : SimpleVector(init.begin(), init.end()) /*SimpleVector(init.size()) */ {
-        /*size_t cursor_ = 0;
-        for (const Type& v : init) {
-            array_[cursor_++] = v;
-        }*/
+    SimpleVector(std::initializer_list<Type> init) : SimpleVector(init.begin(), init.end()) {}
+
+    SimpleVector(const SimpleVector& other) {
+        *this = other;
     }
 
     // Возвращает количество элементов в массиве
@@ -85,9 +82,6 @@ class SimpleVector {
 
     // Обнуляет размер массива, не изменяя его вместимость
     void Clear() noexcept {
-        /*ArrayPtr<Type> new_array(capacity_);
-        array_.swap(new_array);
-        size_ = 0;*/
         Resize(0);
     }
 
@@ -131,10 +125,6 @@ class SimpleVector {
     // Для пустого массива может быть равен (или не равен) nullptr
     ConstIterator cend() const noexcept {
         return end();
-    }
-
-    SimpleVector(const SimpleVector& other) {
-        *this = other;
     }
 
     SimpleVector& operator=(const SimpleVector& rhs) {
