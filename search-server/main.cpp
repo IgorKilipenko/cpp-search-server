@@ -9,15 +9,20 @@ using namespace std;
 
 template <typename RandomIt>
 void MakeJosephusPermutation(RandomIt first, RandomIt last, uint32_t step_size) {
-    vector<typename RandomIt::value_type> pool(std::make_move_iterator(first), std::make_move_iterator(last));
+    list<typename RandomIt::value_type> pool(std::make_move_iterator(first), std::make_move_iterator(last));
     size_t cur_pos = 0;
-    while (!pool.empty()) {
-        *(first++) = move(pool[cur_pos]);
-        pool.erase(pool.begin() + cur_pos);
+    auto step_ptr = pool.begin();
+    while (!pool.empty() && step_ptr != pool.end()) {
+        *first = std::move(*step_ptr);
+        pool.erase(step_ptr);
         if (pool.empty()) {
             break;
         }
+        step_ptr = pool.begin();
         cur_pos = (cur_pos + step_size - 1) % pool.size();
+        for (size_t i = 0; i < cur_pos; ++step_ptr, ++i) {
+        }
+        ++first;
     }
 }
 
@@ -48,7 +53,7 @@ void TestIntVector() {
 
 struct NoncopyableInt {
     int value;
-    NoncopyableInt(int &&value) : value{std::move(value)} {}
+    NoncopyableInt(int&& value) : value{std::move(value)} {}
     NoncopyableInt(const NoncopyableInt&) = delete;
     NoncopyableInt& operator=(const NoncopyableInt&) = delete;
 
