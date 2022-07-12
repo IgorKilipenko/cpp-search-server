@@ -103,7 +103,19 @@ class SimpleVector {
     // Изменяет размер массива.
     // При увеличении размера новые элементы получают значение по умолчанию для типа Type
     void Resize(size_t new_size) {
-        Resize(new_size, true);
+        if (new_size > size_ && new_size <= capacity_) {
+            size_t old_size = size_;
+            size_ = new_size;
+            std::fill(begin() + old_size, begin() + new_size, Type());
+        } else if (new_size > capacity_) {
+            SimpleVector buffer{begin(), end()};
+            buffer.Reserve(new_size);
+            buffer.size_ = new_size;
+            std::fill(buffer.begin() + size_, buffer.end(), Type());
+            this->swap(buffer);
+        } else {
+            size_ = new_size;
+        }
     }
 
     // Возвращает итератор на начало массива
@@ -161,7 +173,7 @@ class SimpleVector {
         size_t old_size = size_;
         if (size_ == capacity_) {
             size_t new_capacity = std::max(capacity_, 1ul) * 2;
-            Resize(new_capacity, false);
+            Reserve(new_capacity);
         }
         Resize(old_size + 1);
         array_[old_size] = item;
@@ -180,8 +192,8 @@ class SimpleVector {
         size_t new_size = size_ + 1;
         size_t input_index = pos - cbegin();
         SimpleVector buffer{cbegin(), cend()};
-        buffer.Resize(new_capacity, false);
-        buffer.Resize(new_size, false);
+        buffer.Reserve(new_capacity);
+        buffer.Resize(new_size);
 
         std::copy_backward(pos, cend(), buffer.end());
 
@@ -221,7 +233,7 @@ class SimpleVector {
         }
         SimpleVector tmp(new_capacity);
         tmp.size_ = size_;
-        std::copy(begin(),end(), tmp.begin());
+        std::copy(begin(), end(), tmp.begin());
         this->swap(tmp);
     }
 
@@ -229,30 +241,6 @@ class SimpleVector {
     ArrayPtr<Type> array_;
     size_t size_ = 0;
     size_t capacity_ = 0;
-
-    void Resize(size_t new_size, bool initial_all) {
-        if (new_size > size_ && new_size <= capacity_) {
-            for (size_t i = size_; i < new_size; ++i) {
-                array_[i] = Type();
-            }
-        }
-        if (new_size > capacity_) {
-            Type* buffer = new Type[new_size];
-            capacity_ = new_size;
-            Type* old_array = array_.Get();
-            for (size_t i = 0; i < size_; ++i) {
-                buffer[i] = old_array[i];
-            }
-            if (initial_all) {
-                for (size_t i = size_; i < capacity_; ++i) {
-                    buffer[i] = Type();
-                }
-            }
-            ArrayPtr<Type> new_array(buffer);
-            array_.swap(new_array);
-        }
-        size_ = new_size;
-    }
 };
 
 template <typename Type>
