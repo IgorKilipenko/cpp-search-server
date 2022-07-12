@@ -100,40 +100,38 @@ inline void Test1() {
     }
 
     // Итерирование по SimpleVector
-    {
-        // Пустой вектор
-        {
-            SimpleVector<int> v;
-            assert(v.begin() == nullptr);
-            assert(v.end() == nullptr);
-        }
+    {// Пустой вектор
+     {SimpleVector<int> v;
+    assert(v.begin() == nullptr);
+    assert(v.end() == nullptr);
+}
 
-        // Непустой вектор
-        {
-            SimpleVector<int> v(10, 42);
-            assert(v.begin());
-            assert(*v.begin() == 42);
-            assert(v.end() == v.begin() + v.GetSize());
-        }
-    }
+// Непустой вектор
+{
+    SimpleVector<int> v(10, 42);
+    assert(v.begin());
+    assert(*v.begin() == 42);
+    assert(v.end() == v.begin() + v.GetSize());
+}
+}
+{
     {
-        {
-            SimpleVector<int> v;
-            v.Resize(3);
-            std::fill(v.begin(), v.end(), 42);
-            std::vector<int> expected_result(3,42);
-            assert(std::equal(v.begin(), v.end(), expected_result.begin()));
+        SimpleVector<int> v;
+        v.Resize(3);
+        std::fill(v.begin(), v.end(), 42);
+        std::vector<int> expected_result(3, 42);
+        assert(std::equal(v.begin(), v.end(), expected_result.begin()));
 
-            expected_result.push_back(44);
-            v.Resize(4);
-            *(v.end()-1) = 44;
-            assert(v[v.GetSize()-1] == 44);
-            assert(v[0] == 42);
-            assert(*v.begin() == v[0]);
-            //assert(v.end() == nullptr);
-            assert(std::equal(v.begin(), v.end(), expected_result.begin()));
-        }
+        expected_result.push_back(44);
+        v.Resize(4);
+        *(v.end() - 1) = 44;
+        assert(v[v.GetSize() - 1] == 44);
+        assert(v[0] == 42);
+        assert(*v.begin() == v[0]);
+        // assert(v.end() == nullptr);
+        assert(std::equal(v.begin(), v.end(), expected_result.begin()));
     }
+}
 }
 
 inline void Test2() {
@@ -241,4 +239,32 @@ inline void Test2() {
         v.Erase(v.cbegin() + 2);
         assert((v == SimpleVector<int>{1, 2, 4}));
     }
-} 
+
+    {
+        SimpleVector<int> v{1, 2, 3, 4};
+        auto ptr = v.Insert(v.end(), 5);
+        SimpleVector<int> expected_vector{1, 2, 3, 4, 5};
+        assert(v == expected_vector);
+        assert(*ptr == 5);
+        assert(ptr == v.end() - 1);
+
+        ptr = v.Erase(v.end() - 1);
+        assert(ptr == v.end());
+        expected_vector = SimpleVector<int>{1, 2, 3, 4};
+        assert(v == expected_vector);
+
+        SimpleVector<int> new_vector(100, 1);
+        v = new_vector;
+        assert(v == new_vector);
+        assert(v.GetSize() == new_vector.GetSize());
+        assert(v.GetCapacity() == new_vector.GetCapacity());
+    }
+    {
+        SimpleVector<int> v(100, 1);
+        SimpleVector<int> new_vector{};
+        v = new_vector;
+        assert(v == new_vector);
+        assert(v.GetSize() == new_vector.GetSize());
+        assert(v.GetCapacity() == new_vector.GetCapacity());
+    }
+}

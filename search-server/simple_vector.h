@@ -134,9 +134,11 @@ class SimpleVector {
         if (rhs.GetCapacity() == 0) {
             Clear();
         }
-
-        SimpleVector tmp(rhs.cbegin(), rhs.cend());
-        this->swap(tmp);
+        //try {
+            SimpleVector tmp(rhs.cbegin(), rhs.cend());
+            this->swap(tmp);
+        /*} catch (...) {
+        }*/
         return *this;
     }
 
@@ -145,8 +147,8 @@ class SimpleVector {
     void PushBack(const Type& item) {
         size_t old_size = size_;
         if (size_ == capacity_) {
-            capacity_ *= 2;
-            Resize(capacity_, false);
+            size_t new_capacity = std::max(capacity_, 1ul) * 2;
+            Resize(new_capacity, false);
         }
         Resize(old_size + 1);
         array_[old_size] = item;
