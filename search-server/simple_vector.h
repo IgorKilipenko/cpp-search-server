@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <initializer_list>
+#include <iterator>
 #include <stdexcept>
 
 #include "array_ptr.h"
@@ -36,6 +37,8 @@ class SimpleVector {
     /// Создаёт вектор из size элементов, инициализированных значением value
     SimpleVector(size_t size, const Type& value);
 
+    SimpleVector(Iterator begin, Iterator end, bool move = false);
+
     SimpleVector(ConstIterator begin, ConstIterator end);
 
     /// Создаёт вектор из std::initializer_list
@@ -43,7 +46,11 @@ class SimpleVector {
 
     SimpleVector(const SimpleVector& other);
 
+    SimpleVector(SimpleVector&& other);
+
     SimpleVector& operator=(const SimpleVector& rhs);
+
+    SimpleVector& operator=(SimpleVector&& rhs);
 
     /// Возвращает количество элементов в массиве
     size_t GetSize() const noexcept;
@@ -101,13 +108,17 @@ class SimpleVector {
 
     /// Добавляет элемент в конец вектора
     /// При нехватке места увеличивает вдвое вместимость вектора
-    void PushBack(const Type& item);
+    template <class T>
+    void PushBack(T&& item);
+
+    // void PushBack(Type&& item);
 
     /// Вставляет значение value в позицию pos.
     /// Возвращает итератор на вставленное значение
     /// Если перед вставкой значения вектор был заполнен полностью,
     /// вместимость вектора должна увеличиться вдвое, а для вектора вместимостью 0 стать равной 1
-    Iterator Insert(ConstIterator pos, const Type& value);
+    template <typename T>
+    Iterator Insert(ConstIterator pos, T&& value);
 
     /// "Удаляет" последний элемент вектора. Вектор не должен быть пустым
     void PopBack() noexcept;
@@ -124,6 +135,13 @@ class SimpleVector {
     ArrayPtr<Type> array_;
     size_t size_ = 0;
     size_t capacity_ = 0;
+
+    template <class T>
+    void Fill(Iterator begin, Iterator end, T&& value) {
+        for (auto ptr = begin; ptr != end; ++ptr) {
+            *ptr = std::move(value);
+        }
+    }
 };
 
 // ----------------------------------------------------------------
@@ -183,11 +201,23 @@ template <typename Type>
 SimpleVector<Type>::SimpleVector(size_t size, const Type& value) : array_(size, value), size_{size}, capacity_{size} {}
 
 template <typename Type>
+SimpleVector<Type>::SimpleVector(Iterator begin, Iterator end, bool move) : SimpleVector((assert(end >= begin), end - begin)) {
+    if (begin == end) {
+        return;
+    }
+    if (move) {
+        std::copy(std::make_move_iterator(begin), std::make_move_iterator(end), this->begin());
+    } else {
+        std::copy(std::make_move_iterator(begin), std::make_move_iterator(end), this->begin());
+    }
+}
+
+template <typename Type>
 SimpleVector<Type>::SimpleVector(ConstIterator begin, ConstIterator end) : SimpleVector((assert(end >= begin), end - begin)) {
     if (begin == end) {
         return;
     }
-    std::copy(begin, end, this->begin());
+    std::copy(std::make_move_iterator(begin), std::make_move_iterator(end), this->begin());
 }
 
 template <typename Type>
@@ -196,6 +226,41 @@ SimpleVector<Type>::SimpleVector(std::initializer_list<Type> init) : SimpleVecto
 template <typename Type>
 SimpleVector<Type>::SimpleVector(const SimpleVector& other) {
     *this = other;
+}
+
+template <typename Type>
+SimpleVector<Type>::SimpleVector(SimpleVector&& other) {
+    SimpleVector<Type> empty{};
+    this->swap(other);
+    other.swap(empty);
+}
+
+template <typename Type>
+SimpleVector<Type>& SimpleVector<Type>::operator=(const SimpleVector& rhs) {
+    if (*this == rhs) {
+        return *this;
+    }
+    if (rhs.GetCapacity() == 0) {
+        Clear();
+    }
+    SimpleVector tmp(rhs.cbegin(), rhs.cend());
+    this->swap(tmp);
+
+    return *this;
+}
+
+template <typename Type>
+SimpleVector<Type>& SimpleVector<Type>::operator=(SimpleVector&& rhs) {
+    // SimpleVector<Type>& moving_instance = std::exchange(rhs, SimpleVector<Type>());
+    /*SimpleVector<Type> empty{};
+    auto moving_instance = std::exchange(rhs, empty);
+    this->swap(moving_instance);
+    return *this;*/
+
+    SimpleVector<Type> empty{};
+    this->swap(rhs);
+    rhs.swap(empty);
+    return *this;
 }
 
 template <typename Type>
@@ -224,20 +289,6 @@ const Type& SimpleVector<Type>::operator[](size_t index) const noexcept {
 }
 
 template <typename Type>
-SimpleVector<Type>& SimpleVector<Type>::operator=(const SimpleVector& rhs) {
-    if (*this == rhs) {
-        return *this;
-    }
-    if (rhs.GetCapacity() == 0) {
-        Clear();
-    }
-    SimpleVector tmp(rhs.cbegin(), rhs.cend());
-    this->swap(tmp);
-
-    return *this;
-}
-
-template <typename Type>
 Type& SimpleVector<Type>::At(size_t index) {
     if (index >= GetSize()) {
         throw std::out_of_range("index out of range");
@@ -263,12 +314,12 @@ void SimpleVector<Type>::Resize(size_t new_size) {
     if (new_size > size_ && new_size <= capacity_) {
         size_t old_size = size_;
         size_ = new_size;
-        std::fill(begin() + old_size, begin() + new_size, Type());
+        Fill(begin() + old_size, begin() + new_size, Type());
     } else if (new_size > capacity_) {
         SimpleVector buffer{begin(), end()};
         buffer.Reserve(new_size);
         buffer.size_ = new_size;
-        std::fill(buffer.begin() + size_, buffer.end(), Type());
+        Fill(buffer.begin() + size_, buffer.end(), Type());
         this->swap(buffer);
     } else {
         size_ = new_size;
@@ -305,7 +356,7 @@ typename SimpleVector<Type>::ConstIterator SimpleVector<Type>::cend() const noex
     return end();
 }
 
-template <typename Type>
+/*template <typename Type>
 void SimpleVector<Type>::PushBack(const Type& item) {
     size_t old_size = size_;
     if (size_ == capacity_) {
@@ -314,24 +365,37 @@ void SimpleVector<Type>::PushBack(const Type& item) {
     }
     Resize(old_size + 1);
     array_[old_size] = item;
+}*/
+
+template <typename Type>
+template <typename T>
+void SimpleVector<Type>::PushBack(T&& item) {
+    size_t old_size = size_;
+    if (size_ == capacity_) {
+        size_t new_capacity = std::max(capacity_, 1ul) * 2;
+        Reserve(new_capacity);
+    }
+    Resize(old_size + 1);
+    array_[old_size] = std::move(item);
 }
 
 template <typename Type>
-typename SimpleVector<Type>::Iterator SimpleVector<Type>::Insert(ConstIterator pos, const Type& value) {
+template <typename T>
+typename SimpleVector<Type>::Iterator SimpleVector<Type>::Insert(ConstIterator pos, T&& value) {
     if (pos == end() && capacity_ > size_) {
-        array_[size_++] = value;
+        array_[size_++] = std::move(value);
         return end() - 1;
     }
     size_t new_capacity = size_ == capacity_ ? std::max(capacity_, 1ul) * 2 : capacity_;
     size_t new_size = size_ + 1;
     size_t input_index = pos - cbegin();
-    SimpleVector buffer{cbegin(), cend()};
+    SimpleVector buffer{begin(), end(), true};
     buffer.Reserve(new_capacity);
     buffer.Resize(new_size);
 
-    std::copy_backward(pos, cend(), buffer.end());
+    std::move_backward(buffer.begin() + input_index, buffer.begin() + size_, buffer.end());
 
-    buffer[input_index] = value;
+    buffer[input_index] = std::move(value);
     this->swap(buffer);
 
     return begin() + input_index;
@@ -346,7 +410,7 @@ template <typename Type>
 typename SimpleVector<Type>::Iterator SimpleVector<Type>::Erase(ConstIterator pos) {
     size_t erase_index = pos - cbegin();
     Iterator new_first = &(array_[erase_index]);
-    std::copy(pos + 1, cend(), new_first);
+    std::move(begin() + erase_index + 1, end(), new_first);
     --size_;
     return begin() + erase_index;
 }
@@ -368,6 +432,6 @@ void SimpleVector<Type>::Reserve(size_t new_capacity) {
     }
     SimpleVector tmp(new_capacity);
     tmp.size_ = size_;
-    std::copy(begin(), end(), tmp.begin());
+    std::move(begin(), end(), tmp.begin());
     this->swap(tmp);
 }

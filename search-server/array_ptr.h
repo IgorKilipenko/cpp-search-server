@@ -1,7 +1,10 @@
 #pragma once
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdlib>
+#include <type_traits>
+#include <utility>
 
 template <typename Type>
 class ArrayPtr {
@@ -17,11 +20,21 @@ class ArrayPtr {
         }
     }
 
-    ArrayPtr(size_t size, const Type& value) : ArrayPtr(size) {
+    template <typename T>
+    ArrayPtr(size_t size, T&& value) : ArrayPtr(size) {
+        //auto v = std::move(value);
         for (size_t i = 0; i < size; ++i) {
-            raw_ptr_[i] = value;
+            raw_ptr_[i] = std::move(value);
         }
+        
+        //std::fill(raw_ptr_, raw_ptr_ + size, v);
     }
+
+    /*ArrayPtr(size_t size, Type&& value) : ArrayPtr(size) {
+        for (size_t i = 0; i < size; ++i) {
+            raw_ptr_[i] = std::move(value);
+        }
+    }*/
 
     // Конструктор из сырого указателя, хранящего адрес массива в куче либо nullptr
     explicit ArrayPtr(Type* raw_ptr) noexcept {
@@ -68,15 +81,16 @@ class ArrayPtr {
 
     // Обменивается значениям указателя на массив с объектом other
     void swap(ArrayPtr& other) noexcept {
-        ArrayPtr::swap(&raw_ptr_, &(other.raw_ptr_));
+        // ArrayPtr::swap(&raw_ptr_, &(other.raw_ptr_));
+        std::swap(raw_ptr_, other.raw_ptr_);
     }
 
     // Обменивается значениям указателя на массив с объектом other
-    static void swap(Type** ptr1, Type** ptr2) noexcept {
+    /*static void swap(Type** ptr1, Type** ptr2) noexcept {
         Type* tmp = *ptr1;
         *ptr1 = *ptr2;
         *ptr2 = tmp;
-    }
+    }*/
 
    private:
     Type* raw_ptr_ = nullptr;
