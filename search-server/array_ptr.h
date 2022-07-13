@@ -73,13 +73,6 @@ class ArrayPtr {
         std::swap(raw_ptr_, other.raw_ptr_);
     }
 
-    // Обменивается значениям указателя на массив с объектом other
-    /*static void swap(Type** ptr1, Type** ptr2) noexcept {
-        Type* tmp = *ptr1;
-        *ptr1 = *ptr2;
-        *ptr2 = tmp;
-    }*/
-
    private:
     Type* raw_ptr_ = nullptr;
 };

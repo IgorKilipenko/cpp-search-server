@@ -248,12 +248,6 @@ SimpleVector<Type>& SimpleVector<Type>::operator=(const SimpleVector& rhs) {
 
 template <typename Type>
 SimpleVector<Type>& SimpleVector<Type>::operator=(SimpleVector&& rhs) {
-    // SimpleVector<Type>& moving_instance = std::exchange(rhs, SimpleVector<Type>());
-    /*SimpleVector<Type> empty{};
-    auto moving_instance = std::exchange(rhs, empty);
-    this->swap(moving_instance);
-    return *this;*/
-
     SimpleVector<Type> empty{};
     this->swap(rhs);
     rhs.swap(empty);
@@ -352,17 +346,6 @@ template <typename Type>
 typename SimpleVector<Type>::ConstIterator SimpleVector<Type>::cend() const noexcept {
     return end();
 }
-
-/*template <typename Type>
-void SimpleVector<Type>::PushBack(const Type& item) {
-    size_t old_size = size_;
-    if (size_ == capacity_) {
-        size_t new_capacity = std::max(capacity_, 1ul) * 2;
-        Reserve(new_capacity);
-    }
-    Resize(old_size + 1);
-    array_[old_size] = item;
-}*/
 
 template <typename Type>
 template <typename T>
