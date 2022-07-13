@@ -2,7 +2,9 @@
 #include <cassert>
 #include <iostream>
 #include <numeric>
+#include <ostream>
 #include <stdexcept>
+#include <string>
 
 #include "simple_vector.h"
 
@@ -329,11 +331,13 @@ public:
     X(size_t num)
         : x_(num) {
     }
-    X(const X& other) {
+    X(const X& other) /*=default;*/  /*= delete;*/
+    {
         assert(false);
         throw "X copy ctr."s;
     }
-    X& operator=(const X& other) {
+    X& operator=(const X& other) /*=default;*/ /*= delete;*/
+    {
         //assert(false);
         throw "X operator=."s;
     }
@@ -351,6 +355,11 @@ public:
     bool operator==(const X& other) const {
         return other.x_ == x_;
     }
+
+    /*friend std::ostream& operator<<(std::ostream& os, const X& x) {
+        os << x.x_;
+        return os;
+    }*/
 
 private:
     size_t x_;
@@ -471,5 +480,50 @@ inline void TestNoncopiableErase() {
 
     auto it = v.Erase(v.begin());
     assert(it->GetX() == 1);
+    cout << "Done!" << endl << endl;
+}
+
+/*template <typename T>
+void PrintVector(const SimpleVector<T>& vector) {
+    std::string sep;
+    cout << "{";
+    for (auto ptr = vector.begin(); ptr != vector.end(); ++ptr) {
+        cout << sep << *ptr;
+        if (sep.empty()) {
+            sep = ", ";
+        }
+    }
+    cout << "}";
+}*/
+
+inline void TestResize() {
+    const size_t size = 3;
+    cout << "Test resize" << endl;
+    SimpleVector<X> v;
+    SimpleVector<X> expected;
+    for (size_t i = 0; i < size; ++i) {
+        v.PushBack(X(i));
+        expected.PushBack(X(i));
+    }
+    expected.PushBack(X{});
+    v.Resize(4);
+    assert(v == expected);
+
+    v.Resize(0);
+    v.Resize(2);
+    expected = SimpleVector<X>(2);
+    assert(v == expected);
+
+    v = SimpleVector<X>(10);
+    v.Resize(20);
+    //PrintVector(v);
+    cout << endl;
+
+    expected = SimpleVector<X>(10);
+    for (size_t i = 0; i < 10; ++i) {
+        expected.PushBack(X(0));
+    }
+    assert(v == expected);
+
     cout << "Done!" << endl << endl;
 }

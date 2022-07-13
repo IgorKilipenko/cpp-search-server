@@ -18,5 +18,6 @@ int main() {
     TestNoncopiablePushBack();
     TestNoncopiableInsert();
     TestNoncopiableErase();
+    //TestResize();
     return 0;
 }

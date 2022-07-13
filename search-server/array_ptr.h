@@ -16,25 +16,13 @@ class ArrayPtr {
     // Если size == 0, поле raw_ptr_ должно быть равно nullptr
     explicit ArrayPtr(size_t size) {
         if (size != 0) {
-            raw_ptr_ = new Type[size];
+            raw_ptr_ = new Type[size]{};
         }
     }
 
-    template <typename T>
-    ArrayPtr(size_t size, T&& value) : ArrayPtr(size) {
-        //auto v = std::move(value);
-        for (size_t i = 0; i < size; ++i) {
-            raw_ptr_[i] = std::move(value);
-        }
-        
-        //std::fill(raw_ptr_, raw_ptr_ + size, v);
+    ArrayPtr(size_t size, const Type& value) : ArrayPtr(size) {
+        std::fill(raw_ptr_, raw_ptr_ + size, value);
     }
-
-    /*ArrayPtr(size_t size, Type&& value) : ArrayPtr(size) {
-        for (size_t i = 0; i < size; ++i) {
-            raw_ptr_[i] = std::move(value);
-        }
-    }*/
 
     // Конструктор из сырого указателя, хранящего адрес массива в куче либо nullptr
     explicit ArrayPtr(Type* raw_ptr) noexcept {
