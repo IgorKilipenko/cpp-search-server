@@ -25,3 +25,25 @@ std::vector<std::vector<Document>> ProcessQueries(const SearchServer& search_ser
 
     return documents_lists;
 }
+
+std::vector<Document> ProcessQueriesJoined(const SearchServer& search_server, const std::vector<std::string>& queries) {
+    using Documents = std::vector<Document>;
+    if (queries.empty()) {
+        return {};
+    }
+    Documents documents_lists;
+    documents_lists.reserve(queries.size());
+    documents_lists = std::transform_reduce(
+        std::execution::par, queries.begin(), queries.end(), documents_lists,
+        [](Documents docs, Documents found_docs) {
+            for (auto& doc : found_docs) {
+                docs.push_back(doc);
+            }
+            return docs;
+        },
+        [&search_server](const std::string& query) {
+            return search_server.FindTopDocuments(query);
+        });
+
+    return documents_lists;
+}
