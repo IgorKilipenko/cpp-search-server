@@ -1,3 +1,4 @@
+#include <pstl/glue_execution_defs.h>
 #include <algorithm>
 #include <functional>
 #include <iostream>
@@ -5,6 +6,7 @@
 #include <random>
 #include <string>
 #include <string_view>
+#include <execution>
 
 #include "log_duration.h"
 
@@ -49,7 +51,7 @@ int CountWords(string_view str) {
     if (ptr == str.end()) {
         return 0;
     }
-    size_t size = transform_reduce(ptr, prev(str.end()), next(ptr), 0ul, std::plus<>{},
+    size_t size = transform_reduce(std::execution::par, ptr, prev(str.end()), next(ptr), 0ul, std::plus<>{},
                                    [](const char cur, const char next) {
                                        return cur != ' ' && next == ' ';
                                    }) +
