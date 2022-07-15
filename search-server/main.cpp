@@ -1,18 +1,15 @@
-#include "search_server.h"
-
 #include <execution>
 #include <iostream>
 #include <random>
 #include <string>
 #include <vector>
-#include <execution>
 
 #include "log_duration.h"
+#include "process_queries.h"
+#include "search_server.h"
 #include "test_example_functions.h"
 
 using namespace std;
-
-
 
 int main() {
     mt19937 generator;
@@ -36,4 +33,4 @@ int main() {
 
         TEST_REMOVE_DOCUMENT(par);
     }
-} 
+}

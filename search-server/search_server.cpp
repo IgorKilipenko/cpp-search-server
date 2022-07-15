@@ -1,5 +1,7 @@
 #include "search_server.h"
 
+#include <pstl/glue_execution_defs.h>
+
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -111,7 +113,8 @@ const map<string, double>& SearchServer::GetWordFrequencies(int document_id) con
 }
 
 void SearchServer::RemoveDocument(int document_id) {
-    if (document_ids_.empty() || !documents_.count(document_id)) {
+    RemoveDocument(std::execution::seq, document_id);
+    /*if (document_ids_.empty() || !documents_.count(document_id)) {
         return;
     }
 
@@ -145,7 +148,7 @@ void SearchServer::RemoveDocument(int document_id) {
             continue;
         }
         EraseFromContainer(document_id, ids);
-    }
+    }*/
 }
 
 void SearchServer::RemoveDuplicates() {
