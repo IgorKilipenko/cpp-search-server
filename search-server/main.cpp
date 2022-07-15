@@ -1,50 +1,39 @@
-#include "process_queries.h"
 #include "search_server.h"
 
+#include <execution>
 #include <iostream>
+#include <random>
 #include <string>
 #include <vector>
+#include <execution>
+
+#include "log_duration.h"
+#include "test_example_functions.h"
 
 using namespace std;
 
+
+
 int main() {
-    SearchServer search_server("and with"s);
+    mt19937 generator;
 
-    int id = 0;
-    for (
-        const string& text : {
-            "funny pet and nasty rat"s,
-            "funny pet with curly hair"s,
-            "funny pet and not very nasty rat"s,
-            "pet with rat and rat and rat"s,
-            "nasty rat with curly hair"s,
+    const auto dictionary = GenerateDictionary(generator, 10'000, 25);
+    const auto documents = GenerateQueries(generator, dictionary, 10'000, 100);
+
+    {
+        SearchServer search_server(dictionary[0]);
+        for (size_t i = 0; i < documents.size(); ++i) {
+            search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
         }
-    ) {
-        search_server.AddDocument(++id, text, DocumentStatus::ACTUAL, {1, 2});
+
+        TEST_REMOVE_DOCUMENT(seq);
     }
+    {
+        SearchServer search_server(dictionary[0]);
+        for (size_t i = 0; i < documents.size(); ++i) {
+            search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
+        }
 
-    const vector<string> queries = {
-        "nasty rat -not"s,
-        "not very funny nasty pet"s,
-        "curly hair"s
-    };
-    for (const Document& document : ProcessQueriesJoined(search_server, queries)) {
-        cout << "Document "s << document.id << " matched with relevance "s << document.relevance << endl;
+        TEST_REMOVE_DOCUMENT(par);
     }
-
-    return 0;
-}
-
-/* 
-Expected results:
-Document 1 matched with relevance 0.183492
-Document 5 matched with relevance 0.183492
-Document 4 matched with relevance 0.167358
-Document 3 matched with relevance 0.743945
-Document 1 matched with relevance 0.311199
-Document 2 matched with relevance 0.183492
-Document 5 matched with relevance 0.127706
-Document 4 matched with relevance 0.0557859
-Document 2 matched with relevance 0.458145
-Document 5 matched with relevance 0.458145 
-*/
+} 

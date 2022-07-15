@@ -1,7 +1,13 @@
 #pragma once
 
+#include <pstl/glue_execution_defs.h>
+
+#include <algorithm>
+#include <execution>
 #include <functional>
+#include <iterator>
 #include <map>
+#include <numeric>
 #include <ostream>
 #include <set>
 #include <stdexcept>
@@ -54,6 +60,9 @@ class SearchServer {
     const map<string, double>& GetWordFrequencies(int document_id) const;
 
     void RemoveDocument(int document_id);
+
+    template <typename ExecutionPolicy>
+    void RemoveDocument(ExecutionPolicy&& policy, int document_id);
 
     void RemoveDuplicates();
 
@@ -137,6 +146,26 @@ typename vector<T>::iterator EraseFromContainer(T id, vector<T>& container) {
     return container.end();
 }
 
+template <typename ExecutionPolicy, typename T, typename Container>
+typename Container::iterator EraseFromContainer(ExecutionPolicy&& policy, T id, Container&& container) {
+    auto ptr = find(policy, container.begin(), container.end(), id);
+    if (ptr != container.end()) {
+        return container.erase(ptr);
+    }
+    return container.end();
+}
+
+template <typename ExecutionPolicy, typename K, typename V>
+auto EraseFromDictionary(ExecutionPolicy&& policy, K id, map<K, V>&& container) {
+    auto ptr = std::find_if(policy, container.begin(), container.end(), [id](auto item) {
+        return item.first == id;
+    });
+    if (ptr != container.end()) {
+        return container.erase(ptr);
+    }
+    return container.end();
+}
+
 // ----------------------------------------------------------------
 // SearchServer template members implementation
 // ----------------------------------------------------------------
@@ -198,4 +227,80 @@ vector<Document> SearchServer::FindAllDocuments(const Query& query, T predicate)
         matched_documents.push_back({document_id, relevance, documents_.at(document_id).rating});
     }
     return matched_documents;
+}
+
+template <typename ExecutionPolicy>
+void SearchServer::RemoveDocument(ExecutionPolicy&& policy, int document_id) {
+    if (document_ids_.empty() || !documents_.count(document_id)) {
+        return;
+    }
+    /*
+    EraseFromContainer(document_id, document_ids_);
+    EraseFromContainer(document_id, documents_);
+    auto doc_words_ptr = document_to_words_freqs_.find(document_id);
+    if (doc_words_ptr == document_to_words_freqs_.end() || word_to_document_freqs_.empty()) {
+        return;  // Empty document or empty word_to_document_freqs container
+    }*/
+
+    /*std::vector<map<string, double>::iterator> words(doc_words_ptr->second.size());
+    std::transform(doc_words_ptr->second.begin(), doc_words_ptr->second.end(),words.begin(), [&](const auto& item) {
+        return word_to_document_freqs_.find(item.first);
+    });
+
+    std::for_each(policy, words.begin(), words.end(), [document_id, this](auto cur_word) {
+        auto docs_ptr = word_to_document_freqs_.find(cur_word);
+        if (docs_ptr == word_to_document_freqs_.end() || docs_ptr->second.empty()) {
+            return;
+        }
+        auto& ids_freq = docs_ptr->second;
+        auto ptr = find_if(ids_freq.begin(), ids_freq.end(), [document_id](const pair<int, double>& item) {
+            return item.first == document_id;
+        });
+        if (ptr == ids_freq.end()) {
+            return;
+        }
+        ids_freq.erase(ptr);
+    });*/
+
+    // document_to_words_freqs_.erase(doc_words_ptr);
+
+    /*for (auto& [_, ids] : hash_content_) {
+        if (ids.empty()) {
+            continue;
+        }
+        EraseFromContainer(document_id, ids);
+    }*/
+
+    auto doc_words_ptr = document_to_words_freqs_.find(document_id);
+    if (doc_words_ptr == document_to_words_freqs_.end() || word_to_document_freqs_.empty()) {
+        return;  // Empty document or empty word_to_document_freqs container
+    }
+    {
+        set<string> exclude_words{};
+        auto hash = BuildHash(doc_words_ptr->second, exclude_words);
+        auto& hash_ids = hash_content_[hash];
+        EraseFromContainer(policy, document_id, move(hash_ids));
+    }
+    {
+        const map<string, double>& words = doc_words_ptr->second;
+        for (auto& [cur_word, _] : words) {
+            auto docs_ptr = word_to_document_freqs_.find(cur_word);
+            if (docs_ptr == word_to_document_freqs_.end() || docs_ptr->second.empty()) {
+                continue;
+            }
+            auto& ids_freq = docs_ptr->second;
+            auto ptr = find_if(ids_freq.begin(), ids_freq.end(), [document_id](const pair<int, double>& item) {
+                return item.first == document_id;
+            });
+            if (ptr == ids_freq.end()) {
+                continue;
+            }
+            ids_freq.erase(ptr);
+        }
+        document_to_words_freqs_.erase(doc_words_ptr);
+    }
+    {
+        EraseFromContainer(policy, document_id, move(document_ids_));
+        EraseFromDictionary(policy, document_id, move(documents_));
+    }
 }

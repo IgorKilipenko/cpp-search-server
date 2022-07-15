@@ -1,4 +1,4 @@
-#include "server_test.hpp"
+#include "server_test.h"
 
 #include <algorithm>
 #include <cstdarg>
