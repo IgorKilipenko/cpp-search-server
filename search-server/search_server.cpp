@@ -112,9 +112,9 @@ const map<string, double>& SearchServer::GetWordFrequencies(int document_id) con
     return word_freqs;
 }
 
-void SearchServer::RemoveDocument(int document_id) {
-    RemoveDocument(std::execution::seq, document_id);
-    /*if (document_ids_.empty() || !documents_.count(document_id)) {
+template <>
+void SearchServer::RemoveDocument(std::execution::sequenced_policy policy, int document_id) {
+    if (document_ids_.empty() || !documents_.count(document_id)) {
         return;
     }
 
@@ -148,7 +148,64 @@ void SearchServer::RemoveDocument(int document_id) {
             continue;
         }
         EraseFromContainer(document_id, ids);
+    }
+    /*if (document_ids_.empty() || !documents_.count(document_id)) {
+        return;
+    }
+
+    auto doc_words_ptr = document_to_words_freqs_.find(document_id);
+    if (doc_words_ptr == document_to_words_freqs_.end() || word_to_document_freqs_.empty()) {
+        return;
+    }
+
+    set<string> exclude_words{};
+    auto hash = BuildHash(doc_words_ptr->second, exclude_words);
+    auto& hash_ids = hash_content_[hash];
+    EraseFromContainer(document_id, hash_ids);
+
+    vector<string> words{doc_words_ptr->second.size()};
+    std::transform(doc_words_ptr->second.begin(), doc_words_ptr->second.end(), words.begin(), [](const auto& item) {
+        return item.second;
+    });
+    EraseFromWordToDocumentFreqs(std::execution::seq, document_id, std::move(words), word_to_document_freqs_);
+
+    EraseFromContainer(document_id, document_ids_);
+    EraseFromContainer(document_id, documents_);*/
+}
+
+void SearchServer::RemoveDocument(int document_id) {
+    RemoveDocument(std::execution::seq, document_id );
+}
+
+template <>
+void SearchServer::RemoveDocument(std::execution::parallel_policy policy, int document_id) {
+    // using Action = std::function<void()>;
+    /*if (!std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value) {
+        RemoveDocument(document_id);
     }*/
+    if (document_ids_.empty() || !documents_.count(document_id)) {
+        return;
+    }
+    auto doc_words_ptr = document_to_words_freqs_.find(document_id);
+    if (doc_words_ptr == document_to_words_freqs_.end() || word_to_document_freqs_.empty()) {
+        return;  // Empty document or empty word_to_document_freqs container
+    }
+
+    set<string> exclude_words{};
+    auto hash = BuildHash(doc_words_ptr->second, exclude_words);
+    auto& hash_ids = hash_content_.at(hash);
+    EraseFromContainer(document_id, hash_ids);
+
+    vector<string> words{doc_words_ptr->second.size()};
+    std::transform(policy, doc_words_ptr->second.begin(), doc_words_ptr->second.end(), words.begin(), [](const auto& item) {
+        return item.second;
+    });
+
+    EraseFromWordToDocumentFreqs(policy, document_id, std::move(words), word_to_document_freqs_);
+
+    EraseFromContainer(document_id, document_ids_);
+    EraseFromContainer(document_id, documents_);
+    document_to_words_freqs_.erase(doc_words_ptr);
 }
 
 void SearchServer::RemoveDuplicates() {
