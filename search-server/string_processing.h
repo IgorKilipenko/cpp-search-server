@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <memory>
+#include <numeric>
 #include <set>
 #include <string>
 #include <vector>
@@ -52,3 +54,24 @@ size_t BuildHash(const map<string, T>& strings, const set<string>& exclude_words
     string str = JoinWithExclude(strings, exclude_words, separator, preprocessor);
     return hash<string>{}(str);
 }
+
+template <typename ExecutionPolicy>
+size_t CountWords(ExecutionPolicy&& policy, string_view str) {
+    if (str.empty()) {
+        return 0;
+    }
+    auto ptr = std::find_if(str.begin(), str.end(), [](const char c) {
+        return c != ' ';
+    });
+    if (ptr == str.end()) {
+        return 0;
+    }
+    size_t size = std::transform_reduce(policy, ptr, prev(str.end()), next(ptr), 0ul, std::plus<>{},
+                                        [](const char cur, const char next) {
+                                            return cur != ' ' && next == ' ';
+                                        }) +
+                  (*prev(str.end()) != ' ');
+    return size;
+}
+
+size_t CountWords(string_view str);
