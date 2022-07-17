@@ -32,12 +32,14 @@ vector<string> GenerateDictionary(mt19937& generator, int word_count, int max_le
     return words;
 }
 
-string GenerateQuery(mt19937& generator, const vector<string>& dictionary, int max_word_count) {
-    const int word_count = uniform_int_distribution(1, max_word_count)(generator);
+string GenerateQuery(mt19937& generator, const vector<string>& dictionary, int word_count, double minus_prob) {
     string query;
     for (int i = 0; i < word_count; ++i) {
         if (!query.empty()) {
             query.push_back(' ');
+        }
+        if (uniform_real_distribution<>(0, 1)(generator) < minus_prob) {
+            query.push_back('-');
         }
         query += dictionary[uniform_int_distribution<int>(0, dictionary.size() - 1)(generator)];
     }
@@ -84,4 +86,39 @@ void TestParRemoveDocument() {
     // многопоточная версия
     search_server.RemoveDocument(execution::par, 2);
     report();
+}
+
+void TestParMatchDocument() {
+    SearchServer search_server("and with"s);
+
+    int id = 0;
+    for (const string& text : {
+             "funny pet and nasty rat"s,
+             "funny pet with curly hair"s,
+             "funny pet and not very nasty rat"s,
+             "pet with rat and rat and rat"s,
+             "nasty rat with curly hair"s,
+         }) {
+        search_server.AddDocument(++id, text, DocumentStatus::ACTUAL, {1, 2});
+    }
+
+    const string query = "curly and funny -not"s;
+
+    {
+        const auto [words, status] = search_server.MatchDocument(query, 1);
+        cout << words.size() << " words for document 1"s << endl;
+        // 1 words for document 1
+    }
+
+    {
+        const auto [words, status] = search_server.MatchDocument(execution::seq, query, 2);
+        cout << words.size() << " words for document 2"s << endl;
+        // 2 words for document 2
+    }
+
+    {
+        const auto [words, status] = search_server.MatchDocument(execution::par, query, 3);
+        cout << words.size() << " words for document 3"s << endl;
+        // 0 words for document 3
+    }
 }

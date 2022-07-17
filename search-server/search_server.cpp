@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <numeric>
 #include <set>
@@ -79,6 +80,11 @@ set<std::string> SearchServer::SearchServer::GetStopWords() const {
 }
 
 tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& raw_query, int document_id) const {
+    return MatchDocument(std::execution::seq, raw_query, document_id);
+}
+
+tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument([[maybe_unused]] std::execution::sequenced_policy policy, const string& raw_query,
+                                                                  int document_id) const {
     const auto query = ParseQuery(raw_query);
 
     vector<string> matched_words;
@@ -99,6 +105,38 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(const string& 
             break;
         }
     }
+    return {matched_words, documents_.at(document_id).status};
+}
+
+tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution::parallel_policy policy, const string& raw_query,
+                                                                  int document_id) const {
+
+    const auto query = ParseQuery(raw_query);
+    if (query.plus_words.empty()) {
+        return {};
+    }
+
+    if (!query.minus_words.empty()) {
+        vector<string> minus_words{query.minus_words.begin(), query.minus_words.end()};
+        if (std::any_of(policy, std::make_move_iterator(minus_words.begin()), std::make_move_iterator(minus_words.end()), [&](string minus_word) {
+                return word_to_document_freqs_.count(minus_word) && word_to_document_freqs_.at(minus_word).count(document_id);
+            })) {
+            return {};
+        }
+    }
+
+    vector<string> matched_words;
+    for (const string& word : query.plus_words) {
+        if (word_to_document_freqs_.count(word) == 0) {
+            continue;
+        }
+        if (word_to_document_freqs_.at(word).count(document_id)) {
+            matched_words.push_back(word);
+        }
+    }
+
+    //std::reduce(policy, )
+
     return {matched_words, documents_.at(document_id).status};
 }
 
@@ -152,7 +190,7 @@ void SearchServer::RemoveDocument(std::execution::sequenced_policy policy, int d
 }
 
 void SearchServer::RemoveDocument(int document_id) {
-    RemoveDocument(std::execution::seq, document_id );
+    RemoveDocument(std::execution::seq, document_id);
 }
 
 template <>

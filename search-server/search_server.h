@@ -53,6 +53,10 @@ class SearchServer {
     int GetDocumentCount() const;
 
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const;
+    tuple<vector<string>, DocumentStatus> MatchDocument([[maybe_unused]] std::execution::sequenced_policy policy, const string& raw_query,
+                                                        int document_id) const;
+    tuple<vector<string>, DocumentStatus> MatchDocument([[maybe_unused]] std::execution::parallel_policy policy, const string& raw_query,
+                                                        int document_id) const;
 
     set<std::string> GetStopWords() const;
 
