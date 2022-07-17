@@ -65,19 +65,14 @@ vector<string> SplitIntoWords(const string& text) {
     return words;
     */
 
+
     if (text.empty()) {
         return {};
     }
-    /*auto ptr = std::find_if(text.begin(), text.end(), [](const char c) {
-        return c != ' ';
-    });
-    if (ptr == text.end()) {
-        return {};
-    }*/
     string_view str{text};
     vector<string> words;
 
-    for (int idx = 0; /*text[idx] != string::npos*/;) {
+    for (int idx = 0; ;) {
         if (str.empty()) {
             break;
         }

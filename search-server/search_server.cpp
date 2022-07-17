@@ -127,7 +127,9 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
     if (!query.minus_words.empty()) {
         if (std::any_of(policy, query.minus_words.begin(), query.minus_words.end(),
                         [&](const string& minus_word) {
-                            return word_to_document_freqs_.count(minus_word) && word_to_document_freqs_.at(minus_word).count(document_id);
+                            //return word_to_document_freqs_.count(minus_word) && word_to_document_freqs_.at(minus_word).count(document_id);
+                            auto ptr = word_to_document_freqs_.find(minus_word);
+                            return ptr != word_to_document_freqs_.end() && ptr->second.count(document_id);
                         })) {
             return {};
         }
@@ -308,7 +310,7 @@ double SearchServer::ComputeWordInverseDocumentFreq(const string& word) const {
 
 bool SearchServer::IsValidWord(const string& word) {
     // A valid word must not contain special characters
-    return none_of(word.begin(), word.end(), [](char c) {
+    return none_of(std::execution::seq, word.begin(), word.end(), [](char c) {
         return c >= '\0' && c < ' ';
     });
 }
