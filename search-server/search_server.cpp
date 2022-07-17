@@ -110,6 +110,9 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument([[maybe_unused
 
 tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution::parallel_policy policy, const string& raw_query,
                                                                   int document_id) const {
+    if (word_to_document_freqs_.empty()) {
+        return {};
+    }
 
     const auto query = ParseQuery(raw_query);
     if (query.plus_words.empty()) {
@@ -117,15 +120,16 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
     }
 
     if (!query.minus_words.empty()) {
-        vector<string> minus_words{query.minus_words.begin(), query.minus_words.end()};
-        if (std::any_of(policy, std::make_move_iterator(minus_words.begin()), std::make_move_iterator(minus_words.end()), [&](string minus_word) {
-                return word_to_document_freqs_.count(minus_word) && word_to_document_freqs_.at(minus_word).count(document_id);
-            })) {
+        // vector<string> minus_words{query.minus_words.begin(), query.minus_words.end()};
+        if (std::any_of(policy, std::make_move_iterator(query.minus_words.begin()), std::make_move_iterator(query.minus_words.end()),
+                        [&](string minus_word) {
+                            return word_to_document_freqs_.count(minus_word) && word_to_document_freqs_.at(minus_word).count(document_id);
+                        })) {
             return {};
         }
     }
 
-    vector<string> matched_words;
+    /*vector<string> matched_words;
     for (const string& word : query.plus_words) {
         if (word_to_document_freqs_.count(word) == 0) {
             continue;
@@ -133,10 +137,31 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
         if (word_to_document_freqs_.at(word).count(document_id)) {
             matched_words.push_back(word);
         }
+    }*/
+    // vector<string> plus_words{std::make_move_iterator(query.plus_words.begin()), std::make_move_iterator(query.plus_words.end())};
+    /*vector<string> matched_words =
+        std::reduce(policy, std::make_move_iterator(query.plus_words.begin()), std::make_move_iterator(query.plus_words.end()), vector<string>{},
+                    [&](vector<string> cur, string plus_word) {
+                        if (word_to_document_freqs_.count(plus_word) && word_to_document_freqs_.at(plus_word).count(document_id)) {
+                            cur.push_back(plus_word);
+                        }
+                        return cur;
+                    });*/
+    auto word_freqs_ptr = document_to_words_freqs_.find(document_id);
+    if (word_freqs_ptr == document_to_words_freqs_.end()) {
+        return {};
     }
-
-    //std::reduce(policy, )
-
+    const auto& word_freqs = word_freqs_ptr->second;
+    vector<string> matched_words;
+    matched_words.reserve(query.plus_words.size());
+    matched_words = std::reduce(policy, std::make_move_iterator(query.plus_words.begin()), std::make_move_iterator(query.plus_words.end()), matched_words,
+                                [&](vector<string> cur, string plus_word) {
+                                    auto ptr = word_freqs.find(plus_word);
+                                    if (ptr != word_freqs.end()) {
+                                        cur.push_back(ptr->first);
+                                    }
+                                    return cur;
+                                });
     return {matched_words, documents_.at(document_id).status};
 }
 
