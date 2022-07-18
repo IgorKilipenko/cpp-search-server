@@ -12,20 +12,47 @@
 using namespace std;
 
 int main() {
-    TestParMatchDocument();
+    
+    {
+        TestParMatchDocument();
+        mt19937 generator;
 
-    mt19937 generator;
+        const auto dictionary = GenerateDictionary(generator, 1000, 10);
+        const auto documents = GenerateQueries(generator, dictionary, 10'000, 70);
 
-    const auto dictionary = GenerateDictionary(generator, 1000, 10);
-    const auto documents = GenerateQueries(generator, dictionary, 10'000, 70);
+        const string query = GenerateQuery(generator, dictionary, 500, 0.1);
 
-    const string query = GenerateQuery(generator, dictionary, 500, 0.1);
+        SearchServer search_server(dictionary[0]);
+        for (size_t i = 0; i < documents.size(); ++i) {
+            search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
+        }
 
-    SearchServer search_server(dictionary[0]);
-    for (size_t i = 0; i < documents.size(); ++i) {
-        search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
+        TEST_MATCH_DOCUMENT(seq);
+        TEST_MATCH_DOCUMENT(par);
     }
+    {
+        TestParRemoveDocument();
 
-    TEST_MATCH_DOCUMENT(seq);
-    TEST_MATCH_DOCUMENT(par);
+        mt19937 generator;
+
+        const auto dictionary = GenerateDictionary(generator, 10'000, 25);
+        const auto documents = GenerateQueries(generator, dictionary, 10'000, 100);
+
+        {
+            SearchServer search_server(dictionary[0]);
+            for (size_t i = 0; i < documents.size(); ++i) {
+                search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
+            }
+
+            TEST_REMOVE_DOCUMENT(seq);
+        }
+        {
+            SearchServer search_server(dictionary[0]);
+            for (size_t i = 0; i < documents.size(); ++i) {
+                search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
+            }
+
+            TEST_REMOVE_DOCUMENT(par);
+        }
+    }
 }

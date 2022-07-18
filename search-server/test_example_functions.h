@@ -19,8 +19,6 @@ void TestParRemoveDocument();
 
 template <typename ExecutionPolicy>
 void TestParRemoveDocument(string_view mark, SearchServer search_server, ExecutionPolicy&& policy) {
-    // TestParRemoveDocument();
-
     LOG_DURATION(mark);
     const int document_count = search_server.GetDocumentCount();
     for (int id = 0; id < document_count; ++id) {
@@ -29,7 +27,7 @@ void TestParRemoveDocument(string_view mark, SearchServer search_server, Executi
     cout << search_server.GetDocumentCount() << endl;
 }
 
-#define TEST_REMOVE_DOCUMENT(mode) Test(#mode, search_server, execution::mode)
+#define TEST_REMOVE_DOCUMENT(mode) TestParRemoveDocument(#mode, search_server, execution::mode)
 
 void TestParMatchDocument();
 
