@@ -110,7 +110,8 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
 
     auto word_freqs_ptr = document_to_words_freqs_.find(document_id);
     if (word_freqs_ptr == document_to_words_freqs_.end()) {
-        return {};
+        //return {};
+        throw out_of_range("No document with id: "s + to_string(document_id));
     }
 
     const Query query = ParseQuery(raw_query);
@@ -118,29 +119,28 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
         return {};
     }
 
-    if (!query.minus_words.empty()) {
-        if (std::any_of(policy, query.minus_words.begin(), query.minus_words.end(),
-                        [&](const string& minus_word) {
-                            //return word_to_document_freqs_.count(minus_word) && word_to_document_freqs_.at(minus_word).count(document_id);
-                            auto ptr = word_to_document_freqs_.find(minus_word);
-                            return ptr != word_to_document_freqs_.end() && ptr->second.count(document_id);
-                        })) {
-            return {};
-        }
+    if (std::any_of(policy, query.minus_words.begin(), query.minus_words.end(), [&](const string& minus_word) {
+            return word_freqs_ptr->second.count(minus_word);
+        })) {
+        return {};
     }
 
+    /*vector<string> plus_words{query.plus_words.size()};
+    std::transform(policy, plus_words.begin(), plus_words.end(), plus_words.begin(), [&](const string& word) {
+        return word;
+    });*/
     vector<string> matched_words;
     const auto& word_freqs = word_freqs_ptr->second;
     matched_words.reserve(query.plus_words.size());
-    matched_words = std::reduce(policy, query.plus_words.begin(), query.plus_words.end(),
-                                matched_words, [word_freqs](vector<string>& cur, const string& plus_word) {
-                                    auto ptr = word_freqs.find(plus_word);
-                                    if (ptr != word_freqs.end()) {
-                                        cur.push_back(ptr->first);
-                                    }
-                                    return cur;
-                                });
-    return {matched_words, documents_.at(document_id).status};
+    std::mutex mutex;
+    std::for_each(policy, make_move_iterator(query.plus_words.begin()), make_move_iterator(query.plus_words.end()),
+                  [&word_freqs, &mutex, &matched_words](const string& plus_word) {
+                      if (word_freqs.count(plus_word)) {
+                          std::lock_guard<std::mutex> guard(mutex);
+                          matched_words.push_back(std::move(plus_word));
+                      }
+                  });
+    return {std::move(matched_words), documents_.at(document_id).status};
 }
 
 const map<string, double>& SearchServer::GetWordFrequencies(int document_id) const {
