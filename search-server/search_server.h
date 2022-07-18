@@ -156,12 +156,11 @@ auto EraseFromContainer(TKey id, TDict& container) {
 
 template <typename ExecutionPolicy, template <typename, typename> class Container, typename Value, typename Allocator = std::allocator<Value>>
 auto EraseFromContainer(ExecutionPolicy&& policy, Value id, Container<Value, Allocator>& container) {
-    /*auto ptr = find(policy, container.begin(), container.end(), id);
+    auto ptr = find(policy, container.begin(), container.end(), id);
     if (ptr != container.end()) {
         return container.erase(ptr);
     }
-    return container.end();*/
-    return std::remove(policy, container.begin(), container.end(), id);
+    return container.end();
 }
 
 template <typename T>
