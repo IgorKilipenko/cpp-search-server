@@ -33,24 +33,15 @@ void SearchServer::AddDocument(int document_id, const string& document, Document
     const auto words = SplitIntoWordsNoStop(document);
 
     const double inv_word_count = 1.0 / words.size();
-    auto& words_container = document_to_words_freqs_[document_id];
-    string hash_buffer_str;
     string hash_sep = ""s;
     for (const string& word : words) {
-        if (stop_words_.empty() || !stop_words_.count(word)) {
-            hash_buffer_str += hash_sep + word;
-            if (hash_sep.empty()) {
-                hash_sep = ",";
-            }
-        }
         double& curr_freq = word_to_document_freqs_[word][document_id];
         curr_freq += inv_word_count;
-        words_container.insert({word, curr_freq});
     }
     documents_.emplace(document_id, DocumentData{ComputeAverageRating(ratings), status});
     document_ids_.push_back(document_id);
 
-    auto hash = BuildHash<double>(words_container, stop_words_, ","s);
+    auto hash = BuildHash<double>(document_to_words_freqs_[document_id], stop_words_, ","s);
     hash_content_[hash].insert(document_id);
 }
 
