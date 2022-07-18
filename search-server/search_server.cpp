@@ -30,7 +30,6 @@ void SearchServer::AddDocument(int document_id, const string& document, Document
     if ((document_id < 0) || (documents_.count(document_id) > 0)) {
         throw invalid_argument("Invalid document_id"s);
     }
-    contents_.push_back(document);
     const auto words = SplitIntoWordsNoStop(document);
 
     const double inv_word_count = 1.0 / words.size();

@@ -97,7 +97,6 @@ class SearchServer {
     map<int, DocumentData> documents_;
     vector<int> document_ids_;
     map<size_t, set<int>> hash_content_;
-    vector<string_view> contents_;
 
     bool IsStopWord(const string& word) const;
 
