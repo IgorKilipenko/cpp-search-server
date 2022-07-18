@@ -213,7 +213,7 @@ void SearchServer::RemoveDocument(std::execution::parallel_policy policy, int do
 
     vector<string> words{doc_words_ptr->second.size()};
     std::transform(policy, doc_words_ptr->second.begin(), doc_words_ptr->second.end(), words.begin(), [](const auto& item) {
-        return item.second;
+        return item.first;
     });
 
     EraseFromWordToDocumentFreqs(policy, document_id, std::move(words), word_to_document_freqs_);
