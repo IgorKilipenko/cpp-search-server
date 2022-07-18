@@ -14,6 +14,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -96,6 +97,7 @@ class SearchServer {
     map<int, DocumentData> documents_;
     vector<int> document_ids_;
     map<size_t, set<int>> hash_content_;
+    vector<string_view> contents_;
 
     bool IsStopWord(const string& word) const;
 
@@ -103,7 +105,7 @@ class SearchServer {
 
     static int ComputeAverageRating(const vector<int>& ratings);
 
-    QueryWord ParseQueryWord(string text) const;
+    QueryWord ParseQueryWord(const string& text) const;
 
     Query ParseQuery(const string& text) const;
 

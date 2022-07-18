@@ -11,82 +11,21 @@
 
 using namespace std;
 
-vector<string> SplitIntoWords(const string& text) {
-    /*if (text.empty()) {
+vector<string_view> SplitIntoWords(string_view str) {
+    if (str.empty()) {
         return {};
     }
-    size_t size = CountWords(text);
-    vector<string> words;
-    words.reserve(size);
-    string word;
-    for (const char c : text) {
-        if (c == ' ') {
-            if (!word.empty()) {
-                words.push_back(word);
-                word.clear();
-            }
-        } else {
-            word += c;
-        }
-    }
-    if (!word.empty()) {
-        words.push_back(word);
+    vector<string_view> result;
+    const int64_t pos_end = str.npos;
+    str.remove_prefix(min(str.find_first_not_of(' '), str.size()));
+
+    while (!str.empty()) {
+        int64_t space = str.find(' ', 0);
+        result.push_back(space == pos_end ? str.substr(0) : str.substr(0, space));
+        str.remove_prefix(min(str.find_first_not_of(' ', space), str.size()));
     }
 
-    return words;*/
-
-    /*
-    if (text.empty()) {
-        return {};
-    }
-    auto ptr = std::find_if(text.begin(), text.end(), [](const char c) {
-        return c != ' ';
-    });
-    if (ptr == text.end()) {
-        return {};
-    }
-    vector<string> words;
-    auto ptr_prev = text.begin();
-    for (auto ptr = text.begin(), ptr_next = next(text.begin()); ptr_next != text.end();) {
-        if (*ptr != ' ' && *ptr_next == ' ') {
-            words.push_back({ptr_prev, ptr_next});
-            ptr_prev = std::find_if(next(ptr_next), text.end(), [](const char c) {
-                return c != ' ';
-            });
-            ptr = prev(ptr_prev);
-            ptr_next = ptr_prev;
-        }
-        ++ptr;
-        ++ptr_next;
-    }
-    if (*prev(text.end()) != ' ') {
-        words.push_back(string(ptr_prev, text.end()));
-    }
-    return words;
-    */
-
-
-    if (text.empty()) {
-        return {};
-    }
-    string_view str{text};
-    vector<string> words;
-
-    for (int idx = 0; ;) {
-        if (str.empty()) {
-            break;
-        }
-        idx = str.find_first_not_of(' ');
-        if (idx < 0) {
-            break;
-        }
-        str = str.substr(idx);
-        int next_idx = str.find(' ');
-        next_idx = next_idx < 0 ? str.length() : next_idx;
-        words.push_back(string(str.substr(0, next_idx)));
-        str = str.substr(next_idx);
-    }
-    return words;
+    return result;
 }
 
 size_t BuildHash(const string& str) {

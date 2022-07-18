@@ -11,6 +11,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "string_processing.h"
@@ -29,6 +30,7 @@ void SearchServer::AddDocument(int document_id, const string& document, Document
     if ((document_id < 0) || (documents_.count(document_id) > 0)) {
         throw invalid_argument("Invalid document_id"s);
     }
+    contents_.push_back(document);
     const auto words = SplitIntoWordsNoStop(document);
 
     const double inv_word_count = 1.0 / words.size();
@@ -249,7 +251,8 @@ bool SearchServer::IsStopWord(const string& word) const {
 
 vector<string> SearchServer::SplitIntoWordsNoStop(const string& text) const {
     vector<string> words;
-    for (const string& word : SplitIntoWords(text)) {
+    for (const string_view word_v : SplitIntoWords(text)) {
+        string word{word_v};
         if (!IsValidWord(word)) {
             throw invalid_argument("Word "s + word + " is invalid"s);
         }
@@ -272,7 +275,7 @@ int SearchServer::ComputeAverageRating(const vector<int>& ratings) {
     return rating_sum / static_cast<int>(ratings.size());
 }
 
-SearchServer::QueryWord SearchServer::ParseQueryWord(string text) const {
+SearchServer::QueryWord SearchServer::ParseQueryWord(const string& text) const {
     if (text.empty()) {
         throw invalid_argument("Query word is empty"s);
     }
@@ -291,8 +294,8 @@ SearchServer::QueryWord SearchServer::ParseQueryWord(string text) const {
 
 SearchServer::Query SearchServer::ParseQuery(const string& text) const {
     Query result;
-    for (const string& word : SplitIntoWords(text)) {
-        const auto query_word = ParseQueryWord(word);
+    for (const string_view word : SplitIntoWords(text)) {
+        const auto query_word = ParseQueryWord(string(word));
         if (!query_word.is_stop) {
             if (query_word.is_minus) {
                 result.minus_words.insert(query_word.data);

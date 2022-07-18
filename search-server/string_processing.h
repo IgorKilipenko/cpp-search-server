@@ -7,14 +7,15 @@
 #include <numeric>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace std;
 
-template <typename StringContainer>
-extern set<string> MakeUniqueNonEmptyStrings(const StringContainer& strings) {
+template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string>::value, bool> = true> 
+set<string> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
     set<string> non_empty_strings;
-    for (const string& str : strings) {
+    for (const T& str : strings) {
         if (!str.empty()) {
             non_empty_strings.insert(str);
         }
@@ -22,8 +23,20 @@ extern set<string> MakeUniqueNonEmptyStrings(const StringContainer& strings) {
     return non_empty_strings;
 }
 
+template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string_view>::value, bool> = true>
+//requires std::convertible_to<T, string_view>
+set<string> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
+    set<string> non_empty_strings;
+    for (const T str : strings) {
+        if (!str.empty()) {
+            non_empty_strings.insert(string(str));
+        }
+    }
+    return non_empty_strings;
+}
+
 /// Splits a raw text string into list of space-separated words
-vector<string> SplitIntoWords(const string& text);
+vector<string_view> SplitIntoWords(string_view text);
 
 string JoinWithExclude(const set<string>& strings, const set<string>& exclude_words, string separator = ","s);
 
