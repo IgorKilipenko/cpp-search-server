@@ -154,26 +154,28 @@ auto EraseFromContainer(TKey id, TDict& container) {
     return container.end();
 }
 
+template <typename ExecutionPolicy, template <typename, typename> class Container, typename Value, typename Allocator = std::allocator<Value>>
+auto EraseFromContainer(ExecutionPolicy&& policy, Value id, Container<Value, Allocator>& container) {
+    /*auto ptr = find(policy, container.begin(), container.end(), id);
+    if (ptr != container.end()) {
+        return container.erase(ptr);
+    }
+    return container.end();*/
+    return std::remove(policy, container.begin(), container.end(), id);
+}
+
 template <typename T>
-typename vector<T>::iterator EraseFromContainer(T id, vector<T>& container) {
-    auto ptr = find(container.begin(), container.end(), id);
+auto EraseFromContainer(T id, vector<T>& container) {
+    /*auto ptr = find(container.begin(), container.end(), id);
     if (ptr != container.end()) {
         return container.erase(ptr);
     }
-    return container.end();
+    return container.end();*/
+    return EraseFromContainer(std::execution::seq, id, container);
 }
 
-template <typename ExecutionPolicy, typename T, typename Container>
-typename Container::iterator EraseFromContainer(ExecutionPolicy&& policy, T id, Container&& container) {
-    auto ptr = find(policy, container.begin(), container.end(), id);
-    if (ptr != container.end()) {
-        return container.erase(ptr);
-    }
-    return container.end();
-}
-
-template <typename ExecutionPolicy, typename K, typename V>
-auto EraseFromDictionary(ExecutionPolicy&& policy, K id, map<K, V>&& container) {
+template <typename ExecutionPolicy, template <typename, typename> class Container, typename Key, typename Value>
+auto EraseFromDictionary(ExecutionPolicy&& policy, Key id, Container<Key, Value>& container) {
     auto ptr = std::find_if(policy, container.begin(), container.end(), [id](auto item) {
         return item.first == id;
     });
@@ -181,6 +183,18 @@ auto EraseFromDictionary(ExecutionPolicy&& policy, K id, map<K, V>&& container) 
         return container.erase(ptr);
     }
     return container.end();
+}
+
+template <template <typename, typename> class Container, typename Key, typename Value>
+auto EraseFromDictionary(Key id, Container<Key, Value>& container) {
+    /*auto ptr = std::find_if(policy, container.begin(), container.end(), [id](auto item) {
+        return item.first == id;
+    });
+    if (ptr != container.end()) {
+        return container.erase(ptr);
+    }
+    return container.end();*/
+    EraseFromDictionary(std::execution::seq, id, container);
 }
 
 // ----------------------------------------------------------------
