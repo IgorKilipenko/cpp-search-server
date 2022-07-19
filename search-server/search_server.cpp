@@ -1,9 +1,8 @@
 #include "search_server.h"
 
-#include <pstl/glue_execution_defs.h>
-
 #include <algorithm>
 #include <cmath>
+#include <future>
 #include <iostream>
 #include <iterator>
 #include <map>
@@ -110,7 +109,6 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
 
     auto word_freqs_ptr = document_to_words_freqs_.find(document_id);
     if (word_freqs_ptr == document_to_words_freqs_.end()) {
-        // return {};
         throw out_of_range("No document with id: "s + to_string(document_id));
     }
 
@@ -119,16 +117,12 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
         return {};
     }
 
-    if (std::any_of(/*policy,*/ query.minus_words.begin(), query.minus_words.end(), [&](const string& minus_word) {
+    if (std::any_of(query.minus_words.begin(), query.minus_words.end(), [&](const string& minus_word) {
             return word_freqs_ptr->second.count(move(minus_word));
         })) {
         return {};
     }
 
-    /*vector<string> plus_words{query.plus_words.size()};
-    std::transform(policy, plus_words.begin(), plus_words.end(), plus_words.begin(), [&](const string& word) {
-        return word;
-    });*/
     vector<string> matched_words;
     const auto& word_freqs = word_freqs_ptr->second;
     matched_words.reserve(query.plus_words.size());
@@ -277,7 +271,7 @@ SearchServer::QueryWord SearchServer::ParseQueryWord(const string_view text) con
         word = text.substr(1);
     }
     if (word.empty() || word[0] == '-' || !IsValidWord(word)) {
-        throw invalid_argument("Query word "s +static_cast<string>(text) + " is invalid");
+        throw invalid_argument("Query word "s + static_cast<string>(text) + " is invalid");
     }
 
     return {move(word), is_minus, IsStopWord(word)};
@@ -303,7 +297,6 @@ double SearchServer::ComputeWordInverseDocumentFreq(const string& word) const {
 }
 
 bool SearchServer::IsValidWord(const string& word) {
-    // A valid word must not contain special characters
     return none_of(std::execution::seq, word.begin(), word.end(), [](char c) {
         return c >= '\0' && c < ' ';
     });

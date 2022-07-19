@@ -1,12 +1,9 @@
 #pragma once
 
-#include <pstl/glue_execution_defs.h>
-
 #include <algorithm>
 #include <cstddef>
 #include <execution>
 #include <functional>
-#include <future>
 #include <iterator>
 #include <map>
 #include <numeric>
@@ -56,8 +53,7 @@ class SearchServer {
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const;
     tuple<vector<string>, DocumentStatus> MatchDocument([[maybe_unused]] std::execution::sequenced_policy policy, const string& raw_query,
                                                         int document_id) const;
-    tuple<vector<string>, DocumentStatus> MatchDocument(std::execution::parallel_policy policy, const string_view raw_query,
-                                                        int document_id) const;
+    tuple<vector<string>, DocumentStatus> MatchDocument(std::execution::parallel_policy policy, const string_view raw_query, int document_id) const;
 
     set<std::string> GetStopWords() const;
 
@@ -165,11 +161,6 @@ auto EraseFromContainer(ExecutionPolicy&& policy, Value id, Container<Value, All
 
 template <typename T>
 auto EraseFromContainer(T id, vector<T>& container) {
-    /*auto ptr = find(container.begin(), container.end(), id);
-    if (ptr != container.end()) {
-        return container.erase(ptr);
-    }
-    return container.end();*/
     return EraseFromContainer(std::execution::seq, id, container);
 }
 
@@ -186,13 +177,6 @@ auto EraseFromDictionary(ExecutionPolicy&& policy, Key id, Container<Key, Value>
 
 template <template <typename, typename> class Container, typename Key, typename Value>
 auto EraseFromDictionary(Key id, Container<Key, Value>& container) {
-    /*auto ptr = std::find_if(policy, container.begin(), container.end(), [id](auto item) {
-        return item.first == id;
-    });
-    if (ptr != container.end()) {
-        return container.erase(ptr);
-    }
-    return container.end();*/
     EraseFromDictionary(std::execution::seq, id, container);
 }
 

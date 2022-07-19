@@ -12,7 +12,7 @@
 
 using namespace std;
 
-template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string>::value, bool> = true> 
+template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string>::value, bool> = true>
 set<string> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
     set<string> non_empty_strings;
     for (const T& str : strings) {
@@ -24,7 +24,6 @@ set<string> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
 }
 
 template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string_view>::value, bool> = true>
-//requires std::convertible_to<T, string_view>
 set<string> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
     set<string> non_empty_strings;
     for (const T str : strings) {
