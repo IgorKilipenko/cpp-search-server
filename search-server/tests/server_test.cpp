@@ -8,14 +8,16 @@
 #include <numeric>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
+#include <execution>
 
 #include "../massert.hpp"
 #include "../string_processing.h"
 
 using namespace std;
 
-using MatchingDocument = tuple<vector<std::string>, DocumentStatus>;
+using MatchingDocument = tuple<vector<std::string_view>, DocumentStatus>;
 
 /* OSTREAM operator<< overrides region -------------------------------------- */
 
@@ -225,7 +227,7 @@ void TestAddDocument() {
 void TestStopWords() {
     {
         const string stop_words = "word word1 word2"s;
-        const set<string> stop_words_set = toSet(SplitIntoWords(stop_words));
+        const set<string_view> stop_words_set = toSet(SplitIntoWords(stop_words));
         SearchServer server(stop_words);
         vector<RawDocument> documents = {{0, "белый кот и модный ошейник"s, DocumentStatus::ACTUAL, {8, -3}},
                                          {1, "пушистый кот пушистый хвост"s, DocumentStatus::ACTUAL, {7, 2, 7}},
@@ -248,8 +250,14 @@ void TestStopWords() {
         }
 
         {
-            vector<Document> found_docs = server.FindTopDocuments(" "s);
-            ASSERT_EQUAL(found_docs.size(), 0);
+            try {
+                vector<Document> found_docs = server.FindTopDocuments(" "s);
+            } catch (const std::invalid_argument& err) {
+                ASSERT(true);
+            } catch (...) {
+                ASSERT_HINT(false, "FindTopDocuments must thrrow invalid_argument aexception.");
+            }
+            // ASSERT_EQUAL(found_docs.size(), 0);
         }
 
         {
@@ -337,7 +345,8 @@ void TestMinusWords() {
  * При матчинге документа по поисковому запросу должны быть возвращены все слова из поискового запроса, присутствующие в документе.
  * Если есть соответствие хотя бы по одному минус-слову, должен возвращаться пустой список слов.
  */
-void TestMatchDocuments() {
+template <typename ExecutionPolicy>
+void TestMatchDocuments(ExecutionPolicy&& policy) {
     // Without minus_words test
     {
         vector<RawDocument> documents = initial_documents;
@@ -353,14 +362,14 @@ void TestMatchDocuments() {
         }
         string raw_query = "пушистый ухоженный кот"s;
         for (const auto& doc : documents) {
-            const auto& [matched_words, status] = server.MatchDocument(raw_query, doc.id);
+            const auto& [matched_words, status] = server.MatchDocument(policy, raw_query, doc.id);
 
             ASSERT_EQUAL_HINT(status, doc.status, "Document status is not as expected."s);
 
             auto query_words = SplitIntoWords(raw_query);
             const int mathed_words_count = count_if(matched_words.begin(), matched_words.end(), [&query_words](const auto& mw) {
                 int _count = count(query_words.begin(), query_words.end(), mw);
-                ASSERT_HINT(_count > 0, "Word \""s + mw + "\" not contained in query."s);
+                ASSERT_HINT(_count > 0, "Word \""s + static_cast<string>(mw) + "\" not contained in query."s);
                 return _count ? 1 : 0;
             });
 
@@ -391,21 +400,29 @@ void TestMatchDocuments() {
         // Empty content check (for minus_words)
         {
             const string query = initial_content + " -" + minus_word;
-            const auto& [matched_words, _] = server.MatchDocument(query, raw_doc.id);
+            const auto& [matched_words, _] = server.MatchDocument(policy, query, raw_doc.id);
             ASSERT_HINT(matched_words.empty(), "Document content for the minus_words query is not empty.");
         }
 
         // Matching does not contain minus_words
         {
             const string query = initial_content;
-            const auto& [matched_words, _] = server.MatchDocument(query, raw_doc.id);
-            ASSERT_HINT(!matched_words.empty() && none_of(matched_words.begin(), matched_words.end(),
-                                                          [stop_word](const string& word) {
-                                                              return word == stop_word;
-                                                          }),
+            const auto& [matched_words, _] = server.MatchDocument(policy, query, raw_doc.id);
+            ASSERT_HINT(!matched_words.empty() && std::none_of(matched_words.begin(), matched_words.end(),
+                                                               [stop_word](const string_view word) {
+                                                                   return word == stop_word;
+                                                               }),
                         "Document contains stop_word:"s + stop_word + "."s);
         }
     }
+}
+
+void TestMatchDocumentsSeq() {
+    TestMatchDocuments(std::execution::seq);
+}
+
+void TestMatchDocumentsPar() {
+    TestMatchDocuments(std::execution::par);
 }
 
 /**
@@ -575,7 +592,9 @@ void TestSearchServer() {
 
     RUN_TEST(TestMinusWords);
 
-    RUN_TEST(TestMatchDocuments);
+    RUN_TEST(TestMatchDocumentsSeq);
+
+    RUN_TEST(TestMatchDocumentsPar);
 
     RUN_TEST(TestRelevanceSortOrder);
 
