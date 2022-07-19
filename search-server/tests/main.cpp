@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 
-#include "server_test.hpp"
+#include "server_test.h"
 #include "../search_server.h"
 
 int main() {
