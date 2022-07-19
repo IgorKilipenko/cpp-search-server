@@ -1,6 +1,7 @@
 #include "search_server.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <future>
 #include <iostream>
@@ -67,7 +68,7 @@ SearchServer::IdsConstIterator SearchServer::end() const {
     return document_ids_.end();
 }
 
-set<std::string> SearchServer::SearchServer::GetStopWords() const {
+set<std::string, std::less<>> SearchServer::SearchServer::GetStopWords() const {
     return stop_words_;
 }
 
@@ -80,19 +81,15 @@ tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument([[maybe_u
     const auto query = ParseQuery(raw_query);
 
     vector<string_view> matched_words;
-    for (const string& word : query.plus_words) {
-        if (word_to_document_freqs_.count(word) == 0) {
-            continue;
-        }
-        if (word_to_document_freqs_.at(word).count(document_id)) {
+    for (const string_view word : query.plus_words) {
+        auto ptr = word_to_document_freqs_.find(word);
+        if (ptr != word_to_document_freqs_.end() && ptr->second.count(document_id)) {
             matched_words.push_back(word);
         }
     }
-    for (const string& word : query.minus_words) {
-        if (word_to_document_freqs_.count(word) == 0) {
-            continue;
-        }
-        if (word_to_document_freqs_.at(word).count(document_id)) {
+    for (const string_view word : query.minus_words) {
+        auto ptr = word_to_document_freqs_.find(word);
+        if (ptr != word_to_document_freqs_.end() && ptr->second.count(document_id)) {
             matched_words.clear();
             break;
         }
@@ -161,7 +158,7 @@ void SearchServer::RemoveDocument(std::execution::sequenced_policy policy, int d
 
     const map<string_view, double>& words = doc_words_ptr->second;
     for (auto& [cur_word, _] : words) {
-        auto docs_ptr = word_to_document_freqs_.find(static_cast<string>(cur_word));
+        auto docs_ptr = word_to_document_freqs_.find(cur_word);
         if (docs_ptr == word_to_document_freqs_.end() || docs_ptr->second.empty()) {
             continue;
         }
@@ -204,7 +201,7 @@ void SearchServer::RemoveDocument(std::execution::parallel_policy policy, int do
     auto& hash_ids = hash_content_.at(hash);
     EraseFromContainer(document_id, hash_ids);
 
-    vector<string> words{doc_words_ptr->second.size()};
+    vector<string_view> words{doc_words_ptr->second.size()};
     std::transform(policy, doc_words_ptr->second.begin(), doc_words_ptr->second.end(), words.begin(), [](const auto& item) {
         return item.first;
     });
@@ -231,7 +228,7 @@ void SearchServer::RemoveDuplicates() {
 }
 
 bool SearchServer::IsStopWord(const string_view word) const {
-    return stop_words_.count(static_cast<string>(word)) > 0;
+    return stop_words_.count(word) > 0;
 }
 
 vector<string_view> SearchServer::SplitIntoWordsNoStop(const string_view text) const {
@@ -259,40 +256,45 @@ int SearchServer::ComputeAverageRating(const vector<int>& ratings) {
     return rating_sum / static_cast<int>(ratings.size());
 }
 
-SearchServer::QueryWord SearchServer::ParseQueryWord(const string_view text) const {
-    if (text.empty()) {
+SearchServer::QueryWord SearchServer::ParseQueryWord(string_view word) const {
+    if (word.empty()) {
         throw invalid_argument("Query word is empty"s);
     }
-    string word(text);
+    //string_view word(text);
     bool is_minus = false;
-    if (text[0] == '-') {
+    if (word[0] == '-') {
         is_minus = true;
-        word = text.substr(1);
+        word = word.substr(1);
     }
     if (word.empty() || word[0] == '-' || !IsValidWord(word)) {
-        throw invalid_argument("Query word "s + static_cast<string>(text) + " is invalid");
+        throw invalid_argument("Query word "s + static_cast<string>(word) + " is invalid");
     }
 
-    return {move(word), is_minus, IsStopWord(word)};
+    return {word, is_minus, IsStopWord(word)};
 }
 
 SearchServer::Query SearchServer::ParseQuery(const string_view text) const {
     Query result;
-    for (const string_view word : SplitIntoWords(text)) {
-        const auto query_word = ParseQueryWord(string(word));
-        if (!query_word.is_stop) {
-            if (query_word.is_minus) {
-                result.minus_words.insert(query_word.data);
-            } else {
-                result.plus_words.insert(query_word.data);
-            }
+    const auto words = SplitIntoWords(text);
+    std::for_each(words.begin(), words.end(), [this, &result](const string_view word) {
+        const auto query_word = ParseQueryWord(word);
+        if (query_word.is_stop) {
+            return;
         }
-    }
+        if (query_word.is_minus) {
+            result.minus_words.insert(query_word.data);
+        } else {
+            result.plus_words.insert(query_word.data);
+        }
+    });
     return result;
 }
 
-double SearchServer::ComputeWordInverseDocumentFreq(const string& word) const {
-    return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
+double SearchServer::ComputeWordInverseDocumentFreq(const string_view word) const {
+    auto ptr = word_to_document_freqs_.find(word);
+    assert(ptr != word_to_document_freqs_.end());
+
+    return log(GetDocumentCount() * 1.0 / ptr->second.size());
 }
 
 bool SearchServer::IsValidWord(const string_view word) {

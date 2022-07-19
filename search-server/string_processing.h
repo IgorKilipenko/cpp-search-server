@@ -28,21 +28,21 @@ Container<string> ToString(const Container<T>& str_views) {
     return result;
 }
 
-template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string>::value, bool> = true>
-set<string> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
-    set<string> non_empty_strings;
-    for (const T& str : strings) {
+template <template <typename...> class Container, typename T, std::enable_if_t<std::is_convertible<T, std::string_view>::value, bool> = true>
+set<string, std::less<>> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
+    set<string,std::less<>> non_empty_strings;
+    for (const string_view str : strings) {
         if (!str.empty()) {
-            non_empty_strings.insert(str);
+            non_empty_strings.emplace(str);
         }
     }
     return non_empty_strings;
 }
-
+/*
 template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string_view>::value, bool> = true>
 set<string> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
     return MakeUniqueNonEmptyStrings(ToString(strings));
-}
+}*/
 
 /// Splits a raw text string into list of space-separated words
 vector<string_view> SplitIntoWords(string_view text);

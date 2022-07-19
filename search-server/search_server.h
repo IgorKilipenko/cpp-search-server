@@ -57,7 +57,7 @@ class SearchServer {
 
     tuple<vector<string_view>, DocumentStatus> MatchDocument(std::execution::parallel_policy policy, const string_view raw_query, int document_id) const;
 
-    set<std::string> GetStopWords() const;
+    set<std::string, std::less<>>  GetStopWords() const;
 
     IdsConstIterator begin() const;
 
@@ -80,17 +80,17 @@ class SearchServer {
         DocumentStatus status = DocumentStatus::ACTUAL;
     };
     struct QueryWord {
-        string data;
+        string_view data;
         bool is_minus = false;
         bool is_stop = false;
     };
     struct Query {
-        set<string> plus_words;
-        set<string> minus_words;
+        set<string_view/*, std::less<>*/> plus_words;
+        set<string_view/*, std::less<>*/> minus_words;
     };
 
-    set<string> stop_words_;
-    map<string, map<int, double>> word_to_document_freqs_;
+    set<string, std::less<>> stop_words_;
+    map<string, map<int, double>, std::less<>> word_to_document_freqs_;
     map<int, map<string_view, double>> document_to_words_freqs_;
     map<int, DocumentData> documents_;
     vector<int> document_ids_;
@@ -106,7 +106,7 @@ class SearchServer {
 
     Query ParseQuery(const string_view text) const;
 
-    double ComputeWordInverseDocumentFreq(const string& word) const;
+    double ComputeWordInverseDocumentFreq(const string_view word) const;
 
     template <typename T = function<bool(int, DocumentStatus, int)>>
     vector<Document> FindAllDocuments(const Query& query, T predicate) const;
@@ -114,11 +114,8 @@ class SearchServer {
     static bool IsValidWord(const string_view word);
 
     template <typename ExecutionPolicy>
-    static void EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id, vector<string>&& words,
-                                             map<std::string, map<int, double>>& word_to_document_freqs);
-    template <typename ExecutionPolicy>
-    vector<pair<string, map<int, double>::const_iterator>> GetEraseFromWordToDocumentFreqs(
-        ExecutionPolicy&& policy, int id, vector<string>&& words, const map<std::string, map<int, double>>& word_to_document_freqs);
+    static void EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id, vector<string_view>&& words,
+                                             map<std::string, map<int, double>, std::less<>>& word_to_document_freqs);
 };
 
 // ----------------------------------------------------------------
@@ -228,12 +225,13 @@ vector<Document> SearchServer::FindTopDocuments(const string_view raw_query, T p
 template <typename T>
 vector<Document> SearchServer::FindAllDocuments(const Query& query, T predicate) const {
     map<int, double> document_to_relevance;
-    for (const string& word : query.plus_words) {
-        if (word_to_document_freqs_.count(word) == 0) {
+    for (const string_view word : query.plus_words) {
+        auto ptr = word_to_document_freqs_.find(word);
+        if (ptr == word_to_document_freqs_.end()) {
             continue;
         }
         const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
-        for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word)) {
+        for (const auto [document_id, term_freq] : ptr->second) {
             const auto& document_data = documents_.at(document_id);
             if (predicate(document_id, document_data.status, document_data.rating)) {
                 document_to_relevance[document_id] += term_freq * inverse_document_freq;
@@ -241,11 +239,12 @@ vector<Document> SearchServer::FindAllDocuments(const Query& query, T predicate)
         }
     }
 
-    for (const string& word : query.minus_words) {
-        if (word_to_document_freqs_.count(word) == 0) {
+    for (const string_view word : query.minus_words) {
+        auto ptr = word_to_document_freqs_.find(word);
+        if (ptr == word_to_document_freqs_.end()) {
             continue;
         }
-        for (const auto [document_id, _] : word_to_document_freqs_.at(word)) {
+        for (const auto [document_id, _] : ptr->second) {
             document_to_relevance.erase(document_id);
         }
     }
@@ -258,9 +257,9 @@ vector<Document> SearchServer::FindAllDocuments(const Query& query, T predicate)
 }
 
 template <typename ExecutionPolicy>
-void SearchServer::EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id, vector<string>&& words,
-                                                map<std::string, map<int, double>>& word_to_document_freqs) {
-    std::for_each(policy, words.begin(), words.end(), [&](const string& cur_word) {
+void SearchServer::EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id, vector<string_view>&& words,
+                                                map<std::string, map<int, double>, std::less<>>& word_to_document_freqs) {
+    std::for_each(policy, words.begin(), words.end(), [&](const string_view cur_word) {
         auto docs_ptr = word_to_document_freqs.find(cur_word);
         if (docs_ptr == word_to_document_freqs.end() || docs_ptr->second.empty()) {
             return;
