@@ -24,6 +24,8 @@ using namespace std;
 
 SearchServer::SearchServer(const string_view stop_words_text) : SearchServer(SplitIntoWords(stop_words_text)) {}
 
+SearchServer::SearchServer(const string& stop_words_text) : SearchServer(SplitIntoWords(stop_words_text)) {}
+
 void SearchServer::AddDocument(int document_id, const string_view document, DocumentStatus status, const vector<int>& ratings) {
     if ((document_id < 0) || (documents_.count(document_id) > 0)) {
         throw invalid_argument("Invalid document_id"s);
@@ -78,6 +80,11 @@ tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(const str
 
 tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument([[maybe_unused]] std::execution::sequenced_policy policy,
                                                                        const string_view raw_query, int document_id) const {
+    auto word_freqs_ptr = document_to_words_freqs_.find(document_id);
+    if (word_freqs_ptr == document_to_words_freqs_.end()) {
+        throw out_of_range("No document with id: "s + to_string(document_id));
+    }
+
     const auto query = ParseQuery(raw_query);
 
     vector<string_view> matched_words;
@@ -260,7 +267,7 @@ SearchServer::QueryWord SearchServer::ParseQueryWord(string_view word) const {
     if (word.empty()) {
         throw invalid_argument("Query word is empty"s);
     }
-    //string_view word(text);
+    // string_view word(text);
     bool is_minus = false;
     if (word[0] == '-') {
         is_minus = true;

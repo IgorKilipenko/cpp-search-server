@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <execution>
 #include <functional>
 #include <map>
 #include <memory>
@@ -10,7 +11,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include <execution>
 
 using namespace std;
 
@@ -28,16 +28,22 @@ Container<string> ToString(const Container<T>& str_views) {
     return result;
 }
 
-template <template <typename...> class Container, typename T, std::enable_if_t<std::is_convertible<T, std::string_view>::value, bool> = true>
-set<string, std::less<>> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
-    set<string,std::less<>> non_empty_strings;
-    for (const string_view str : strings) {
+template <typename Iterator>
+set<string, std::less<>> MakeUniqueNonEmptyStrings(Iterator begin, Iterator end) {
+    set<string, std::less<>> non_empty_strings;
+    std::for_each(begin, end, [&non_empty_strings](const auto str) {
         if (!str.empty()) {
             non_empty_strings.emplace(str);
         }
-    }
+    });
     return non_empty_strings;
 }
+
+template <template <typename...> class Container, typename T, std::enable_if_t<std::is_convertible<T, std::string_view>::value, bool> = true>
+set<string, std::less<>> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
+    return MakeUniqueNonEmptyStrings(strings.begin(), strings.end());
+}
+
 /*
 template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string_view>::value, bool> = true>
 set<string> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
