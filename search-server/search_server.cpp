@@ -102,7 +102,7 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument([[maybe_unused
     return {matched_words, documents_.at(document_id).status};
 }
 
-tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution::parallel_policy policy, const string& raw_query,
+tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution::parallel_policy policy, const string_view raw_query,
                                                                   int document_id) const {
     if (word_to_document_freqs_.empty()) {
         return {};
@@ -110,7 +110,7 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
 
     auto word_freqs_ptr = document_to_words_freqs_.find(document_id);
     if (word_freqs_ptr == document_to_words_freqs_.end()) {
-        //return {};
+        // return {};
         throw out_of_range("No document with id: "s + to_string(document_id));
     }
 
@@ -119,8 +119,8 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
         return {};
     }
 
-    if (std::any_of(policy, query.minus_words.begin(), query.minus_words.end(), [&](const string& minus_word) {
-            return word_freqs_ptr->second.count(minus_word);
+    if (std::any_of(/*policy,*/ query.minus_words.begin(), query.minus_words.end(), [&](const string& minus_word) {
+            return word_freqs_ptr->second.count(move(minus_word));
         })) {
         return {};
     }
@@ -133,13 +133,12 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
     const auto& word_freqs = word_freqs_ptr->second;
     matched_words.reserve(query.plus_words.size());
     std::mutex mutex;
-    std::for_each(policy, make_move_iterator(query.plus_words.begin()), make_move_iterator(query.plus_words.end()),
-                  [&word_freqs, &mutex, &matched_words](const string& plus_word) {
-                      if (word_freqs.count(plus_word)) {
-                          std::lock_guard<std::mutex> guard(mutex);
-                          matched_words.push_back(std::move(plus_word));
-                      }
-                  });
+    std::for_each(policy, query.plus_words.begin(), query.plus_words.end(), [&word_freqs, &mutex, &matched_words](const string& plus_word) {
+        if (word_freqs.count(plus_word)) {
+            std::lock_guard<std::mutex> guard(mutex);
+            matched_words.push_back(std::move(plus_word));
+        }
+    });
     return {std::move(matched_words), documents_.at(document_id).status};
 }
 
@@ -241,7 +240,7 @@ bool SearchServer::IsStopWord(const string& word) const {
     return stop_words_.count(word) > 0;
 }
 
-vector<string> SearchServer::SplitIntoWordsNoStop(const string& text) const {
+vector<string> SearchServer::SplitIntoWordsNoStop(const string_view text) const {
     vector<string> words;
     for (const string_view word_v : SplitIntoWords(text)) {
         string word{word_v};
@@ -267,24 +266,24 @@ int SearchServer::ComputeAverageRating(const vector<int>& ratings) {
     return rating_sum / static_cast<int>(ratings.size());
 }
 
-SearchServer::QueryWord SearchServer::ParseQueryWord(const string& text) const {
+SearchServer::QueryWord SearchServer::ParseQueryWord(const string_view text) const {
     if (text.empty()) {
         throw invalid_argument("Query word is empty"s);
     }
-    string word = text;
+    string word(text);
     bool is_minus = false;
-    if (word[0] == '-') {
+    if (text[0] == '-') {
         is_minus = true;
-        word = word.substr(1);
+        word = text.substr(1);
     }
     if (word.empty() || word[0] == '-' || !IsValidWord(word)) {
-        throw invalid_argument("Query word "s + text + " is invalid");
+        throw invalid_argument("Query word "s +static_cast<string>(text) + " is invalid");
     }
 
-    return {word, is_minus, IsStopWord(word)};
+    return {move(word), is_minus, IsStopWord(word)};
 }
 
-SearchServer::Query SearchServer::ParseQuery(const string& text) const {
+SearchServer::Query SearchServer::ParseQuery(const string_view text) const {
     Query result;
     for (const string_view word : SplitIntoWords(text)) {
         const auto query_word = ParseQueryWord(string(word));

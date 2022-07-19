@@ -56,7 +56,7 @@ class SearchServer {
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const;
     tuple<vector<string>, DocumentStatus> MatchDocument([[maybe_unused]] std::execution::sequenced_policy policy, const string& raw_query,
                                                         int document_id) const;
-    tuple<vector<string>, DocumentStatus> MatchDocument([[maybe_unused]] std::execution::parallel_policy policy, const string& raw_query,
+    tuple<vector<string>, DocumentStatus> MatchDocument(std::execution::parallel_policy policy, const string_view raw_query,
                                                         int document_id) const;
 
     set<std::string> GetStopWords() const;
@@ -100,13 +100,13 @@ class SearchServer {
 
     bool IsStopWord(const string& word) const;
 
-    vector<string> SplitIntoWordsNoStop(const string& text) const;
+    vector<string> SplitIntoWordsNoStop(const string_view text) const;
 
     static int ComputeAverageRating(const vector<int>& ratings);
 
-    QueryWord ParseQueryWord(const string& text) const;
+    QueryWord ParseQueryWord(const string_view text) const;
 
-    Query ParseQuery(const string& text) const;
+    Query ParseQuery(const string_view text) const;
 
     double ComputeWordInverseDocumentFreq(const string& word) const;
 
