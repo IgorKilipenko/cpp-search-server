@@ -34,4 +34,4 @@ enum class DocumentStatus {
 
 void PrintDocument(const Document& document);
 
-void PrintMatchDocumentResult(int document_id, const vector<string>& words, DocumentStatus status);
+void PrintMatchDocumentResult(int document_id, const vector<string_view>& words, DocumentStatus status);

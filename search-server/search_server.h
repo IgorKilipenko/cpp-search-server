@@ -31,29 +31,31 @@ class SearchServer {
 
     SearchServer() = default;
 
-    template <typename StringContainer>
-    SearchServer(const StringContainer& stop_words);
+    template <template <typename...> class Container, typename T, std::enable_if_t<std::is_convertible<T, string_view>::value, bool> = true>
+    SearchServer(const Container<T>& stop_words);
 
-    explicit SearchServer(const string& stop_words_text);
+    explicit SearchServer(const string_view stop_words_text);
 
     /// Add new document to the search server's internal database
-    void AddDocument(int document_id, const string& document, DocumentStatus status, const vector<int>& ratings);
+    void AddDocument(int document_id, const string_view document, DocumentStatus status, const vector<int>& ratings);
 
     /// Find most matched documents for request
     template <typename T = function<bool(int, DocumentStatus, int)>>
-    vector<Document> FindTopDocuments(const string& raw_query, T predicate) const;
+    vector<Document> FindTopDocuments(const string_view raw_query, T predicate) const;
 
-    vector<Document> FindTopDocuments(const string& raw_query) const;
+    vector<Document> FindTopDocuments(const string_view raw_query) const;
 
-    vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus status) const;
+    vector<Document> FindTopDocuments(const string_view raw_query, DocumentStatus status) const;
 
     /// Get total number of documents in internal database
     int GetDocumentCount() const;
 
-    tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const;
-    tuple<vector<string>, DocumentStatus> MatchDocument([[maybe_unused]] std::execution::sequenced_policy policy, const string& raw_query,
+    tuple<vector<string_view>, DocumentStatus> MatchDocument(const string_view raw_query, int document_id) const;
+
+    tuple<vector<string_view>, DocumentStatus> MatchDocument([[maybe_unused]] std::execution::sequenced_policy policy, const string_view raw_query,
                                                         int document_id) const;
-    tuple<vector<string>, DocumentStatus> MatchDocument(std::execution::parallel_policy policy, const string_view raw_query, int document_id) const;
+
+    tuple<vector<string_view>, DocumentStatus> MatchDocument(std::execution::parallel_policy policy, const string_view raw_query, int document_id) const;
 
     set<std::string> GetStopWords() const;
 
@@ -61,7 +63,7 @@ class SearchServer {
 
     IdsConstIterator end() const;
 
-    const map<string, double>& GetWordFrequencies(int document_id) const;
+    map<string_view, double> GetWordFrequencies(int document_id) const;
 
     void RemoveDocument(int document_id);
 
@@ -89,14 +91,14 @@ class SearchServer {
 
     set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
-    map<int, map<string, double>> document_to_words_freqs_;
+    map<int, map<string_view, double>> document_to_words_freqs_;
     map<int, DocumentData> documents_;
     vector<int> document_ids_;
     map<size_t, set<int>> hash_content_;
 
-    bool IsStopWord(const string& word) const;
+    bool IsStopWord(const string_view word) const;
 
-    vector<string> SplitIntoWordsNoStop(const string_view text) const;
+    vector<string_view> SplitIntoWordsNoStop(const string_view text) const;
 
     static int ComputeAverageRating(const vector<int>& ratings);
 
@@ -109,7 +111,7 @@ class SearchServer {
     template <typename T = function<bool(int, DocumentStatus, int)>>
     vector<Document> FindAllDocuments(const Query& query, T predicate) const;
 
-    static bool IsValidWord(const string& word);
+    static bool IsValidWord(const string_view word);
 
     template <typename ExecutionPolicy>
     static void EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id, vector<string>&& words,
@@ -184,15 +186,27 @@ auto EraseFromDictionary(Key id, Container<Key, Value>& container) {
 // SearchServer template members implementation
 // ----------------------------------------------------------------
 
-template <typename StringContainer>
-SearchServer::SearchServer(const StringContainer& stop_words) : stop_words_(MakeUniqueNonEmptyStrings(stop_words)) {
+template <>
+inline SearchServer::SearchServer(const vector<string_view>& stop_words) /*: stop_words_(MakeUniqueNonEmptyStrings(stop_words))*/ {
+    const auto views = MakeUniqueNonEmptyStrings(stop_words);
+    /*std::for_each(views.cbegin(), views.cend(), [this](const auto word){
+        stop_words_.insert(string(word));
+    });*/
+    stop_words_ = {views.cbegin(), views.cend()};
+    if (!all_of(stop_words_.begin(), stop_words_.end(), IsValidWord)) {
+        throw invalid_argument("Some of stop words are invalid"s);
+    }
+}
+
+template <>
+inline SearchServer::SearchServer(const vector<string>& stop_words) : stop_words_(MakeUniqueNonEmptyStrings(stop_words)) {
     if (!all_of(stop_words_.begin(), stop_words_.end(), IsValidWord)) {
         throw invalid_argument("Some of stop words are invalid"s);
     }
 }
 
 template <typename T>
-vector<Document> SearchServer::FindTopDocuments(const string& raw_query, T predicate) const {
+vector<Document> SearchServer::FindTopDocuments(const string_view raw_query, T predicate) const {
     const auto query = ParseQuery(raw_query);
 
     auto matched_documents = FindAllDocuments(query, predicate);

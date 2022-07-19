@@ -1,6 +1,10 @@
 #pragma once
+#include <cassert>
 #include <execution>
+#include <iostream>
 #include <random>
+#include <string>
+#include <string_view>
 
 #include "log_duration.h"
 #include "search_server.h"
@@ -44,3 +48,15 @@ void TestParMatchDocument(string_view mark, SearchServer search_server, const st
 }
 
 #define TEST_MATCH_DOCUMENT(policy) TestParMatchDocument(#policy, search_server, query, execution::policy)
+
+inline void TestToString() {
+    cerr << "Start TestToString." << endl;
+    string str{"test string"};
+    string_view view{str};
+    view = view.substr(5);
+    assert(str.substr(5) == ToString(view));
+    assert(str.substr(5) == static_cast<string>(view));
+    assert(str.substr(5) == string(view));
+    assert(str.substr(5) == view);
+    cerr << "Done." << endl << endl;
+}
