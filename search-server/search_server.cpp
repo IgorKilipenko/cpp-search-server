@@ -117,7 +117,7 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
         return {};
     }
 
-    if (std::any_of(query.minus_words.begin(), query.minus_words.end(), [&](const string& minus_word) {
+    if (std::any_of(query.minus_words.begin(), query.minus_words.end(), [&](auto minus_word) {
             return word_freqs_ptr->second.count(move(minus_word));
         })) {
         return {};
@@ -127,7 +127,7 @@ tuple<vector<string>, DocumentStatus> SearchServer::MatchDocument(std::execution
     const auto& word_freqs = word_freqs_ptr->second;
     matched_words.reserve(query.plus_words.size());
     std::mutex mutex;
-    std::for_each(policy, query.plus_words.begin(), query.plus_words.end(), [&word_freqs, &mutex, &matched_words](const string& plus_word) {
+    std::for_each(policy, query.plus_words.begin(), query.plus_words.end(), [&word_freqs, &mutex, &matched_words](auto plus_word) {
         if (word_freqs.count(plus_word)) {
             std::lock_guard<std::mutex> guard(mutex);
             matched_words.push_back(std::move(plus_word));
