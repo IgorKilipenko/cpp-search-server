@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <future>
 #include <iostream>
 #include <iterator>
 #include <map>
@@ -76,67 +75,6 @@ set<std::string, std::less<>> SearchServer::SearchServer::GetStopWords() const {
 
 tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(const string_view raw_query, int document_id) const {
     return MatchDocument(std::execution::seq, raw_query, document_id);
-}
-
-tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument([[maybe_unused]] std::execution::sequenced_policy policy,
-                                                                       const string_view raw_query, int document_id) const {
-    auto word_freqs_ptr = document_to_words_freqs_.find(document_id);
-    if (word_freqs_ptr == document_to_words_freqs_.end()) {
-        throw out_of_range("No document with id: "s + to_string(document_id));
-    }
-
-    const auto query = ParseQuery(raw_query);
-
-    vector<string_view> matched_words;
-    for (const string_view word : query.plus_words) {
-        auto ptr = word_to_document_freqs_.find(word);
-        if (ptr != word_to_document_freqs_.end() && ptr->second.count(document_id)) {
-            matched_words.push_back(word);
-        }
-    }
-    for (const string_view word : query.minus_words) {
-        auto ptr = word_to_document_freqs_.find(word);
-        if (ptr != word_to_document_freqs_.end() && ptr->second.count(document_id)) {
-            matched_words.clear();
-            break;
-        }
-    }
-    return {matched_words, documents_.at(document_id).status};
-}
-
-tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(std::execution::parallel_policy policy, const string_view raw_query,
-                                                                       int document_id) const {
-    if (word_to_document_freqs_.empty()) {
-        return {};
-    }
-
-    auto word_freqs_ptr = document_to_words_freqs_.find(document_id);
-    if (word_freqs_ptr == document_to_words_freqs_.end()) {
-        throw out_of_range("No document with id: "s + to_string(document_id));
-    }
-
-    const Query query = ParseQuery(raw_query);
-    if (query.plus_words.empty()) {
-        return {};
-    }
-
-    if (std::any_of(query.minus_words.begin(), query.minus_words.end(), [&](auto minus_word) {
-            return word_freqs_ptr->second.count(minus_word);
-        })) {
-        return {};
-    }
-
-    vector<string_view> matched_words;
-    const auto& word_freqs = word_freqs_ptr->second;
-    matched_words.reserve(query.plus_words.size());
-    std::mutex mutex;
-    std::for_each(policy, query.plus_words.begin(), query.plus_words.end(), [&word_freqs, &mutex, &matched_words](auto plus_word) {
-        if (word_freqs.count(plus_word)) {
-            std::lock_guard<std::mutex> guard(mutex);
-            matched_words.push_back(plus_word);
-        }
-    });
-    return {std::move(matched_words), documents_.at(document_id).status};
 }
 
 map<string_view, double> SearchServer::GetWordFrequencies(int document_id) const {

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <execution>
 #include <functional>
+#include <future>
 #include <iterator>
 #include <map>
 #include <numeric>
@@ -58,11 +59,8 @@ class SearchServer {
 
     tuple<vector<string_view>, DocumentStatus> MatchDocument(const string_view raw_query, int document_id) const;
 
-    tuple<vector<string_view>, DocumentStatus> MatchDocument([[maybe_unused]] std::execution::sequenced_policy policy, const string_view raw_query,
-                                                             int document_id) const;
-
-    tuple<vector<string_view>, DocumentStatus> MatchDocument(std::execution::parallel_policy policy, const string_view raw_query,
-                                                             int document_id) const;
+    template <typename ExecutionPolicy>
+    tuple<vector<string_view>, DocumentStatus> MatchDocument(ExecutionPolicy&& policy, const string_view raw_query, int document_id) const;
 
     set<std::string, std::less<>> GetStopWords() const;
 
@@ -286,4 +284,35 @@ void SearchServer::EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id
         }
         ids_freq.erase(ptr);
     });
+}
+
+template <typename ExecutionPolicy>
+tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(ExecutionPolicy&& policy, const string_view raw_query, int document_id) const {
+    auto word_freqs_ptr = document_to_words_freqs_.find(document_id);
+    if (word_freqs_ptr == document_to_words_freqs_.end()) {
+        throw out_of_range("No document with id: "s + to_string(document_id));
+    }
+
+    const Query query = ParseQuery(raw_query);
+    tuple<vector<string_view>, DocumentStatus> result{{}, documents_.at(document_id).status};
+
+    if (std::any_of(policy, query.minus_words.begin(), query.minus_words.end(), [&](const auto minus_word) {
+            return word_freqs_ptr->second.count(minus_word);
+        })) {
+        return result;
+    }
+
+    const std::map<string_view, double>& word_freqs = word_freqs_ptr->second;
+
+    auto& matched_words = get<0>(result);
+    matched_words.reserve(query.plus_words.size());
+    std::mutex mutex;
+    std::for_each(/*policy,*/ query.plus_words.begin(), query.plus_words.end(), [&word_freqs, &mutex, &matched_words](auto plus_word) {
+        auto ptr = word_freqs.find(plus_word);
+        if (ptr != word_freqs.end()) {
+            std::lock_guard<std::mutex> guard(mutex);
+            matched_words.push_back(ptr->first);
+        }
+    });
+    return result;
 }
