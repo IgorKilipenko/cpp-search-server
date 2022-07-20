@@ -218,7 +218,7 @@ SearchServer::QueryWord SearchServer::ParseQueryWord(string_view word) const {
     return {word, is_minus, IsStopWord(word)};
 }
 
-SearchServer::Query SearchServer::ParseQuery(const string_view text) const {
+SearchServer::Query SearchServer::ParseQuery(const string_view text, bool make_unique) const {
     Query result;
     const auto words = SplitIntoWords(text);
     std::for_each(words.begin(), words.end(), [this, &result](const string_view word) {
@@ -227,11 +227,14 @@ SearchServer::Query SearchServer::ParseQuery(const string_view text) const {
             return;
         }
         if (query_word.is_minus) {
-            result.minus_words.insert(query_word.data);
+            result.minus_words.push_back(query_word.data);
         } else {
-            result.plus_words.insert(query_word.data);
+            result.plus_words.push_back(query_word.data);
         }
     });
+    if (make_unique) {
+        result.MakeUnique();
+    }
     return result;
 }
 

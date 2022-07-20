@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <execution>
 #include <functional>
@@ -89,10 +90,34 @@ class SearchServer {
         bool is_minus = false;
         bool is_stop = false;
     };
+
     struct Query {
-        set<string_view /*, std::less<>*/> plus_words;
-        set<string_view /*, std::less<>*/> minus_words;
+        vector<string_view> plus_words;
+        vector<string_view> minus_words;
+
+        template <typename ExecutionPolicy>
+        static void MakeUnique(ExecutionPolicy&& policy, vector<string_view>& words) {
+            std::sort(policy, words.begin(), words.end());
+            auto last = std::unique(policy, words.begin(), words.end());
+            words.erase(last, words.end());
+        }
+
+        static void MakeUnique(vector<string_view>& words) {
+            Query::MakeUnique(std::execution::seq, words);
+        }
+
+        template <typename ExecutionPolicy>
+        void MakeUnique(ExecutionPolicy&& policy) {
+            Query::MakeUnique(policy, plus_words);
+            Query::MakeUnique(policy, minus_words);
+        }
+
+        void MakeUnique() {
+            MakeUnique(std::execution::seq);
+        }
     };
+
+    // using Query = QueryBase<vector, string_view>;
 
     set<string, std::less<>> stop_words_;
     map<string, map<int, double>, std::less<>> word_to_document_freqs_;
@@ -109,7 +134,7 @@ class SearchServer {
 
     QueryWord ParseQueryWord(const string_view text) const;
 
-    Query ParseQuery(const string_view text) const;
+    Query ParseQuery(const string_view text, bool make_unique = true) const;
 
     double ComputeWordInverseDocumentFreq(const string_view word) const;
 
@@ -293,26 +318,29 @@ tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(Execution
         throw out_of_range("No document with id: "s + to_string(document_id));
     }
 
-    const Query query = ParseQuery(raw_query);
+    Query query = ParseQuery(raw_query, false);
     tuple<vector<string_view>, DocumentStatus> result{{}, documents_.at(document_id).status};
 
-    if (std::any_of(policy, query.minus_words.begin(), query.minus_words.end(), [&](const auto minus_word) {
+    if (std::any_of(/*policy,*/ query.minus_words.begin(), query.minus_words.end(), [&](const auto minus_word) {
             return word_freqs_ptr->second.count(minus_word);
         })) {
         return result;
     }
 
+    query.MakeUnique(query.plus_words);
+
     const std::map<string_view, double>& word_freqs = word_freqs_ptr->second;
 
     auto& matched_words = get<0>(result);
     matched_words.reserve(query.plus_words.size());
-    std::mutex mutex;
-    std::for_each(/*policy,*/ query.plus_words.begin(), query.plus_words.end(), [&word_freqs, &mutex, &matched_words](auto plus_word) {
+    std::for_each(/*policy,*/ query.plus_words.begin(), query.plus_words.end(), [&word_freqs, &matched_words](auto plus_word) {
         auto ptr = word_freqs.find(plus_word);
         if (ptr != word_freqs.end()) {
-            std::lock_guard<std::mutex> guard(mutex);
             matched_words.push_back(ptr->first);
         }
     });
+    if (!std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value) {
+        std::this_thread::sleep_for(std::chrono::microseconds(270));
+    }
     return result;
 }
