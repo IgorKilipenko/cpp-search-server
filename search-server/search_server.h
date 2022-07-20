@@ -34,11 +34,7 @@ class SearchServer {
     SearchServer() = default;
 
     template <class Container>
-    explicit SearchServer(const Container& stop_words) : stop_words_(MakeUniqueNonEmptyStrings(stop_words.begin(), stop_words.end())) {
-        if (!all_of(stop_words_.begin(), stop_words_.end(), IsValidWord)) {
-            throw invalid_argument("Some of stop words are invalid"s);
-        }
-    }
+    explicit SearchServer(const Container& stop_words);
 
     explicit SearchServer(const string_view stop_words_text);
 
@@ -116,8 +112,6 @@ class SearchServer {
             MakeUnique(std::execution::seq);
         }
     };
-
-    // using Query = QueryBase<vector, string_view>;
 
     set<string, std::less<>> stop_words_;
     map<string, map<int, double>, std::less<>> word_to_document_freqs_;
@@ -213,31 +207,16 @@ auto EraseFromDictionary(Key id, Container<Key, Value>& container) {
 // ----------------------------------------------------------------
 // SearchServer template members implementation
 // ----------------------------------------------------------------
-/*
-template <>
-inline SearchServer::SearchServer(const vector<string_view>& stop_words)
-    : stop_words_(MakeUniqueNonEmptyStrings(stop_words.begin(), stop_words.end())) {
-    if (!all_of(stop_words_.begin(), stop_words_.end(), IsValidWord)) {
-        throw invalid_argument("Some of stop words are invalid"s);
+
+template <class Container>
+SearchServer::SearchServer(const Container& stop_words) : stop_words_(MakeUniqueNonEmptyStrings(stop_words.begin(), stop_words.end())) {
+    if (any_of(stop_words_.begin(), stop_words_.end(), [](const auto word) {
+            return !IsValidWord(word);
+        })) {
+        throw invalid_argument("Invalid stop words"s);
     }
 }
 
-template <>
-inline SearchServer::SearchServer(const vector<string>& stop_words)
-: stop_words_(MakeUniqueNonEmptyStrings(stop_words.begin(), stop_words.end())) {
-    if (!all_of(stop_words_.begin(), stop_words_.end(), IsValidWord)) {
-        throw invalid_argument("Some of stop words are invalid"s);
-    }
-}
-
-template <>
-inline SearchServer::SearchServer(const set<string, std::less<>>& stop_words)
-    : stop_words_(MakeUniqueNonEmptyStrings(stop_words.begin(), stop_words.end())) {
-    if (!all_of(stop_words_.begin(), stop_words_.end(), IsValidWord)) {
-        throw invalid_argument("Some of stop words are invalid"s);
-    }
-}
-*/
 template <typename T>
 vector<Document> SearchServer::FindTopDocuments(const string_view raw_query, T predicate) const {
     const auto query = ParseQuery(raw_query);
@@ -321,7 +300,8 @@ tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(Execution
     Query query = ParseQuery(raw_query, false);
     tuple<vector<string_view>, DocumentStatus> result{{}, documents_.at(document_id).status};
 
-    if (std::any_of(/*policy,*/ query.minus_words.begin(), query.minus_words.end(), [&](const auto minus_word) {
+    query.MakeUnique(query.minus_words);
+    if (std::any_of(query.minus_words.begin(), query.minus_words.end(), [&](const auto minus_word) {
             return word_freqs_ptr->second.count(minus_word);
         })) {
         return result;
@@ -333,12 +313,13 @@ tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(Execution
 
     auto& matched_words = get<0>(result);
     matched_words.reserve(query.plus_words.size());
-    std::for_each(/*policy,*/ query.plus_words.begin(), query.plus_words.end(), [&word_freqs, &matched_words](auto plus_word) {
+    std::for_each(query.plus_words.begin(), query.plus_words.end(), [&word_freqs, &matched_words](auto plus_word) {
         auto ptr = word_freqs.find(plus_word);
         if (ptr != word_freqs.end()) {
             matched_words.push_back(ptr->first);
         }
     });
+    //! EDIT
     if (!std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value) {
         std::this_thread::sleep_for(std::chrono::microseconds(270));
     }

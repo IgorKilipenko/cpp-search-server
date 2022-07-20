@@ -4,7 +4,6 @@
 #include <cassert>
 #include <cstddef>
 #include <execution>
-#include <iterator>
 #include <numeric>
 #include <string>
 #include <string_view>

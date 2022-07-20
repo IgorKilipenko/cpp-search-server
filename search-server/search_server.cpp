@@ -138,7 +138,7 @@ void SearchServer::RemoveDocument(std::execution::parallel_policy policy, int do
     }
     auto doc_words_ptr = document_to_words_freqs_.find(document_id);
     if (doc_words_ptr == document_to_words_freqs_.end() || word_to_document_freqs_.empty()) {
-        return;  // Empty document or empty word_to_document_freqs container
+        return;
     }
 
     set<string> exclude_words{};
@@ -205,7 +205,6 @@ SearchServer::QueryWord SearchServer::ParseQueryWord(string_view word) const {
     if (word.empty()) {
         throw invalid_argument("Query word is empty"s);
     }
-    // string_view word(text);
     bool is_minus = false;
     if (word[0] == '-') {
         is_minus = true;

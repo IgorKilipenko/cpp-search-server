@@ -14,20 +14,6 @@
 
 using namespace std;
 
-inline string ToString(const string_view str_view) {
-    return string(str_view.data(), str_view.size());
-}
-
-template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string_view>::value, bool> = true>
-Container<string> ToString(const Container<T>& str_views) {
-    vector<string> result;
-    result.reserve(str_views.size());
-    std::for_each(std::execution::seq, str_views.begin(), str_views.end(), [&result](const string_view view) {
-        result.push_back(ToString(view));
-    });
-    return result;
-}
-
 template <typename Iterator>
 set<string, std::less<>> MakeUniqueNonEmptyStrings(Iterator begin, Iterator end) {
     set<string, std::less<>> non_empty_strings;
@@ -43,12 +29,6 @@ template <template <typename...> class Container, typename T, std::enable_if_t<s
 set<string, std::less<>> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
     return MakeUniqueNonEmptyStrings(strings.begin(), strings.end());
 }
-
-/*
-template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string_view>::value, bool> = true>
-set<string> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
-    return MakeUniqueNonEmptyStrings(ToString(strings));
-}*/
 
 /// Splits a raw text string into list of space-separated words
 vector<string_view> SplitIntoWords(string_view text);
@@ -104,3 +84,17 @@ size_t CountWords(ExecutionPolicy&& policy, string_view str) {
 }
 
 size_t CountWords(string_view str);
+
+inline string ToString(const string_view str_view) {
+    return string(str_view.data(), str_view.size());
+}
+
+template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string_view>::value, bool> = true>
+Container<string> ToString(const Container<T>& str_views) {
+    vector<string> result;
+    result.reserve(str_views.size());
+    std::for_each(std::execution::seq, str_views.begin(), str_views.end(), [&result](const string_view view) {
+        result.push_back(ToString(view));
+    });
+    return result;
+}
