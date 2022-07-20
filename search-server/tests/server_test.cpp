@@ -441,8 +441,9 @@ void TestMatchDocuments(ExecutionPolicy&& policy) {
             }
         }
         server.RemoveDocument(2);
-        auto words = std::get<0>(server.MatchDocument(policy, "пушистый", 1));
-        ASSERT(words[0] == "пушистый");
+        string query = "пушистый"s;
+        auto words = std::get<0>(server.MatchDocument(policy, query, 1));
+        ASSERT(words.size() == 1 && words[0] == query);
     }
 }
 

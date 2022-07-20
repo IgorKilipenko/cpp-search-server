@@ -297,26 +297,25 @@ tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(Execution
         throw out_of_range("No document with id: "s + to_string(document_id));
     }
 
+    const auto& words = word_freqs_ptr->second;
+
     Query query = ParseQuery(raw_query, false);
     tuple<vector<string_view>, DocumentStatus> result{{}, documents_.at(document_id).status};
 
     query.MakeUnique(query.minus_words);
-    if (std::any_of(query.minus_words.begin(), query.minus_words.end(), [&](const auto minus_word) {
-            return word_freqs_ptr->second.count(minus_word);
+    if (std::any_of(query.minus_words.begin(), query.minus_words.end(), [&words](const auto minus_word) {
+            return words.count(minus_word);
         })) {
         return result;
     }
 
     query.MakeUnique(query.plus_words);
 
-    const std::map<string_view, double>& word_freqs = word_freqs_ptr->second;
-
-    auto& matched_words = get<0>(result);
+    auto& matched_words = std::get<0>(result);
     matched_words.reserve(query.plus_words.size());
-    std::for_each(query.plus_words.begin(), query.plus_words.end(), [&word_freqs, &matched_words](auto plus_word) {
-        auto ptr = word_freqs.find(plus_word);
-        if (ptr != word_freqs.end()) {
-            matched_words.push_back(ptr->first);
+    std::for_each(query.plus_words.begin(), query.plus_words.end(), [&words, &matched_words](const auto plus_word) {
+        if (words.count(plus_word)) {
+            matched_words.push_back(plus_word);
         }
     });
     //! EDIT
