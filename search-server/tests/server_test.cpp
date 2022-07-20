@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdarg>
 #include <cstdlib>
+#include <execution>
 #include <iostream>
 #include <map>
 #include <numeric>
@@ -10,7 +11,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include <execution>
 
 #include "../massert.hpp"
 #include "../string_processing.h"
@@ -386,7 +386,7 @@ void TestMatchDocuments(ExecutionPolicy&& policy) {
     // With minus_words an stop words test
     {
         const string initial_content = "белый кот и модный ошейник"s;
-        RawDocument raw_doc = {0, initial_content, DocumentStatus::ACTUAL, {8, -3}};
+        RawDocument raw_doc = {0, initial_content, DocumentStatus::BANNED, {8, -3}};
         vector<RawDocument> raw_documents = {raw_doc};
         string minus_word = "кот"s;
         string stop_word = "белый"s;
@@ -400,8 +400,9 @@ void TestMatchDocuments(ExecutionPolicy&& policy) {
         // Empty content check (for minus_words)
         {
             const string query = initial_content + " -" + minus_word;
-            const auto& [matched_words, _] = server.MatchDocument(policy, query, raw_doc.id);
+            const auto& [matched_words, status] = server.MatchDocument(policy, query, raw_doc.id);
             ASSERT_HINT(matched_words.empty(), "Document content for the minus_words query is not empty.");
+            ASSERT_EQUAL_HINT(status, raw_doc.status, "Document status is not as expected.");
         }
 
         // Matching does not contain minus_words
@@ -414,6 +415,34 @@ void TestMatchDocuments(ExecutionPolicy&& policy) {
                                                                }),
                         "Document contains stop_word:"s + stop_word + "."s);
         }
+    }
+    {
+        SearchServer server;
+
+        {
+            vector<RawDocument> documents = initial_documents;
+            for (const auto& [id, content, status, ratings] : documents) {
+                try {
+                    server.AddDocument(id, content, status, ratings);
+                } catch (const std::exception& ex) {
+                    ASSERT_HINT(false, ADD_DOCUMENT_FAILURE_MSG);
+                }
+            }
+            server.RemoveDocument(0);
+            for (int i = 1; i <= server.GetDocumentCount(); ++i) {
+                auto match = server.MatchDocument(policy, documents[i].content, i);
+                auto content = string(move(documents[i].content));
+                documents[i].content = "";
+                auto words = std::get<0>(match);
+                auto expected = SplitIntoWords(content);
+                for (auto expected_word : expected) {
+                    ASSERT(std::find(words.begin(), words.end(), expected_word) != words.end());
+                }
+            }
+        }
+        server.RemoveDocument(2);
+        auto words = std::get<0>(server.MatchDocument(policy, "пушистый", 1));
+        ASSERT(words[0] == "пушистый");
     }
 }
 
