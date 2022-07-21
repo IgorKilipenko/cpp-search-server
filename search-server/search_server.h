@@ -313,8 +313,10 @@ tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(Execution
 
     auto& matched_words = std::get<0>(result);
     matched_words.reserve(query.plus_words.size());
-    std::for_each(query.plus_words.begin(), query.plus_words.end(), [&words, &matched_words](const auto plus_word) {
+    std::mutex mutex;
+    std::for_each(policy, query.plus_words.begin(), query.plus_words.end(), [&mutex, &words, &matched_words](const auto plus_word) {
         if (words.count(plus_word)) {
+            std::lock_guard<std::mutex> lock_guard(mutex);
             matched_words.push_back(plus_word);
         }
     });
