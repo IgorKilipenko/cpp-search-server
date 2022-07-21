@@ -46,73 +46,40 @@ RandomAccessIterator LowerBound(const execution::parallel_policy&, RandomAccessI
     if (range_end - range_begin < 4) {
         return LowerBound(std::execution::seq, range_begin, range_end, value);
     }
-    [[maybe_unused]] const auto is_right_pos = [](const Value& value, RandomAccessIterator right_middle) {
-        return *right_middle < value;
-    };
     [[maybe_unused]] const auto is_middle_pos = [](const Value& value, RandomAccessIterator left_middle) {
-        return  *left_middle < value;
-    };
-    const auto is_equal_prev = [](RandomAccessIterator left_middle, RandomAccessIterator right_middle) {
-        return  !(*left_middle < *prev(right_middle)); 
+        return *left_middle < value;
     };
 
-    //[[maybe_unused]] vector<Value> tmp{range_begin, range_end};
     auto left_bound = range_begin;
     auto right_bound = range_end;
     while (left_bound + 1 < right_bound) {
-        const auto left_middle = left_bound + max(static_cast<int>((right_bound - left_bound) / 3), 1);
-        const auto right_middle = right_bound - max(static_cast<int>((right_bound - left_bound) / 3), 1);
-        /*
-        if (value > *right_middle) {
-            left_bound = right_middle;
-        } else if (value > *left_middle) {
-            if (*prev(right_middle) == *left_middle) {
-                left_bound = prev(right_middle);
-                right_bound = right_middle;
-            } else {
-                left_bound = left_middle;
-                right_bound = right_middle;
-            }
-        } else {
-            right_bound = left_middle;
-        }
-        */
-        //auto check_is_right_pos = std::async(std::launch::async, is_right_pos, std::ref(value), right_middle);
-        auto check_is_middle_pos = std::async(/*std::launch::async,*/ is_middle_pos, std::ref(value), left_middle);
-        auto check_is_equal_prev = std::async(/*std::launch::async, */is_equal_prev, left_middle, right_middle);
+        const int part_length = max(static_cast<int>((right_bound - left_bound) / 3), 1);
+        const auto left_middle = left_bound + part_length;
+        const auto right_middle = right_bound - part_length;
+        auto check_is_middle_pos = std::async([left_middle, &value]() {
+            return *left_middle < value;
+        });
 
         if (*right_middle < value) {
             left_bound = right_middle;
         } else if (check_is_middle_pos.get()) {
-            if (check_is_equal_prev.get()) {
-                left_bound = prev(right_middle);
-                right_bound = right_middle;
-            } else {
-                left_bound = left_middle;
-                right_bound = right_middle;
-            }
+            left_bound = left_middle;
+            right_bound = right_middle;
         } else {
             right_bound = left_middle;
         }
     }
 
-    //auto expected = LowerBound(std::execution::seq, range_begin, range_end, value);
     if (left_bound == range_begin && !(*left_bound < value)) {
-        /*if (left_bound != expected) {
-            throw *expected;
-        }*/
         return left_bound;
     } else {
-        /*if (right_bound != expected) {
-            throw *expected;
-        }*/
         return right_bound;
     }
 }
 
 void Test() {
-    size_t size = 50;
-    size_t word_len = 5000000;
+    size_t size = 5000;
+    size_t word_len = 10;
     const auto wordsGenerator = [](size_t count, size_t word_len) {
         mt19937 generator;
         vector<string> result{count};
