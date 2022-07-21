@@ -1,4 +1,7 @@
+#include <pstl/glue_execution_defs.h>
+
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <execution>
 #include <future>
@@ -41,59 +44,48 @@ RandomAccessIterator LowerBound(RandomAccessIterator range_begin, RandomAccessIt
 template <typename RandomAccessIterator, typename Value>
 RandomAccessIterator LowerBound(const execution::parallel_policy&, RandomAccessIterator range_begin, RandomAccessIterator range_end,
                                 const Value& value) {
+    if (range_end - range_begin < 5) {
+        return LowerBound(std::execution::seq, range_begin, range_end, value);
+    }
+    auto expected = LowerBound(std::execution::seq, range_begin, range_end, value);
+    [[maybe_unused]] vector<Value> tmp{range_begin, range_end};
     auto left_bound = range_begin;
     auto right_bound = range_end;
-
-    const auto action = [&value](RandomAccessIterator& left_bound, RandomAccessIterator& right_bound) {
-        const auto middle = left_bound + (right_bound - left_bound) / 2;
-        if (*middle < value) {
-            left_bound = middle;
+    while (left_bound + 1 < right_bound) {
+        const auto left_middle = left_bound + max(static_cast<int>((right_bound - left_bound) / 3), 1);
+        const auto right_middle = right_bound - max(static_cast<int>((right_bound - left_bound) / 3), 1);
+        [[maybe_unused]] auto left_idx = left_middle - range_begin;
+        [[maybe_unused]] auto right_idx = right_middle - range_begin;
+        if (value > *right_middle) {
+            left_bound = right_middle;
+        } else if (value > *left_middle) {
+            if (*prev(right_middle) == *left_middle) {
+                left_bound = prev(right_middle);
+                right_bound = right_middle;
+            } else {
+                left_bound = left_middle;
+                right_bound = right_middle;
+            }
         } else {
-            right_bound = middle;
+            right_bound = left_middle;
         }
-        return left_bound + 1 < right_bound;
-    };
-    while (action(left_bound, right_bound))
-        ;
-
-    auto f1 = std::async(std::launch::async, [&]() {
-        auto begin = range_begin, end = range_begin + (range_end - range_begin) / 2;
-        while (action(begin, end)) {
-        }
-        return pair{begin, end};
-    });
-    auto f2 = std::async(std::launch::async, [&]() {
-        auto begin = range_begin + (right_bound - range_begin) / 2, end = right_bound;
-        while (action(begin, end)) {
-        }
-
-        return pair{begin, end};
-    });
-
-    [[maybe_unused]] auto res1 = f1.get();
-    if (res1.first == range_begin && !(*res1.first < value)) {
-        return res1.first;
     }
-
-    [[maybe_unused]] auto res2 = f2.get();
-    if (res2.first == range_begin && !(*res2.first < value)) {
-        return res2.first;
-    }
-
-    return res2.second;
-
-    /*
     if (left_bound == range_begin && !(*left_bound < value)) {
+        if (left_bound != expected) {
+            throw *expected;
+        }
         return left_bound;
     } else {
+        if (right_bound != expected) {
+            throw *expected;
+        }
         return right_bound;
     }
-    */
 }
 
 void Test() {
-    size_t size = 1'000'000;
-    size_t word_len = 1000;
+    size_t size = 500;
+    size_t word_len = 5;
     const auto wordsGenerator = [](size_t count, size_t word_len) {
         mt19937 generator;
         vector<string> result{count};
@@ -102,8 +94,11 @@ void Test() {
         }
         return result;
     };
-    const auto strings = wordsGenerator(size, word_len);
+    auto strings = wordsGenerator(size, word_len);
     const auto requests = wordsGenerator(size * 2, word_len);
+    std::sort(std::execution::par, strings.begin(), strings.end(), [](const auto a, const auto b) {
+        return lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
+    });
     vector<vector<string>::const_iterator> seq_result;
     vector<vector<string>::const_iterator> par_result;
     {
@@ -118,7 +113,11 @@ void Test() {
     {
         LOG_DURATION("Параллельная версия:");
         for_each(requests.begin(), requests.end(), [&](const string_view req) {
-            auto res = LowerBound(strings.begin(), strings.end(), req);
+            auto res = LowerBound(execution::par, strings.begin(), strings.end(), req);
+            /*if (!seq_result.empty() && res != *prev(seq_result.end())) {
+                auto val = *prev(seq_result.end());
+                throw val;
+            }*/
             if (res != strings.end()) {
                 par_result.push_back(res);
             }
@@ -127,34 +126,30 @@ void Test() {
 
     cerr << endl;
     cerr << "Последовательная версия: " << seq_result.size() << " шт." << endl;
-    cerr << "Последовательная версия: " << par_result.size() << " шт." << endl;
+    cerr << "Параллельная версия: " << par_result.size() << " шт." << endl;
 }
 
 int main() {
-    const vector<string> strings = {"cat", "dog", "dog", "horse"};
+    const vector<string> strings = {"a", "cat", "cat", "dog", "dog", "horse"};
 
-    const vector<string> requests = {"bear", "cat", "deer", "dog", "dogs", "horses"};
+    const vector<string> requests = {"as", "cats", "dogs", "bear", "cat", "deer", "dog", "horses"};
 
     // последовательные версии
     {
-        cout << "Request [" << requests[0] << "] → position " << LowerBound(strings.begin(), strings.end(), requests[0]) - strings.begin() << endl;
-        cout << "Request [" << requests[1] << "] → position "
-             << LowerBound(execution::seq, strings.begin(), strings.end(), requests[1]) - strings.begin() << endl;
-        cout << "Request [" << requests[2] << "] → position "
-             << LowerBound(execution::seq, strings.begin(), strings.end(), requests[2]) - strings.begin() << endl;
+        for (const auto& request : requests) {
+            cout << "Request [" << request << "] → position " << LowerBound(strings.begin(), strings.end(), request) - strings.begin() << endl;
+        }
+        cout << endl;
     }
 
     // параллельные
     {
-        //cout << "Request ["
-        //     << "aaaaa"
-        //     << "] → position " << LowerBound(execution::par, strings.begin(), strings.end(), "aaaaa") - strings.begin() << endl;
-        cout << "Request [" << requests[0] << "] → position "
-             << LowerBound(execution::par, strings.begin(), strings.end(), requests[0]) - strings.begin() << endl;
-        cout << "Request [" << requests[1] << "] → position "
-             << LowerBound(execution::par, strings.begin(), strings.end(), requests[1]) - strings.begin() << endl;
-        cout << "Request [" << requests[2] << "] → position "
-             << LowerBound(execution::par, strings.begin(), strings.end(), requests[2]) - strings.begin() << endl;
+        [[maybe_unused]] int i = 0;
+        for (const auto& request : requests) {
+            // if (i++ < 3) continue;
+            cout << "Request [" << request << "] → position " << LowerBound(execution::par, strings.begin(), strings.end(), request) - strings.begin()
+                 << endl;
+        }
     }
     cout << endl << endl;
     Test();
