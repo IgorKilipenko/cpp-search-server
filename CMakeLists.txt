@@ -28,7 +28,7 @@ endif()
 set(CFLAGS -Wall -Werror -pedantic)
 set(DEFS)
 set(LINK_OPTS)
-set(LDLIBS pthread)
+set(LDLIBS tbb pthread)
 
 if (DEFINED CMAKE_BUILD_TYPE AND CMAKE_BUILD_TYPE STREQUAL "Debug") 
     message("Debug mode.")
