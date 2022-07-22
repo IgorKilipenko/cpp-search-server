@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <cstddef>
 #include <functional>
+#include <future>
 #include <iostream>
 #include <map>
 #include <set>
@@ -13,7 +15,7 @@
 using namespace std;
 
 struct Stats {
-    map<string, int, less<>> word_frequences;
+    map<string, int> word_frequences;
 
     void operator+=(const Stats& other) {
         const auto& other_frequences = other.word_frequences;
@@ -36,16 +38,36 @@ Stats ExploreKeyWords(const KeyWords& key_words, istream& input) {
         lines.push_back(str);
     }
 
-    Stats stats;
-    std::for_each(lines.begin(), lines.end(), [&stats, &key_words](const string_view str) {
-        const auto words = SplitIntoWords(str);
-        for (const string_view word : words) {
-            auto ptr = key_words.find(word);
-            if (ptr != key_words.end()) {
-                ++stats.word_frequences[*ptr];
-            }
+    size_t thread_count = std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() : 4ul;
+    vector<std::future<Stats>> actions;
+    int actions_per_thread = max(static_cast<size_t>(lines.size() / thread_count), 1ul);
+    for (size_t i = 0; i < thread_count; ++i) {
+        auto begin = lines.begin() + (i * actions_per_thread);
+        auto end = (lines.end() - begin > actions_per_thread) ? begin + actions_per_thread : lines.end();
+        actions.push_back(std::async(
+            [&key_words](vector<string>::iterator begin, vector<string>::iterator end) {
+                Stats stats;
+                std::for_each(begin, end, [&key_words, &stats](const string_view str) {
+                    const auto words = SplitIntoWords(str);
+                    for (const string_view word : words) {
+                        auto ptr = key_words.find(word);
+                        if (ptr != key_words.end()) {
+                            ++stats.word_frequences[*ptr];
+                        }
+                    }
+                });
+                return stats;
+            },
+            begin, end));
+        if (end == lines.end()) {
+            break;
         }
-    });
+    }
+
+    Stats stats;
+    for (size_t i = 0; i < actions.size(); ++i) {
+        stats += actions[i].get();
+    }
 
     return stats;
 }
