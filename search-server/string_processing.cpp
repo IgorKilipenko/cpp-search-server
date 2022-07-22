@@ -20,11 +20,15 @@ vector<string_view> SplitIntoWords(string_view str) {
 
     do {
         int64_t space = str.find(' ', 0);
-        result.push_back(space == str.npos ? str.substr(0) : str.substr(0, space));
+        result.push_back(space == static_cast<int64_t>(str.npos) ? str.substr(0) : str.substr(0, space));
         str.remove_prefix(min(str.find_first_not_of(' ', space), str.size()));
     } while (!str.empty());
 
     return result;
+}
+
+vector<string_view> SplitIntoWords(const string& str) {
+    return SplitIntoWords(static_cast<string_view>(str));
 }
 
 size_t BuildHash(const string& str) {

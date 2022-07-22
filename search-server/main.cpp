@@ -1,147 +1,68 @@
 #include <algorithm>
-#include <cassert>
-#include <cstddef>
-#include <execution>
 #include <functional>
-#include <future>
 #include <iostream>
-#include <random>
+#include <map>
+#include <set>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "log_duration.h"
-#include "test_example_functions.h"
+#include "string_processing.h"
 
 using namespace std;
 
-template <typename RandomAccessIterator, typename Value>
-RandomAccessIterator LowerBound(const execution::sequenced_policy&, RandomAccessIterator range_begin, RandomAccessIterator range_end,
-                                const Value& value) {
-    auto left_bound = range_begin;
-    auto right_bound = range_end;
-    while (left_bound + 1 < right_bound) {
-        const auto middle = left_bound + (right_bound - left_bound) / 2;
-        if (*middle < value) {
-            left_bound = middle;
-        } else {
-            right_bound = middle;
-        }
-    }
-    if (left_bound == range_begin && !(*left_bound < value)) {
-        return left_bound;
-    } else {
-        return right_bound;
-    }
-}
+struct Stats {
+    map<string, int, less<>> word_frequences;
 
-template <typename RandomAccessIterator, typename Value>
-RandomAccessIterator LowerBound(RandomAccessIterator range_begin, RandomAccessIterator range_end, const Value& value) {
-    return LowerBound(execution::seq, range_begin, range_end, value);
-}
-
-template <typename RandomAccessIterator, typename Value>
-RandomAccessIterator LowerBound(const execution::parallel_policy&, RandomAccessIterator range_begin, RandomAccessIterator range_end,
-                                const Value& value) {
-    if (range_end - range_begin < 4) {
-        return LowerBound(std::execution::seq, range_begin, range_end, value);
-    }
-    [[maybe_unused]] const auto is_middle_pos = [](const Value& value, RandomAccessIterator left_middle) {
-        return *left_middle < value;
-    };
-
-    auto left_bound = range_begin;
-    auto right_bound = range_end;
-    while (left_bound + 1 < right_bound) {
-        const int part_length = max(static_cast<int>((right_bound - left_bound) / 3), 1);
-        const auto left_middle = left_bound + part_length;
-        const auto right_middle = right_bound - part_length;
-        auto check_is_middle_pos = std::async([left_middle, &value]() {
-            return *left_middle < value;
+    void operator+=(const Stats& other) {
+        const auto& other_frequences = other.word_frequences;
+        std::for_each(other_frequences.begin(), other_frequences.end(), [this](const auto& item) {
+            word_frequences[item.first] += item.second;
         });
+    }
+};
 
-        if (*right_middle < value) {
-            left_bound = right_middle;
-        } else if (check_is_middle_pos.get()) {
-            left_bound = left_middle;
-            right_bound = right_middle;
-        } else {
-            right_bound = left_middle;
+using KeyWords = set<string, less<>>;
+
+Stats ExploreKeyWords(const KeyWords& key_words, istream& input) {
+    vector<string> lines;
+    while (true) {
+        string str;
+        std::getline(input, str);
+        if (str.empty()) {
+            break;
         }
+        lines.push_back(str);
     }
 
-    if (left_bound == range_begin && !(*left_bound < value)) {
-        return left_bound;
-    } else {
-        return right_bound;
-    }
-}
-
-void Test() {
-    size_t size = 5000;
-    size_t word_len = 10;
-    const auto wordsGenerator = [](size_t count, size_t word_len) {
-        mt19937 generator;
-        vector<string> result{count};
-        for (size_t i = 0; i < count; ++i) {
-            result[i] = GenerateWord(generator, word_len);
+    Stats stats;
+    std::for_each(lines.begin(), lines.end(), [&stats, &key_words](const string_view str) {
+        const auto words = SplitIntoWords(str);
+        for (const string_view word : words) {
+            auto ptr = key_words.find(word);
+            if (ptr != key_words.end()) {
+                ++stats.word_frequences[*ptr];
+            }
         }
-        return result;
-    };
-    auto strings = wordsGenerator(size, word_len);
-    const auto requests = wordsGenerator(size * 2, word_len);
-    std::sort(std::execution::par, strings.begin(), strings.end(), [](const string_view a, const string_view b) {
-        return lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
     });
-    vector<vector<string>::const_iterator> seq_result;
-    vector<vector<string>::const_iterator> par_result;
-    {
-        LOG_DURATION("Последовательная версия:");
-        for_each(requests.begin(), requests.end(), [&](const string_view req) {
-            auto res = LowerBound(strings.begin(), strings.end(), req);
-            if (res != strings.end()) {
-                seq_result.push_back(res);
-            }
-        });
-    }
-    {
-        LOG_DURATION("Параллельная версия:");
-        for_each(requests.begin(), requests.end(), [&](const string_view req) {
-            auto res = LowerBound(execution::par, strings.begin(), strings.end(), req);
-            if (res != strings.end()) {
-                par_result.push_back(res);
-            }
-        });
-    }
 
-    cerr << endl;
-    cerr << "Последовательная версия: " << seq_result.size() << " шт." << endl;
-    cerr << "Параллельная версия: " << par_result.size() << " шт." << endl;
+    return stats;
 }
 
 int main() {
-    const vector<string> strings = {"a", "cat", "cat", "dog", "dog", "horse"};
+    const KeyWords key_words = {"yangle", "rocks", "sucks", "all"};
 
-    const vector<string> requests = {"as", "cats", "dogs", "bear", "cat", "deer", "dog", "horses"};
+    stringstream ss;
+    ss << "this new yangle service really rocks\n";
+    ss << "It sucks when yangle isn't available\n";
+    ss << "10 reasons why yangle is the best IT company\n";
+    ss << "yangle rocks others suck\n";
+    ss << "Goondex really sucks, but yangle rocks. Use yangle\n";
 
-    // последовательные версии
-    {
-        for (const auto& request : requests) {
-            cout << "Request [" << request << "] → position " << LowerBound(strings.begin(), strings.end(), request) - strings.begin() << endl;
-        }
-        cout << endl;
+    for (const auto& [word, frequency] : ExploreKeyWords(key_words, ss).word_frequences) {
+        cout << word << " " << frequency << endl;
     }
 
-    // параллельные
-    {
-        [[maybe_unused]] int i = 0;
-        for (const auto& request : requests) {
-            // if (i++ < 3) continue;
-            cout << "Request [" << request << "] → position " << LowerBound(execution::par, strings.begin(), strings.end(), request) - strings.begin()
-                 << endl;
-        }
-    }
-    cout << endl << endl;
-    Test();
-    cout << endl << endl;
+    return 0;
 }
