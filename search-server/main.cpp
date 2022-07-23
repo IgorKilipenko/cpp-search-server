@@ -1,89 +1,99 @@
 #include <algorithm>
-#include <cstddef>
 #include <functional>
 #include <future>
 #include <iostream>
-#include <map>
-#include <set>
-#include <sstream>
-#include <string>
-#include <string_view>
+#include <iterator>
+#include <numeric>
+#include <random>
 #include <vector>
 
-#include "string_processing.h"
+#include "log_duration.h"
 
 using namespace std;
 
-struct Stats {
-    map<string, int> word_frequences;
-
-    void operator+=(const Stats& other) {
-        const auto& other_frequences = other.word_frequences;
-        std::for_each(other_frequences.begin(), other_frequences.end(), [this](const auto& item) {
-            word_frequences[item.first] += item.second;
-        });
+template <typename It>
+void PrintRange(It range_begin, It range_end) {
+    for (auto it = range_begin; it != range_end; ++it) {
+        cout << *it << " "s;
     }
-};
+    cout << endl;
+}
 
-using KeyWords = set<string, less<>>;
-
-Stats ExploreKeyWords(const KeyWords& key_words, istream& input) {
-    vector<string> lines;
-    while (true) {
-        string str;
-        std::getline(input, str);
-        if (str.empty()) {
-            break;
-        }
-        lines.push_back(str);
+// Ускорьте с помощью параллельности
+template <typename RandomIt>
+void MergeSortSync(RandomIt range_begin, RandomIt range_end) {
+    // 1. Если диапазон содержит меньше 2 элементов, выходим из функции
+    int range_length = range_end - range_begin;
+    if (range_length < 2) {
+        return;
     }
 
-    size_t thread_count = std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() : 4ul;
-    vector<std::future<Stats>> actions;
-    int actions_per_thread = max(static_cast<size_t>(lines.size() / thread_count), 1ul);
-    for (size_t i = 0; i < thread_count; ++i) {
-        auto begin = lines.begin() + (i * actions_per_thread);
-        auto end = (lines.end() - begin > actions_per_thread) ? begin + actions_per_thread : lines.end();
-        actions.push_back(std::async(
-            [&key_words](vector<string>::iterator begin, vector<string>::iterator end) {
-                Stats stats;
-                std::for_each(begin, end, [&key_words, &stats](const string_view str) {
-                    const auto words = SplitIntoWords(str);
-                    for (const string_view word : words) {
-                        auto ptr = key_words.find(word);
-                        if (ptr != key_words.end()) {
-                            ++stats.word_frequences[*ptr];
-                        }
-                    }
-                });
-                return stats;
-            },
-            begin, end));
-        if (end == lines.end()) {
-            break;
-        }
-    }
+    // 2. Создаём вектор, содержащий все элементы текущего диапазона
+    vector elements(range_begin, range_end);
+    // Тип элементов — typename iterator_traits<RandomIt>::value_type
 
-    Stats stats;
-    for (size_t i = 0; i < actions.size(); ++i) {
-        stats += actions[i].get();
-    }
+    // 3. Разбиваем вектор на две равные части
+    auto mid = elements.begin() + range_length / 2;
 
-    return stats;
+    // 4. Вызываем функцию MergeSort от каждой половины вектора
+    MergeSortSync(elements.begin(), mid);
+    MergeSortSync(mid, elements.end());
+
+    // 5. С помощью алгоритма merge сливаем отсортированные половины
+    // в исходный диапазон
+    // merge -> http://ru.cppreference.com/w/cpp/algorithm/merge
+    merge(elements.begin(), mid, mid, elements.end(), range_begin);
+}
+
+// Ускорьте с помощью параллельности
+template <typename RandomIt>
+void MergeSort(RandomIt range_begin, RandomIt range_end) {
+    vector elements(make_move_iterator(range_begin), make_move_iterator(range_end));
+    auto begin = elements.begin();
+    auto end = elements.end();
+    auto mid = begin + elements.size() / 2;
+    auto f1 = async([&]() {
+        MergeSortSync(begin, mid);
+    });
+    auto f2 = async([&]() {
+        MergeSortSync(mid, end);
+    });
+    f1.get();
+    f2.get();
+    merge(begin, mid, mid, end, range_begin);
 }
 
 int main() {
-    const KeyWords key_words = {"yangle", "rocks", "sucks", "all"};
+    mt19937 generator;
 
-    stringstream ss;
-    ss << "this new yangle service really rocks\n";
-    ss << "It sucks when yangle isn't available\n";
-    ss << "10 reasons why yangle is the best IT company\n";
-    ss << "yangle rocks others suck\n";
-    ss << "Goondex really sucks, but yangle rocks. Use yangle\n";
+    vector<int> test_vector(4'000'000);
 
-    for (const auto& [word, frequency] : ExploreKeyWords(key_words, ss).word_frequences) {
-        cout << word << " " << frequency << endl;
+    // iota             -> http://ru.cppreference.com/w/cpp/algorithm/iota
+    // Заполняет диапазон последовательно возрастающими значениями
+    iota(test_vector.begin(), test_vector.end(), 1);
+
+    // shuffle   -> https://ru.cppreference.com/w/cpp/algorithm/random_shuffle
+    // Перемешивает элементы в случайном порядке
+    // shuffle(test_vector.begin(), test_vector.end(), generator);
+    /*
+        // Выводим вектор до сортировки
+        PrintRange(test_vector.begin(), test_vector.end());
+
+        // Сортируем вектор с помощью сортировки слиянием
+        MergeSort(test_vector.begin(), test_vector.end());
+
+        // Выводим результат
+        PrintRange(test_vector.begin(), test_vector.end());
+    */
+    {
+        LOG_DURATION_STREAM("MergeSort", cerr);
+        // Проверяем, можно ли передать указатели
+        MergeSortSync(test_vector.data(), test_vector.data() + test_vector.size());
+    }
+    {
+        LOG_DURATION_STREAM("MergeSort async", cerr);
+        // Проверяем, можно ли передать указатели
+        MergeSort(test_vector.data(), test_vector.data() + test_vector.size());
     }
 
     return 0;
