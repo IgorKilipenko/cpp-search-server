@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <functional>
 #include <future>
 #include <iostream>
@@ -48,8 +49,53 @@ void MergeSortSync(RandomIt range_begin, RandomIt range_end) {
 // Ускорьте с помощью параллельности
 template <typename RandomIt>
 void MergeSort(RandomIt range_begin, RandomIt range_end) {
-    vector elements(make_move_iterator(range_begin), make_move_iterator(range_end));
-    auto begin = elements.begin();
+    size_t size = range_end - range_begin;
+    size_t thread_count = std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() : 4ul;
+    int items_per_thread = max(static_cast<size_t>(size * 2 / thread_count), 2ul);
+    thread_count = size / items_per_thread;
+    if (thread_count < 2) {
+        MergeSortSync(range_begin, range_end);
+    }
+    vector<std::future<vector<typename iterator_traits<RandomIt>::value_type>>> actions{thread_count};
+    for (size_t i = 0; i < thread_count; ++i) {
+        auto begin = range_begin + (i * items_per_thread);
+        auto end = (range_end - begin > items_per_thread) ? begin + items_per_thread : range_end;
+        
+        actions[i] = async([begin, end]() {
+            vector<typename iterator_traits<RandomIt>::value_type> items(begin, end);
+            auto mid = items.begin() + items.size() / 2;
+            vector<typename iterator_traits<RandomIt>::value_type> result(items.size());
+            MergeSortSync(items.begin(), mid);
+            MergeSortSync(mid, items.end());
+            merge(items.begin(), mid, mid, items.end(), result.begin());
+            return result;
+        });
+    }
+
+    vector<vector<typename iterator_traits<RandomIt>::value_type>> parts;
+    for (size_t i = 1; i < actions.size(); i += 2) {
+        auto part1 = actions[i - 1].get();
+        auto part2 = actions[i].get();
+        vector<typename iterator_traits<RandomIt>::value_type> result(part1.size() + part2.size());
+        merge(part1.begin(), part1.end(), part2.begin(), part2.end(), result.begin());
+        parts.push_back(result);
+    }
+
+    for (; parts.size() > 1;) {
+        auto part1 = parts.back();
+        parts.pop_back();
+        auto part2 = parts.back();
+        parts.pop_back();
+        vector<typename iterator_traits<RandomIt>::value_type> result(part1.size() + part2.size());
+        merge(part1.begin(), part1.end(), part2.begin(), part2.end(), result.begin());
+        parts.push_back(result);
+    }
+
+    if (!parts.empty()) {
+        std::move(parts.back().begin(), parts.back().end(), range_begin);
+    }
+
+    /*auto begin = elements.begin();
     auto end = elements.end();
     auto mid = begin + elements.size() / 2;
     auto f1 = async([&]() {
@@ -60,13 +106,13 @@ void MergeSort(RandomIt range_begin, RandomIt range_end) {
     });
     f1.get();
     f2.get();
-    merge(begin, mid, mid, end, range_begin);
+    merge(begin, mid, mid, end, range_begin);*/
 }
 
 int main() {
     mt19937 generator;
 
-    vector<int> test_vector(4'000'000);
+    vector<int> test_vector(7);
 
     // iota             -> http://ru.cppreference.com/w/cpp/algorithm/iota
     // Заполняет диапазон последовательно возрастающими значениями
@@ -74,7 +120,7 @@ int main() {
 
     // shuffle   -> https://ru.cppreference.com/w/cpp/algorithm/random_shuffle
     // Перемешивает элементы в случайном порядке
-    // shuffle(test_vector.begin(), test_vector.end(), generator);
+    shuffle(test_vector.begin(), test_vector.end(), generator);
     /*
         // Выводим вектор до сортировки
         PrintRange(test_vector.begin(), test_vector.end());
@@ -86,14 +132,15 @@ int main() {
         PrintRange(test_vector.begin(), test_vector.end());
     */
     {
-        LOG_DURATION_STREAM("MergeSort", cerr);
+        //LOG_DURATION_STREAM("MergeSort", cerr);
         // Проверяем, можно ли передать указатели
-        MergeSortSync(test_vector.data(), test_vector.data() + test_vector.size());
+        //MergeSortSync(test_vector.data(), test_vector.data() + test_vector.size());
     }
     {
         LOG_DURATION_STREAM("MergeSort async", cerr);
         // Проверяем, можно ли передать указатели
         MergeSort(test_vector.data(), test_vector.data() + test_vector.size());
+        PrintRange(test_vector.begin(), test_vector.end());
     }
 
     return 0;
