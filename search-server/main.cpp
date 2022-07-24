@@ -65,7 +65,7 @@ void MergeSort(RandomIt range_begin, RandomIt range_end) {
         auto begin = range_begin + (i * items_per_thread);
         auto end = (range_end - begin > items_per_thread) ? begin + items_per_thread : range_end;
         actions[i] = async([begin, end]() {
-            vector<typename iterator_traits<RandomIt>::value_type> items(make_move_iterator(begin), make_move_iterator(end));
+            vector items(make_move_iterator(begin), make_move_iterator(end));
             auto mid = items.begin() + items.size() / 2;
             vector<typename iterator_traits<RandomIt>::value_type> result(items.size());
             MergeSortSync(items.begin(), mid);
@@ -79,17 +79,49 @@ void MergeSort(RandomIt range_begin, RandomIt range_end) {
     for (size_t i = 1; i < actions.size(); ++i) {
         auto part = actions[i].get();
         vector<typename iterator_traits<RandomIt>::value_type> part_merged(part.size() + result.size());
-        merge(result.begin(), result.end(), part.begin(), part.end(), part_merged.begin());
+        merge(std::execution::par, result.begin(), result.end(), part.begin(), part.end(), part_merged.begin());
         result.swap(part_merged);
     }
 
     std::move(result.begin(), result.end(), range_begin);
 }
 
+constexpr int MAX_ASYNC_DEPTH = 2;
+
+template <typename RandomIt>
+void MergeSortYandex(RandomIt range_begin, RandomIt range_end, int depth = 0) {
+    const int range_length = range_end - range_begin;
+    if (range_length < 2) {
+        return;
+    }
+
+    vector elements(range_begin, range_end);
+
+    const auto mid = elements.begin() + range_length / 2;
+
+    auto left_task = [start = elements.begin(), mid, depth] {
+        MergeSortYandex(start, mid, depth + 1);
+    };
+    auto right_task = [mid, finish = elements.end(), depth] {
+        MergeSortYandex(mid, finish, depth + 1);
+    };
+
+    if (depth <= MAX_ASYNC_DEPTH) {
+        auto left_future = async(left_task);
+        right_task();
+        left_future.get();
+    } else {
+        left_task();
+        right_task();
+    }
+
+    merge(execution::par, elements.begin(), mid, mid, elements.end(), range_begin);
+}
+
 int main() {
     mt19937 generator;
 
-    vector<int> test_vector(4'000'000);
+    vector<int> test_vector(100'000'000);
 
     // iota             -> http://ru.cppreference.com/w/cpp/algorithm/iota
     // Заполняет диапазон последовательно возрастающими значениями
@@ -108,17 +140,23 @@ int main() {
     // Выводим результат
     // PrintRange(test_vector.begin(), test_vector.end());
 
-    {
+    /*{
         vector data(test_vector.begin(), test_vector.end());
         LOG_DURATION_STREAM("MergeSort", cerr);
         //  Проверяем, можно ли передать указатели
         MergeSortSync(data.data(), data.data() + data.size());
-    }
+    }*/
     {
         vector data(test_vector.begin(), test_vector.end());
         LOG_DURATION_STREAM("MergeSort async", cerr);
         // Проверяем, можно ли передать указатели
         MergeSort(data.data(), data.data() + data.size());
+    }
+    {
+        vector data(test_vector.begin(), test_vector.end());
+        LOG_DURATION_STREAM("MergeSort async Yandex", cerr);
+        // Проверяем, можно ли передать указатели
+        MergeSortYandex(data.data(), data.data() + data.size());
     }
 
     return 0;
