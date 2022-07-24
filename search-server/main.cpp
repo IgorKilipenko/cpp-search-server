@@ -50,23 +50,18 @@ void Test(string_view mark, Container keys, Function function) {
 }
 
 #define TEST(function) Test(#function, keys, function<remove_const_t<decltype(keys)>, Reverser>)
-/*
-template <typename ExecutionPolicy, typename ForwardRange, typename Function,
-          std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
-                               std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
-                           bool> = true>
-void ForEachStandart(ExecutionPolicy&& policy, ForwardRange& range, Function function) {
-    for_each(policy, range.begin(), range.end(), function);
-}*/
 
 template <typename ExecutionPolicy, typename ForwardRange, typename Function,
-          std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
-                               std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
-                           bool> = true>
-void ForEach([[maybe_unused]]ExecutionPolicy&& policy, ForwardRange& range, Function function) {
+          std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value, bool> = true>
+void ForEach(ExecutionPolicy&& policy, ForwardRange& range, Function function) {
+    for_each(policy, range.begin(), range.end(), function);
+}
+
+template <typename ExecutionPolicy, typename ForwardRange, typename Function,
+          std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value, bool> = true>
+void ForEach(ExecutionPolicy&& policy, ForwardRange& range, Function function) {
     using Iterator = decltype(range.begin());
-    if constexpr (is_same_v<typename iterator_traits<Iterator>::iterator_category, random_access_iterator_tag> ||
-                  is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value) {
+    if constexpr (is_same_v<typename iterator_traits<Iterator>::iterator_category, random_access_iterator_tag>) {
         for_each(policy, range.begin(), range.end(), function);
         return;
     }
