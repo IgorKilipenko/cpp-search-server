@@ -1,5 +1,8 @@
+#include <pstl/glue_execution_defs.h>
+
 #include <algorithm>
 #include <cstddef>
+#include <execution>
 #include <functional>
 #include <future>
 #include <iostream>
@@ -61,9 +64,8 @@ void MergeSort(RandomIt range_begin, RandomIt range_end) {
     for (size_t i = 0; i < thread_count; ++i) {
         auto begin = range_begin + (i * items_per_thread);
         auto end = (range_end - begin > items_per_thread) ? begin + items_per_thread : range_end;
-
         actions[i] = async([begin, end]() {
-            vector<typename iterator_traits<RandomIt>::value_type> items(begin, end);
+            vector<typename iterator_traits<RandomIt>::value_type> items(make_move_iterator(begin), make_move_iterator(end));
             auto mid = items.begin() + items.size() / 2;
             vector<typename iterator_traits<RandomIt>::value_type> result(items.size());
             MergeSortSync(items.begin(), mid);
@@ -72,6 +74,7 @@ void MergeSort(RandomIt range_begin, RandomIt range_end) {
             return result;
         });
     }
+
     vector<typename iterator_traits<RandomIt>::value_type> result = actions[0].get();
     for (size_t i = 1; i < actions.size(); ++i) {
         auto part = actions[i].get();
@@ -97,20 +100,20 @@ int main() {
     shuffle(test_vector.begin(), test_vector.end(), generator);
 
     // Выводим вектор до сортировки
-    //PrintRange(test_vector.begin(), test_vector.end());
+    // PrintRange(test_vector.begin(), test_vector.end());
 
     // Сортируем вектор с помощью сортировки слиянием
-    //MergeSort(test_vector.begin(), test_vector.end());
+    // MergeSort(test_vector.begin(), test_vector.end());
 
     // Выводим результат
-    //PrintRange(test_vector.begin(), test_vector.end());
+    // PrintRange(test_vector.begin(), test_vector.end());
 
     {
         vector data(test_vector.begin(), test_vector.end());
         LOG_DURATION_STREAM("MergeSort", cerr);
         //  Проверяем, можно ли передать указатели
         MergeSortSync(data.data(), data.data() + data.size());
-    } 
+    }
     {
         vector data(test_vector.begin(), test_vector.end());
         LOG_DURATION_STREAM("MergeSort async", cerr);
