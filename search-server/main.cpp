@@ -24,7 +24,7 @@ static string GenerateWord(mt19937& generator, int max_length) {
     return word;
 }
 
-template <template <typename...> typename Container=list, typename T = string>
+template <template <typename...> typename Container = list, typename T = string>
 static Container<T> GenerateDictionary(mt19937& generator, int word_count, int max_length) {
     vector<T> words;
     words.reserve(word_count);
@@ -49,7 +49,7 @@ void Test(string_view mark, Container keys, Function function) {
 #define TEST(function) Test(#function, keys, function<remove_const_t<decltype(keys)>, Reverser>)
 
 template <typename ForwardRange, typename Function>
-void ForEachOld(ForwardRange& range, Function function) {
+void ForEachSync(ForwardRange& range, Function function) {
     // ускорьте эту реализацию
     for_each(execution::par, range.begin(), range.end(), function);
 }
@@ -68,13 +68,11 @@ void ForEach(ForwardRange& range, Function function) {
     for (auto ptr = range.begin(); ptr != range.end(); ++ptr) {
         args.push_back(ptr);
         if (args.size() % items_per_thread == 0 || ptr == prev(range.end())) {
-            actions.push_back(
-                async([args, function](){
-                    for (auto ptr : args){
-                        function(*ptr);
-                    }
-                })
-            );
+            actions.push_back(async([args, function]() {
+                for (auto ptr : args) {
+                    function(*ptr);
+                }
+            }));
             args.clear();
         }
     }
@@ -83,14 +81,32 @@ void ForEach(ForwardRange& range, Function function) {
     }
 }
 
+template <typename ForwardRange, typename Function>
+void ForEachYandex(ForwardRange& range, Function function) {
+    static constexpr int PART_COUNT = 4;
+    const auto part_length = range.size() / PART_COUNT;
+    auto part_begin = range.begin();
+    auto part_end = next(part_begin, part_length);
+
+    vector<future<void>> futures;
+    for (int i = 0; i < PART_COUNT; ++i, part_begin = part_end, part_end = (i == PART_COUNT - 1 ? range.end() : next(part_begin, part_length))) {
+        futures.push_back(async([function, part_begin, part_end] {
+            for_each(part_begin, part_end, function);
+        }));
+    }
+}
+
 int main() {
     // для итераторов с произвольным доступом тоже должно работать
     vector<string> strings = {"cat", "dog", "code"};
 
+    ForEachSync(strings, [](string& s) {
+        reverse(s.begin(), s.end());
+    });
     ForEach(strings, [](string& s) {
         reverse(s.begin(), s.end());
     });
-    ForEachOld(strings, [](string& s) {
+    ForEachYandex(strings, [](string& s) {
         reverse(s.begin(), s.end());
     });
 
@@ -103,8 +119,9 @@ int main() {
     mt19937 generator;
     const auto keys = GenerateDictionary<list>(generator, 50'000, 5'000);
 
-    TEST(ForEachOld);
+    TEST(ForEachSync);
     TEST(ForEach);
+    TEST(ForEachYandex);
 
     return 0;
 }
