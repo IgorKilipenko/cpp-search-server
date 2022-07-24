@@ -1,163 +1,110 @@
-#include <pstl/glue_execution_defs.h>
-
 #include <algorithm>
 #include <cstddef>
 #include <execution>
-#include <functional>
 #include <future>
 #include <iostream>
-#include <iterator>
-#include <numeric>
+#include <list>
 #include <random>
+#include <string>
+#include <string_view>
+#include <type_traits>
 #include <vector>
 
 #include "log_duration.h"
 
 using namespace std;
 
-template <typename It>
-void PrintRange(It range_begin, It range_end) {
-    for (auto it = range_begin; it != range_end; ++it) {
-        cout << *it << " "s;
+static string GenerateWord(mt19937& generator, int max_length) {
+    const int length = uniform_int_distribution(1, max_length)(generator);
+    string word;
+    word.reserve(length);
+    for (int i = 0; i < length; ++i) {
+        word.push_back(uniform_int_distribution('a', 'z')(generator));
     }
-    cout << endl;
+    return word;
 }
 
-// Ускорьте с помощью параллельности
-template <typename RandomIt>
-void MergeSortSync(RandomIt range_begin, RandomIt range_end) {
-    // 1. Если диапазон содержит меньше 2 элементов, выходим из функции
-    int range_length = range_end - range_begin;
-    if (range_length < 2) {
-        return;
+template <template <typename...> typename Container=list, typename T = string>
+static Container<T> GenerateDictionary(mt19937& generator, int word_count, int max_length) {
+    vector<T> words;
+    words.reserve(word_count);
+    for (int i = 0; i < word_count; ++i) {
+        words.push_back(GenerateWord(generator, max_length));
     }
-
-    // 2. Создаём вектор, содержащий все элементы текущего диапазона
-    vector elements(range_begin, range_end);
-    // Тип элементов — typename iterator_traits<RandomIt>::value_type
-
-    // 3. Разбиваем вектор на две равные части
-    auto mid = elements.begin() + range_length / 2;
-
-    // 4. Вызываем функцию MergeSort от каждой половины вектора
-    MergeSortSync(elements.begin(), mid);
-    MergeSortSync(mid, elements.end());
-
-    // 5. С помощью алгоритма merge сливаем отсортированные половины
-    // в исходный диапазон
-    // merge -> http://ru.cppreference.com/w/cpp/algorithm/merge
-    merge(elements.begin(), mid, mid, elements.end(), range_begin);
+    return Container(words.begin(), words.end());
 }
 
-// Ускорьте с помощью параллельности
-template <typename RandomIt>
-void MergeSort(RandomIt range_begin, RandomIt range_end) {
-    size_t size = range_end - range_begin;
+struct Reverser {
+    void operator()(string& value) const {
+        reverse(value.begin(), value.end());
+    }
+};
+
+template <typename Container, typename Function>
+void Test(string_view mark, Container keys, Function function) {
+    LOG_DURATION(mark);
+    function(keys, Reverser{});
+}
+
+#define TEST(function) Test(#function, keys, function<remove_const_t<decltype(keys)>, Reverser>)
+
+template <typename ForwardRange, typename Function>
+void ForEachOld(ForwardRange& range, Function function) {
+    // ускорьте эту реализацию
+    for_each(execution::par, range.begin(), range.end(), function);
+}
+
+template <typename ForwardRange, typename Function>
+void ForEach(ForwardRange& range, Function function) {
+    using Iterator = decltype(range.begin());
+    size_t size = range.size();
     size_t thread_count = std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() : 4ul;
-    int items_per_thread = max(static_cast<size_t>(size * 2 / thread_count), 2ul);
-    items_per_thread = (size % items_per_thread > 0 && size % items_per_thread < 2) ? items_per_thread + 1 : items_per_thread;
+    int items_per_thread = max(static_cast<size_t>(size * 2 / thread_count), 1ul);
     thread_count = size % items_per_thread ? size / items_per_thread + 1 : size / items_per_thread;
-    if (thread_count < 2) {
-        MergeSortSync(range_begin, range_end);
+    vector<Iterator> args;
+    args.reserve(items_per_thread);
+    vector<future<void>> actions;
+    actions.reserve(thread_count);
+    for (auto ptr = range.begin(); ptr != range.end(); ++ptr) {
+        args.push_back(ptr);
+        if (args.size() % items_per_thread == 0 || ptr == prev(range.end())) {
+            actions.push_back(
+                async([args, function](){
+                    for (auto ptr : args){
+                        function(*ptr);
+                    }
+                })
+            );
+            args.clear();
+        }
     }
-    vector<std::future<vector<typename iterator_traits<RandomIt>::value_type>>> actions{thread_count};
-    for (size_t i = 0; i < thread_count; ++i) {
-        auto begin = range_begin + (i * items_per_thread);
-        auto end = (range_end - begin > items_per_thread) ? begin + items_per_thread : range_end;
-        actions[i] = async([begin, end]() {
-            vector items(make_move_iterator(begin), make_move_iterator(end));
-            auto mid = items.begin() + items.size() / 2;
-            vector<typename iterator_traits<RandomIt>::value_type> result(items.size());
-            MergeSortSync(items.begin(), mid);
-            MergeSortSync(mid, items.end());
-            merge(items.begin(), mid, mid, items.end(), result.begin());
-            return result;
-        });
+    for (auto& action : actions) {
+        action.get();
     }
-
-    vector<typename iterator_traits<RandomIt>::value_type> result = actions[0].get();
-    for (size_t i = 1; i < actions.size(); ++i) {
-        auto part = actions[i].get();
-        vector<typename iterator_traits<RandomIt>::value_type> part_merged(part.size() + result.size());
-        merge(std::execution::par, result.begin(), result.end(), part.begin(), part.end(), part_merged.begin());
-        result.swap(part_merged);
-    }
-
-    std::move(result.begin(), result.end(), range_begin);
-}
-
-constexpr int MAX_ASYNC_DEPTH = 2;
-
-template <typename RandomIt>
-void MergeSortYandex(RandomIt range_begin, RandomIt range_end, int depth = 0) {
-    const int range_length = range_end - range_begin;
-    if (range_length < 2) {
-        return;
-    }
-
-    vector elements(range_begin, range_end);
-
-    const auto mid = elements.begin() + range_length / 2;
-
-    auto left_task = [start = elements.begin(), mid, depth] {
-        MergeSortYandex(start, mid, depth + 1);
-    };
-    auto right_task = [mid, finish = elements.end(), depth] {
-        MergeSortYandex(mid, finish, depth + 1);
-    };
-
-    if (depth <= MAX_ASYNC_DEPTH) {
-        auto left_future = async(left_task);
-        right_task();
-        left_future.get();
-    } else {
-        left_task();
-        right_task();
-    }
-
-    merge(execution::par, elements.begin(), mid, mid, elements.end(), range_begin);
 }
 
 int main() {
+    // для итераторов с произвольным доступом тоже должно работать
+    vector<string> strings = {"cat", "dog", "code"};
+
+    ForEach(strings, [](string& s) {
+        reverse(s.begin(), s.end());
+    });
+    ForEachOld(strings, [](string& s) {
+        reverse(s.begin(), s.end());
+    });
+
+    for (string_view s : strings) {
+        cout << s << " ";
+    }
+    cout << endl;
+    // вывод: tac god edoc
+
     mt19937 generator;
+    const auto keys = GenerateDictionary<list>(generator, 50'000, 5'000);
 
-    vector<int> test_vector(100'000'000);
-
-    // iota             -> http://ru.cppreference.com/w/cpp/algorithm/iota
-    // Заполняет диапазон последовательно возрастающими значениями
-    iota(test_vector.begin(), test_vector.end(), 1);
-
-    // shuffle   -> https://ru.cppreference.com/w/cpp/algorithm/random_shuffle
-    // Перемешивает элементы в случайном порядке
-    shuffle(test_vector.begin(), test_vector.end(), generator);
-
-    // Выводим вектор до сортировки
-    // PrintRange(test_vector.begin(), test_vector.end());
-
-    // Сортируем вектор с помощью сортировки слиянием
-    // MergeSort(test_vector.begin(), test_vector.end());
-
-    // Выводим результат
-    // PrintRange(test_vector.begin(), test_vector.end());
-
-    /*{
-        vector data(test_vector.begin(), test_vector.end());
-        LOG_DURATION_STREAM("MergeSort", cerr);
-        //  Проверяем, можно ли передать указатели
-        MergeSortSync(data.data(), data.data() + data.size());
-    }*/
-    {
-        vector data(test_vector.begin(), test_vector.end());
-        LOG_DURATION_STREAM("MergeSort async", cerr);
-        // Проверяем, можно ли передать указатели
-        MergeSort(data.data(), data.data() + data.size());
-    }
-    {
-        vector data(test_vector.begin(), test_vector.end());
-        LOG_DURATION_STREAM("MergeSort async Yandex", cerr);
-        // Проверяем, можно ли передать указатели
-        MergeSortYandex(data.data(), data.data() + data.size());
-    }
+    TEST(ForEachOld);
+    TEST(ForEach);
 
     return 0;
 }
