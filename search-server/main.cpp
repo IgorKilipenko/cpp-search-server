@@ -1,3 +1,5 @@
+#include <pstl/glue_execution_defs.h>
+
 #include <algorithm>
 #include <cstddef>
 #include <execution>
@@ -13,7 +15,7 @@
 #include "log_duration.h"
 
 using namespace std;
-
+/*
 static string GenerateWord(mt19937& generator, int max_length) {
     const int length = uniform_int_distribution(1, max_length)(generator);
     string word;
@@ -33,6 +35,7 @@ static Container<T> GenerateDictionary(mt19937& generator, int word_count, int m
     }
     return Container(words.begin(), words.end());
 }
+*/
 
 struct Reverser {
     void operator()(string& value) const {
@@ -48,15 +51,24 @@ void Test(string_view mark, Container keys, Function function) {
 
 #define TEST(function) Test(#function, keys, function<remove_const_t<decltype(keys)>, Reverser>)
 
-template <typename ForwardRange, typename Function>
-void ForEachSync(ForwardRange& range, Function function) {
-    // ускорьте эту реализацию
-    for_each(execution::par, range.begin(), range.end(), function);
+template <typename ExecutionPolicy, typename ForwardRange, typename Function,
+          std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
+                               std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
+                           bool> = true>
+void ForEachStandart(ExecutionPolicy&& policy, ForwardRange& range, Function function) {
+    for_each(policy, range.begin(), range.end(), function);
 }
 
-template <typename ForwardRange, typename Function>
-void ForEach(ForwardRange& range, Function function) {
+template <typename ExecutionPolicy, typename ForwardRange, typename Function,
+          std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
+                               std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
+                           bool> = true>
+void ForEach(ExecutionPolicy&& policy, ForwardRange& range, Function function) {
     using Iterator = decltype(range.begin());
+    if constexpr (!is_same_v<typename iterator_traits<Iterator>::iterator_category, random_access_iterator_tag> ||
+                  is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value) {
+        ForEachStandart(policy, range, function);
+    }
     size_t size = range.size();
     size_t thread_count = std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() : 4ul;
     int items_per_thread = max(static_cast<size_t>(size * 2 / thread_count), 1ul);
@@ -82,46 +94,52 @@ void ForEach(ForwardRange& range, Function function) {
 }
 
 template <typename ForwardRange, typename Function>
-void ForEachYandex(ForwardRange& range, Function function) {
-    static constexpr int PART_COUNT = 4;
-    const auto part_length = range.size() / PART_COUNT;
-    auto part_begin = range.begin();
-    auto part_end = next(part_begin, part_length);
-
-    vector<future<void>> futures;
-    for (int i = 0; i < PART_COUNT; ++i, part_begin = part_end, part_end = (i == PART_COUNT - 1 ? range.end() : next(part_begin, part_length))) {
-        futures.push_back(async([function, part_begin, part_end] {
-            for_each(part_begin, part_end, function);
-        }));
-    }
+void ForEach(ForwardRange& range, Function function) {
+    ForEach(std::execution::seq, range, function);
 }
 
-int main() {
-    // для итераторов с произвольным доступом тоже должно работать
-    vector<string> strings = {"cat", "dog", "code"};
-
-    ForEachSync(strings, [](string& s) {
-        reverse(s.begin(), s.end());
-    });
-    ForEach(strings, [](string& s) {
-        reverse(s.begin(), s.end());
-    });
-    ForEachYandex(strings, [](string& s) {
-        reverse(s.begin(), s.end());
-    });
-
+template <typename Strings>
+void PrintStrings(const Strings& strings) {
     for (string_view s : strings) {
         cout << s << " ";
     }
     cout << endl;
-    // вывод: tac god edoc
+}
 
-    mt19937 generator;
-    const auto keys = GenerateDictionary<list>(generator, 50'000, 5'000);
+int main() {
+    auto reverser = [](string& s) {
+        reverse(s.begin(), s.end());
+    };
 
-    TEST(ForEachSync);
-    TEST(ForEach);
-    TEST(ForEachYandex);
+    list<string> strings_list = {"cat", "dog", "code"};
+
+    ForEach(strings_list, reverser);
+    PrintStrings(strings_list);
+    // tac god edoc
+
+    ForEach(execution::seq, strings_list, reverser);
+    PrintStrings(strings_list);
+    // cat dog code
+
+    // единственный из вызовов, где должна работать ваша версия
+    // из предыдущего задания
+    ForEach(execution::par, strings_list, reverser);
+    PrintStrings(strings_list);
+    // tac god edoc
+
+    vector<string> strings_vector = {"cat", "dog", "code"};
+
+    ForEach(strings_vector, reverser);
+    PrintStrings(strings_vector);
+    // tac god edoc
+
+    ForEach(execution::seq, strings_vector, reverser);
+    PrintStrings(strings_vector);
+    // cat dog code
+
+    ForEach(execution::par, strings_vector, reverser);
+    PrintStrings(strings_vector);
+    // tac god edoc
 
     return 0;
 }
