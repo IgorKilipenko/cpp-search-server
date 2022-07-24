@@ -72,7 +72,6 @@ void MergeSort(RandomIt range_begin, RandomIt range_end) {
             return result;
         });
     }
-    vector ppp(range_begin, range_end);
     vector<typename iterator_traits<RandomIt>::value_type> result = actions[0].get();
     for (size_t i = 1; i < actions.size(); ++i) {
         auto part = actions[i].get();
@@ -81,41 +80,7 @@ void MergeSort(RandomIt range_begin, RandomIt range_end) {
         result.swap(part_merged);
     }
 
-    /*vector<vector<typename iterator_traits<RandomIt>::value_type>> parts;
-    for (size_t i = 1; i < actions.size(); i += 2) {
-        auto part1 = actions[i - 1].get();
-        auto part2 = actions[i].get();
-        vector<typename iterator_traits<RandomIt>::value_type> result(part1.size() + part2.size());
-        merge(part1.begin(), part1.end(), part2.begin(), part2.end(), result.begin());
-        parts.push_back(result);
-    }
-
-    for (; parts.size() > 1;) {
-        auto part1 = parts.back();
-        parts.pop_back();
-        auto part2 = parts.back();
-        parts.pop_back();
-        vector<typename iterator_traits<RandomIt>::value_type> result(part1.size() + part2.size());
-        merge(part1.begin(), part1.end(), part2.begin(), part2.end(), result.begin());
-        parts.push_back(result);
-    }
-
-    if (!parts.empty()) {
-        std::move(parts.back().begin(), parts.back().end(), range_begin);
-    }*/
     std::move(result.begin(), result.end(), range_begin);
-    /*auto begin = elements.begin();
-    auto end = elements.end();
-    auto mid = begin + elements.size() / 2;
-    auto f1 = async([&]() {
-        MergeSortSync(begin, mid);
-    });
-    auto f2 = async([&]() {
-        MergeSortSync(mid, end);
-    });
-    f1.get();
-    f2.get();
-    merge(begin, mid, mid, end, range_begin);*/
 }
 
 int main() {
@@ -151,7 +116,6 @@ int main() {
         LOG_DURATION_STREAM("MergeSort async", cerr);
         // Проверяем, можно ли передать указатели
         MergeSort(data.data(), data.data() + data.size());
-        //PrintRange(test_vector.begin(), test_vector.end());
     }
 
     return 0;
