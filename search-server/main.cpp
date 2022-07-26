@@ -1,141 +1,114 @@
-#include <pstl/glue_execution_defs.h>
-
-#include <algorithm>
-#include <cstddef>
-#include <execution>
 #include <future>
-#include <iostream>
-#include <list>
-#include <random>
+#include <mutex>
+#include <numeric>
+#include <queue>
 #include <string>
-#include <string_view>
-#include <type_traits>
+#include <thread>
 #include <vector>
 
-#include "log_duration.h"
+#include "test_framework.h"
 
 using namespace std;
-/*
-static string GenerateWord(mt19937& generator, int max_length) {
-    const int length = uniform_int_distribution(1, max_length)(generator);
-    string word;
-    word.reserve(length);
-    for (int i = 0; i < length; ++i) {
-        word.push_back(uniform_int_distribution('a', 'z')(generator));
-    }
-    return word;
-}
 
-template <template <typename...> typename Container = list, typename T = string>
-static Container<T> GenerateDictionary(mt19937& generator, int word_count, int max_length) {
-    vector<T> words;
-    words.reserve(word_count);
-    for (int i = 0; i < word_count; ++i) {
-        words.push_back(GenerateWord(generator, max_length));
-    }
-    return Container(words.begin(), words.end());
-}
-*/
+// Реализуйте шаблон Synchronized<T>.
+// Метод GetAccess должен возвращать структуру, в которой есть поле T& ref_to_value.
+template <typename T>
+class Synchronized {
+   public:
+    explicit Synchronized(T initial = T()) : value_{initial} {}
 
-struct Reverser {
-    void operator()(string& value) const {
-        reverse(value.begin(), value.end());
+    class Access {
+       public:
+        T& ref_to_value;
+
+        Access(T& ref_to_value, std::mutex& mutex) : ref_to_value{ref_to_value}, mutex_{mutex} {
+            mutex_.lock();
+        }
+        ~Access() {
+            mutex_.unlock();
+        }
+
+       private:
+        std::mutex& mutex_;
+    };
+
+    Access GetAccess() {
+        return {value_, mutex_};
     }
+
+   private:
+    T value_;
+    std::mutex mutex_;
 };
 
-template <typename Container, typename Function>
-void Test(string_view mark, Container keys, Function function) {
-    LOG_DURATION(mark);
-    function(keys, Reverser{});
+void TestConcurrentUpdate() {
+    Synchronized<string> common_string;
+
+    const size_t add_count = 50000;
+    auto updater = [&common_string /*, add_count*/] {
+        for (size_t i = 0; i < add_count; ++i) {
+            auto access = common_string.GetAccess();
+            access.ref_to_value += 'a';
+        }
+    };
+
+    auto f1 = async(updater);
+    auto f2 = async(updater);
+
+    f1.get();
+    f2.get();
+
+    ASSERT_EQUAL(common_string.GetAccess().ref_to_value.size(), 2 * add_count);
 }
 
-#define TEST(function) Test(#function, keys, function<remove_const_t<decltype(keys)>, Reverser>)
+vector<int> Consume(Synchronized<deque<int>>& common_queue) {
+    vector<int> got;
 
-template <typename ExecutionPolicy, typename ForwardRange, typename Function,
-          std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value, bool> = true>
-void ForEach(ExecutionPolicy&& policy, ForwardRange& range, Function function) {
-    for_each(policy, range.begin(), range.end(), function);
-}
+    for (;;) {
+        deque<int> q;
 
-template <typename ExecutionPolicy, typename ForwardRange, typename Function,
-          std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value, bool> = true>
-void ForEach(ExecutionPolicy&& policy, ForwardRange& range, Function function) {
-    using Iterator = decltype(range.begin());
-    if constexpr (is_same_v<typename iterator_traits<Iterator>::iterator_category, random_access_iterator_tag>) {
-        for_each(policy, range.begin(), range.end(), function);
-        return;
-    }
-    size_t size = range.size();
-    size_t thread_count = std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() : 4ul;
-    int items_per_thread = max(static_cast<size_t>(size * 2 / thread_count), 1ul);
-    thread_count = size % items_per_thread ? size / items_per_thread + 1 : size / items_per_thread;
-    vector<Iterator> args;
-    args.reserve(items_per_thread);
-    vector<future<void>> actions;
-    actions.reserve(thread_count);
-    for (auto ptr = range.begin(); ptr != range.end(); ++ptr) {
-        args.push_back(ptr);
-        if (args.size() % items_per_thread == 0 || ptr == prev(range.end())) {
-            actions.push_back(async([args, function]() {
-                for (auto ptr : args) {
-                    function(*ptr);
-                }
-            }));
-            args.clear();
+        {
+            // Мы специально заключили эти две строчки в операторные скобки, чтобы
+            // уменьшить размер критической секции. Поток-потребитель захватывает
+            // мьютекс, перемещает всё содержимое общей очереди в свою
+            // локальную переменную и отпускает мьютекс. После этого он обрабатывает
+            // объекты в очереди за пределами критической секции, позволяя
+            // потоку-производителю параллельно помещать в очередь новые объекты.
+            //
+            // Размер критической секции существенно влияет на быстродействие
+            // многопоточных программ.
+            auto access = common_queue.GetAccess();
+            q = move(access.ref_to_value);
+        }
+
+        for (int item : q) {
+            if (item > 0) {
+                got.push_back(item);
+            } else {
+                return got;
+            }
         }
     }
-    for (auto& action : actions) {
-        action.get();
-    }
 }
 
-template <typename ForwardRange, typename Function>
-void ForEach(ForwardRange& range, Function function) {
-    ForEach(std::execution::seq, range, function);
-}
+void TestProducerConsumer() {
+    Synchronized<deque<int>> common_queue;
 
-template <typename Strings>
-void PrintStrings(const Strings& strings) {
-    for (string_view s : strings) {
-        cout << s << " ";
+    auto consumer = async(Consume, ref(common_queue));
+
+    const size_t item_count = 100000;
+    for (size_t i = 1; i <= item_count; ++i) {
+        common_queue.GetAccess().ref_to_value.push_back(i);
     }
-    cout << endl;
+    common_queue.GetAccess().ref_to_value.push_back(-1);
+
+    vector<int> expected(item_count);
+    iota(begin(expected), end(expected), 1);
+    ASSERT_EQUAL(consumer.get(), expected);
 }
 
 int main() {
-    auto reverser = [](string& s) {
-        reverse(s.begin(), s.end());
-    };
-
-    list<string> strings_list = {"cat", "dog", "code"};
-
-    ForEach(strings_list, reverser);
-    PrintStrings(strings_list);
-    // tac god edoc
-
-    ForEach(execution::seq, strings_list, reverser);
-    PrintStrings(strings_list);
-    // cat dog code
-
-    // единственный из вызовов, где должна работать ваша версия
-    // из предыдущего задания
-    ForEach(execution::par, strings_list, reverser);
-    PrintStrings(strings_list);
-    // tac god edoc
-
-    vector<string> strings_vector = {"cat", "dog", "code"};
-
-    ForEach(strings_vector, reverser);
-    PrintStrings(strings_vector);
-    // tac god edoc
-
-    ForEach(execution::seq, strings_vector, reverser);
-    PrintStrings(strings_vector);
-    // cat dog code
-
-    ForEach(execution::par, strings_vector, reverser);
-    PrintStrings(strings_vector);
-    // tac god edoc
-
-    return 0;
+    TestRunner tr;
+    RUN_TEST(tr, TestConcurrentUpdate);
+    RUN_TEST(tr, TestProducerConsumer);
 }
