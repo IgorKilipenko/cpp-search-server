@@ -109,21 +109,21 @@ void TestParMatchDocument() {
     {
         const auto [words, status] = search_server.MatchDocument(query, 1);
         cout << words.size() << " words for document 1"s << endl;
-        ASSERT_HINT(words.size() == 1, "Expected 1 words for document 1");
+        ASSERT(words.size() == 1);
         // 1 words for document 1
     }
 
     {
         const auto [words, status] = search_server.MatchDocument(execution::seq, query, 2);
         cout << words.size() << " words for document 2"s << endl;
-        ASSERT_HINT(words.size() == 2, "Expected 2 words for document 2");
+        ASSERT(words.size() == 2);
         // 2 words for document 2
     }
 
     {
         const auto [words, status] = search_server.MatchDocument(execution::par, query, 3);
         cout << words.size() << " words for document 3"s << endl;
-        ASSERT_HINT(words.size() == 0, "Expected 0 words for document 3");
+        ASSERT(words.size() == 0);
         // 0 words for document 3
     }
 }
