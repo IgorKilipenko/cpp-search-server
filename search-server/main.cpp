@@ -20,43 +20,39 @@ template <typename Key, typename Value>
 class ConcurrentMap {
    public:
     static_assert(std::is_integral_v<Key>, "ConcurrentMap supports only integer keys");
-
+    struct Bucket {
+        std::mutex mutex;
+        std::map<Key, Value> map;
+        Value& operator[](const Key& key) {
+            return map[key];
+        }
+    };
     class Access {
-       public:
-        Value& ref_to_value;
-        Access(Value& ref_to_value, std::mutex& mutex) : ref_to_value(ref_to_value), guard_{mutex} {}
-
        private:
         std::lock_guard<std::mutex> guard_;
+
+       public:
+        Value& ref_to_value;
+        Access(const Key& key, Bucket& bucket) : guard_{bucket.mutex}, ref_to_value{bucket[key]} {}
     };
 
-    explicit ConcurrentMap(size_t bucket_count) : mutex_set_{bucket_count}, buckets_{bucket_count} {}
+    explicit ConcurrentMap(size_t bucket_count) : buckets_{bucket_count} {}
 
     Access operator[](const Key& key) {
-        std::lock_guard<std::mutex> guard(mutex_);
-        size_t chank_idx = static_cast<size_t>(key) % buckets_.size();
-        return Access{buckets_[chank_idx][key], mutex_set_[chank_idx]};
+        return Access{key, buckets_[static_cast<size_t>(key) % buckets_.size()]};
     }
 
     std::map<Key, Value> BuildOrdinaryMap() {
         std::map<Key, Value> result;
-        std::mutex mutex;
-        std::for_each(std::execution::seq, buckets_.begin(), buckets_.end(), [&result, &mutex](const auto& container) {
-            for (auto& [k, v] : container) {
-                auto value = v;
-                {
-                    std::lock_guard<std::mutex> guard(mutex);
-                    result[k] = std::move(value);
-                }
-            }
-        });
+        for (auto& [mutex, container] : buckets_) {
+            std::lock_guard guard(mutex);
+            result.insert(container.begin(), container.end());
+        }
         return result;
     }
 
    private:
-    std::vector<std::mutex> mutex_set_;
-    std::vector<std::map<Key, Value>> buckets_;
-    std::mutex mutex_;
+    std::vector<Bucket> buckets_;
 };
 
 using namespace std;
