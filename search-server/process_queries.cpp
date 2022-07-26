@@ -1,5 +1,4 @@
 #include "process_queries.h"
-#include <pstl/glue_execution_defs.h>
 
 #include <execution>
 #include <list>

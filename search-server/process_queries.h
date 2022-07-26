@@ -29,7 +29,8 @@ std::vector<std::vector<Document>> ProcessQueries(ExecutionPolicy&& policy, cons
     return documents_lists;
 }
 
-template <typename ExecutionPolicy=std::execution::parallel_policy, template<typename, typename...> typename Container = std::list, typename TDoc = Document> 
+template <typename ExecutionPolicy = std::execution::parallel_policy, template <typename, typename...> typename Container = std::list,
+          typename TDoc = Document>
 Container<TDoc> ProcessQueriesJoined(ExecutionPolicy&& policy, const SearchServer& search_server, const std::vector<std::string>& queries) {
     using Documents = Container<TDoc>;
     if (queries.empty()) {
@@ -41,7 +42,6 @@ Container<TDoc> ProcessQueriesJoined(ExecutionPolicy&& policy, const SearchServe
             for (auto& doc : found_docs) {
                 docs.push_back(std::move(doc));
             }
-            // docs.splice(docs.end(), std::move(found_docs));
             return docs;
         },
         [&search_server](const std::string& query) {
