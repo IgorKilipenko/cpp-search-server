@@ -1,5 +1,9 @@
 #include <algorithm>
+#include <atomic>
+#include <execution>
 #include <iostream>
+#include <map>
+#include <mutex>
 #include <numeric>
 #include <random>
 #include <string>
@@ -20,7 +24,7 @@ static string GenerateWord(mt19937& generator, int max_length) {
     return word;
 }
 
-template <template <typename, typename...> typename Container=vector, typename T = string>
+template <template <typename, typename...> typename Container = vector, typename T = string>
 static Container<T> GenerateDictionary(mt19937& generator, int word_count, int max_length) {
     vector<T> words;
     words.reserve(word_count);
@@ -37,18 +41,35 @@ void Test(string_view mark, const Strings& strings, Predicate predicate, Functio
     cout << result.size() << " " << result[5].substr(0, 5) << endl;
 }
 
-#define TEST(function) \
-    Test(#function, strings, predicate, function<vector<string>, decltype(predicate)>)
+#define TEST(function) Test(#function, strings, predicate, function<vector<string>, decltype(predicate)>)
 
 template <typename Container, typename Predicate>
-vector<typename Container::value_type> CopyIfUnordered(const Container& container,
-                                                       Predicate predicate) {
+vector<typename Container::value_type> CopyIfUnorderedSync(const Container& container, Predicate predicate) {
     vector<typename Container::value_type> result;
     for (const auto& value : container) {
         if (predicate(value)) {
             result.push_back(value);
         }
     }
+    return result;
+}
+
+template <typename Container, typename Predicate>
+vector<typename Container::value_type> CopyIfUnordered(const Container& container, Predicate predicate) {
+    vector<typename Container::value_type> result;
+    std::mutex mutex;
+    //std::atomic_int i = 0;
+    std::for_each(std::execution::par, container.begin(), container.end(), [&result, predicate, &mutex](const auto& value) {
+        if (predicate(value)) {
+            auto new_value = value;
+            {
+                mutex.lock();
+                result.push_back(move(new_value));
+                mutex.unlock();
+            }
+            
+        }
+    });
     return result;
 }
 
@@ -72,5 +93,6 @@ int main() {
         return count(s.begin(), s.end(), 'a') < 100;
     };
 
+    TEST(CopyIfUnorderedSync);
     TEST(CopyIfUnordered);
 }
