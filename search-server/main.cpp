@@ -71,23 +71,18 @@ vector<typename Container::value_type> CopyIfUnordered(const Container& containe
 
 template <typename Container, typename Predicate>
 vector<typename Container::value_type> CopyIfUnorderedYandex(const Container& container, Predicate predicate) {
-    vector<typename Container::value_type> result;
-    result.reserve(container.size());
-    mutex result_mutex;
+    vector<typename Container::value_type> result(container.size());
+    atomic_int size = 0;
     for_each(
             execution::par,
             container.begin(), container.end(),
-            [predicate, &result_mutex, &result](const auto& value) {
+            [predicate, &size, &result](const auto& value) {
                 if (predicate(value)) {
-                    typename Container::value_type* destination;
-                    {
-                        lock_guard guard(result_mutex);
-                        destination = &result.emplace_back();
-                    }
-                    *destination = value;
+                    result[size++] = value;
                 }
             }
     );
+    result.resize(size);
     return result;
 }
 
@@ -106,12 +101,13 @@ int main() {
 
     mt19937 generator;
 
-    const auto strings = GenerateDictionary<vector>(generator, 50'000, 3000);
+    const auto strings = GenerateDictionary<vector>(generator, 500'000, 3000);
     auto predicate = [](const string& s) {
         return count(s.begin(), s.end(), 'a') < 100;
     };
 
-    //TEST(CopyIfUnorderedSync);
+    
+    TEST(CopyIfUnorderedYandex);
     TEST(CopyIfUnordered);
-    //TEST(CopyIfUnorderedYandex);
+    TEST(CopyIfUnorderedSync);
 }
