@@ -35,6 +35,8 @@ void TestParRemoveDocument(string_view mark, SearchServer search_server, Executi
 
 void TestParMatchDocument();
 
+void TestFindTopDocuments();
+
 template <typename ExecutionPolicy>
 void TestParMatchDocument(string_view mark, SearchServer search_server, const string& query, ExecutionPolicy&& policy) {
     LOG_DURATION(mark);
@@ -60,3 +62,17 @@ inline void TestToString() {
     assert(str.substr(5) == view);
     cerr << "Done." << endl << endl;
 }
+
+template <typename ExecutionPolicy>
+void TestParFindTopDocuments(string_view mark, const SearchServer& search_server, const vector<string>& queries, ExecutionPolicy&& policy) {
+    LOG_DURATION(mark);
+    double total_relevance = 0;
+    for (const string_view query : queries) {
+        for (const auto& document : search_server.FindTopDocuments(policy, query)) {
+            total_relevance += document.relevance;
+        }
+    }
+    cout << total_relevance << endl;
+}
+
+#define TEST_FIND_TOP_DOCUMENTS(policy) TestParFindTopDocuments(#policy, search_server, queries, execution::policy)

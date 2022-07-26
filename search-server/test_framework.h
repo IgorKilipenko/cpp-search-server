@@ -198,6 +198,13 @@ class TestRunner {
         Assert(static_cast<bool>(x), __assert_private_os.str());                    \
     }
 
+#define ASSERT_HINT(expr, hint)                                                                               \
+    {                                                                                                         \
+        std::ostringstream __assert_private_os;                                                               \
+        __assert_private_os << #expr << " is false, " << FILE_NAME << ":" << __LINE__ << " HINT: " << (hint); \
+        Assert(static_cast<bool>(expr), __assert_private_os.str());                                           \
+    }
+
 /**
  * Макрос RUN_TEST служит для удобного запуска тест-функции func.
  * Параметр tr задаёт имя переменной типа TestRunner.
