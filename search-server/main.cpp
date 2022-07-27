@@ -1,44 +1,76 @@
-#include <algorithm>
-#include <cmath>
+#include <execution>
 #include <iostream>
+#include <random>
 #include <string>
+#include <vector>
 
-#include "document.h"
-#include "request_queue.h"
+#include "log_duration.h"
+#include "process_queries.h"
 #include "search_server.h"
+#include "test_example_functions.h"
 
 using namespace std;
 
 int main() {
-    SearchServer search_server("and with"s);
+    {
+        TestParFindTopDocuments();
 
-    AddDocument(search_server, 1, "funny pet and nasty rat"s, DocumentStatus::ACTUAL, {7, 2, 7});
-    AddDocument(search_server, 2, "funny pet with curly hair"s, DocumentStatus::ACTUAL, {1, 2});
+        mt19937 generator;
 
-    // дубликат документа 2, будет удалён
-    AddDocument(search_server, 3, "funny pet with curly hair"s, DocumentStatus::ACTUAL, {1, 2});
+        const auto dictionary = GenerateDictionary(generator, 1000, 10);
+        const auto documents = GenerateQueries(generator, dictionary, 10'000, 70);
 
-    // отличие только в стоп-словах, считаем дубликатом
-    AddDocument(search_server, 4, "funny pet and curly hair"s, DocumentStatus::ACTUAL, {1, 2});
+        SearchServer search_server(dictionary[0]);
+        for (size_t i = 0; i < documents.size(); ++i) {
+            search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
+        }
 
-    // множество слов такое же, считаем дубликатом документа 1
-    AddDocument(search_server, 5, "funny funny pet and nasty nasty rat"s, DocumentStatus::ACTUAL, {1, 2});
+        const auto queries = GenerateQueries(generator, dictionary, 100, 70, 0.1);
 
-    // добавились новые слова, дубликатом не является
-    AddDocument(search_server, 6, "funny pet and not very nasty rat"s, DocumentStatus::ACTUAL, {1, 2});
+        TEST_FIND_TOP_DOCUMENTS(seq);
+        TEST_FIND_TOP_DOCUMENTS(par);
+    }
+    {
+        TestParMatchDocument();
 
-    // множество слов такое же, как в id 6, несмотря на другой порядок, считаем дубликатом
-    AddDocument(search_server, 7, "very nasty rat and not very funny pet"s, DocumentStatus::ACTUAL, {1, 2});
+        mt19937 generator;
 
-    // есть не все слова, не является дубликатом
-    AddDocument(search_server, 8, "pet with rat and rat and rat"s, DocumentStatus::ACTUAL, {1, 2});
+        const auto dictionary = GenerateDictionary(generator, 1000, 10);
+        const auto documents = GenerateQueries(generator, dictionary, 10'000, 70);
 
-    // слова из разных документов, не является дубликатом
-    AddDocument(search_server, 9, "nasty rat with curly hair"s, DocumentStatus::ACTUAL, {1, 2});
-    
-    cout << "Before duplicates removed: "s << search_server.GetDocumentCount() << endl;
-    RemoveDuplicates(search_server);
-    cout << "After duplicates removed: "s << search_server.GetDocumentCount() << endl;
-    
-    return 0;
+        const string query = GenerateQuery(generator, dictionary, 500, 0.1);
+
+        SearchServer search_server(dictionary[0]);
+        for (size_t i = 0; i < documents.size(); ++i) {
+            search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
+        }
+
+        TEST_MATCH_DOCUMENT(seq);
+        TEST_MATCH_DOCUMENT(par);
+    }
+    {
+        TestParRemoveDocument();
+
+        mt19937 generator;
+
+        const auto dictionary = GenerateDictionary(generator, 10'000, 25);
+        const auto documents = GenerateQueries(generator, dictionary, 10'000, 100);
+
+        {
+            SearchServer search_server(dictionary[0]);
+            for (size_t i = 0; i < documents.size(); ++i) {
+                search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
+            }
+
+            TEST_REMOVE_DOCUMENT(seq);
+        }
+        {
+            SearchServer search_server(dictionary[0]);
+            for (size_t i = 0; i < documents.size(); ++i) {
+                search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
+            }
+
+            TEST_REMOVE_DOCUMENT(par);
+        }
+    }
 }

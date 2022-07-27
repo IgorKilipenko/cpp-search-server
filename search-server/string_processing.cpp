@@ -1,28 +1,34 @@
 #include "string_processing.h"
 
+#include <algorithm>
+#include <cassert>
+#include <cstddef>
+#include <execution>
+#include <numeric>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace std;
 
-vector<string> SplitIntoWords(const string& text) {
-    vector<string> words;
-    string word;
-    for (const char c : text) {
-        if (c == ' ') {
-            if (!word.empty()) {
-                words.push_back(word);
-                word.clear();
-            }
-        } else {
-            word += c;
-        }
+vector<string_view> SplitIntoWords(string_view str) {
+    if (str.empty()) {
+        return {};
     }
-    if (!word.empty()) {
-        words.push_back(word);
-    }
+    vector<string_view> result;
+    str.remove_prefix(min(str.find_first_not_of(' '), str.size()));
 
-    return words;
+    do {
+        int64_t space = str.find(' ', 0);
+        result.push_back(space == static_cast<int64_t>(str.npos) ? str.substr(0) : str.substr(0, space));
+        str.remove_prefix(min(str.find_first_not_of(' ', space), str.size()));
+    } while (!str.empty());
+
+    return result;
+}
+
+vector<string_view> SplitIntoWords(const string& str) {
+    return SplitIntoWords(static_cast<string_view>(str));
 }
 
 size_t BuildHash(const string& str) {
@@ -47,4 +53,8 @@ string JoinWithExclude(const set<string>& strings, const set<string>& exclude_wo
         }
     }
     return result;
+}
+
+size_t CountWords(string_view str) {
+    return CountWords(std::execution::seq, str);
 }
