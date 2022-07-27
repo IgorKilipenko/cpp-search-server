@@ -2,8 +2,8 @@
 #include <cstddef>
 #include <execution>
 #include <map>
-#include <set>
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -18,6 +18,9 @@ class ConcurrentMap {
         std::map<Key, Value> map;
         Value& operator[](const Key& key) {
             return map[key];
+        }
+        size_t Size() const {
+            return map.size();
         }
     };
     class Access {
@@ -36,6 +39,9 @@ class ConcurrentMap {
     }
 
     std::map<Key, Value> BuildOrdinaryMap() {
+        if (buckets_.empty()) {
+            return {};
+        }
         std::map<Key, Value> result;
         for (auto& [mutex, container] : buckets_) {
             std::lock_guard<std::mutex> guard(mutex);
@@ -44,17 +50,28 @@ class ConcurrentMap {
         return result;
     }
 
-    void Erase(const Key &key)
-    {
-        auto &bucket = buckets_[static_cast<size_t>(key) % buckets_.size()];
+    std::vector<std::pair<Key, Value>> BuildOrdinaryVector() {
+        if (buckets_.empty()) {
+            return {};
+        }
+        std::vector<std::pair<Key, Value>> result;
+        result.reserve(buckets_.size() * buckets_.front().Size());
+        for (auto& [mutex, container] : buckets_) {
+            std::lock_guard<std::mutex> guard(mutex);
+            result.insert(result.end(), container.begin(), container.end());
+        }
+        return result;
+    }
+
+    void Erase(const Key& key) {
+        auto& bucket = buckets_[static_cast<size_t>(key) % buckets_.size()];
         std::lock_guard<std::mutex> lock(bucket.mutex);
         bucket.map.erase(key);
     }
 
-    size_t Size() const { 
+    size_t Size() const {
         std::atomic_size_t result = 0;
         for (auto& [_, container] : buckets_) {
-            //std::lock_guard<std::mutex> guard(mutex);
             result += container.size();
         }
         return result;
@@ -62,6 +79,7 @@ class ConcurrentMap {
 
    private:
     std::vector<Bucket> buckets_;
+    //! std::mutex mutex_;
 };
 
 template <typename Key>
@@ -71,6 +89,14 @@ class ConcurrentSet {
     struct Bucket {
         std::mutex mutex;
         std::set<Key> set;
+        template <typename ValueType>
+        Key& operator[](ValueType&& key) {
+            auto result = set.insert(key);
+            return const_cast<Key&>(*result.first);
+        }
+        size_t Size() const {
+            return set.size();
+        }
     };
     class Access {
        private:
@@ -87,7 +113,10 @@ class ConcurrentSet {
         return Access{key, buckets_[static_cast<size_t>(key) % buckets_.size()]};
     }
 
-    std::set<Key> BuildOrdinaryMap() {
+    std::set<Key> BuildOrdinarySet() {
+        if (buckets_.empty()) {
+            return {};
+        }
         std::set<Key> result;
         for (auto& [mutex, container] : buckets_) {
             std::lock_guard guard(mutex);
@@ -96,11 +125,31 @@ class ConcurrentSet {
         return result;
     }
 
-    void Erase(const Key &key)
-    {
-        auto &bucket = buckets_[static_cast<size_t>(key) % buckets_.size()];
+    std::vector<Key> BuildOrdinaryVector() {
+        if (buckets_.empty()) {
+            return {};
+        }
+        std::vector<Key> result;
+        result.reserve(buckets_.size() * buckets_.front().Size());
+        for (auto& [mutex, container] : buckets_) {
+            std::lock_guard guard(mutex);
+            result.insert(result.end(), container.begin(), container.end());
+        }
+        return result;
+    }
+
+    void Erase(const Key& key) {
+        auto& bucket = buckets_[static_cast<size_t>(key) % buckets_.size()];
         std::lock_guard<std::mutex> lock(bucket.mutex);
         bucket.set.erase(key);
+    }
+
+    size_t Size() const {
+        std::atomic_size_t result = 0;
+        for (auto& [_, container] : buckets_) {
+            result += container.size();
+        }
+        return result;
     }
 
    private:
