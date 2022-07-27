@@ -13,7 +13,7 @@ using namespace std;
 
 int main() {
     {
-        TestFindTopDocuments();
+        TestParFindTopDocuments();
 
         mt19937 generator;
 
@@ -25,7 +25,7 @@ int main() {
             search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
         }
 
-        const auto queries = GenerateQueries(generator, dictionary, 100, 70);
+        const auto queries = GenerateQueries(generator, dictionary, 100, 70, 0.1);
 
         TEST_FIND_TOP_DOCUMENTS(seq);
         TEST_FIND_TOP_DOCUMENTS(par);

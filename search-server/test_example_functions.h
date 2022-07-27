@@ -17,7 +17,7 @@ vector<string> GenerateDictionary(mt19937& generator, int word_count, int max_le
 
 string GenerateQuery(mt19937& generator, const vector<string>& dictionary, int word_count, double minus_prob = 0);
 
-vector<string> GenerateQueries(mt19937& generator, const vector<string>& dictionary, int query_count, int max_word_count);
+vector<string> GenerateQueries(mt19937& generator, const vector<string>& dictionary, int query_count, int max_word_count, double minus_prob = 0);
 
 void TestParRemoveDocument();
 
@@ -35,7 +35,7 @@ void TestParRemoveDocument(string_view mark, SearchServer search_server, Executi
 
 void TestParMatchDocument();
 
-void TestFindTopDocuments();
+void TestParFindTopDocuments();
 
 template <typename ExecutionPolicy>
 void TestParMatchDocument(string_view mark, SearchServer search_server, const string& query, ExecutionPolicy&& policy) {

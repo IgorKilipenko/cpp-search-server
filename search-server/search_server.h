@@ -246,7 +246,7 @@ template <typename ExecutionPolicy, typename T,
                                std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
                            bool>>
 vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query, T predicate) const {
-    auto query = ParseQuery(raw_query, true);
+    auto query = ParseQuery(raw_query, false);
     if (query.plus_words.empty()) {
         return {};
     }
@@ -294,7 +294,7 @@ vector<Document> SearchServer::FindAllDocuments(ExecutionPolicy&& policy, const 
     std::set<int> exclude_doc_ids = cm_exclude_doc_ids.BuildOrdinarySet();
     ConcurrentMap<int, double> cm_document_to_relevance(default_bucket_size * (query.plus_words.empty() ? 0ul : 1ul));
     std::for_each(policy, query.plus_words.begin(), query.plus_words.end(),
-                  [this, &cm_document_to_relevance, predicate, exclude_doc_ids](const string_view word) {
+                  [this, &cm_document_to_relevance, predicate, &exclude_doc_ids](const string_view word) {
                       auto ptr = word_to_document_freqs_.find(word);
                       if (ptr == word_to_document_freqs_.end()) {
                           return;
@@ -304,7 +304,7 @@ vector<Document> SearchServer::FindAllDocuments(ExecutionPolicy&& policy, const 
 
                       const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
                       for (const auto& [document_id, term_freq] : words) {
-                          if (!exclude_doc_ids.empty() && exclude_doc_ids.count(document_id)) {
+                          if (exclude_doc_ids.count(document_id)) {
                               continue;
                           }
                           const auto& document_data = documents_.at(document_id);
@@ -313,7 +313,7 @@ vector<Document> SearchServer::FindAllDocuments(ExecutionPolicy&& policy, const 
                           }
                       }
                   });
-
+    
     const auto docs = cm_document_to_relevance.BuildOrdinaryVector();
     std::vector<Document> matched_documents(docs.size());
     std::transform(policy, std::make_move_iterator(docs.begin()), std::make_move_iterator(docs.end()), matched_documents.begin(),

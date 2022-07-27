@@ -48,11 +48,11 @@ string GenerateQuery(mt19937& generator, const vector<string>& dictionary, int w
     return query;
 }
 
-vector<string> GenerateQueries(mt19937& generator, const vector<string>& dictionary, int query_count, int max_word_count) {
+vector<string> GenerateQueries(mt19937& generator, const vector<string>& dictionary, int query_count, int max_word_count, double minus_prob) {
     vector<string> queries;
     queries.reserve(query_count);
     for (int i = 0; i < query_count; ++i) {
-        queries.push_back(GenerateQuery(generator, dictionary, max_word_count));
+        queries.push_back(GenerateQuery(generator, dictionary, max_word_count, minus_prob));
     }
     return queries;
 }
@@ -128,7 +128,7 @@ void TestParMatchDocument() {
     }
 }
 
-void TestFindTopDocuments() {
+void TestParFindTopDocuments() {
     SearchServer search_server("and with"s);
 
     int id = 0;
