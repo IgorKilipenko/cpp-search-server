@@ -79,7 +79,6 @@ class ConcurrentMap {
 
    private:
     std::vector<Bucket> buckets_;
-    //! std::mutex mutex_;
 };
 
 template <typename Key>

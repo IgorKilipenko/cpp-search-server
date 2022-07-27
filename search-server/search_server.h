@@ -375,10 +375,7 @@ tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(Execution
             matched_words.push_back(plus_word);
         }
     });
-    //! EDIT
-    if (!std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value) {
-        std::this_thread::sleep_for(std::chrono::microseconds(270));
-    }
+
     return result;
 }
 

@@ -52,9 +52,6 @@ vector<Document> SearchServer::FindTopDocuments(const string_view raw_query) con
 }
 
 vector<Document> SearchServer::FindTopDocuments(const string_view raw_query, DocumentStatus status) const {
-    /*return FindTopDocuments(raw_query, [status](int id, DocumentStatus doc_status, [[maybe_unused]] int rating) -> bool {
-        return (doc_status == status);
-    });*/
     return FindTopDocuments(std::execution::seq, raw_query, status);
 }
 
