@@ -274,7 +274,10 @@ vector<Document> SearchServer::FindAllDocuments(ExecutionPolicy&& policy, const 
         return {};
     }
 
-    ConcurrentSet<int> cm_exclude_doc_ids{word_to_document_freqs_.size() * (query.minus_words.empty() ? 0ul : 1ul)};
+    constexpr bool is_seq = !std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value;
+    size_t default_bucket_size = is_seq ? 1ul : word_to_document_freqs_.size();
+
+    ConcurrentSet<int> cm_exclude_doc_ids{default_bucket_size * (query.minus_words.empty() ? 0ul : 1ul)};
     std::for_each(policy, query.minus_words.begin(), query.minus_words.end(), [this, &cm_exclude_doc_ids](const string_view minus_word) {
         auto ptr = word_to_document_freqs_.find(minus_word);
         if (ptr == word_to_document_freqs_.end()) {
@@ -289,9 +292,9 @@ vector<Document> SearchServer::FindAllDocuments(ExecutionPolicy&& policy, const 
     });
 
     std::set<int> exclude_doc_ids = cm_exclude_doc_ids.BuildOrdinarySet();
-    ConcurrentMap<int, double> document_to_relevance(word_to_document_freqs_.size());
+    ConcurrentMap<int, double> cm_document_to_relevance(default_bucket_size * (query.plus_words.empty() ? 0ul : 1ul));
     std::for_each(policy, query.plus_words.begin(), query.plus_words.end(),
-                  [this, &document_to_relevance, predicate, exclude_doc_ids](const string_view word) {
+                  [this, &cm_document_to_relevance, predicate, exclude_doc_ids](const string_view word) {
                       auto ptr = word_to_document_freqs_.find(word);
                       if (ptr == word_to_document_freqs_.end()) {
                           return;
@@ -306,12 +309,12 @@ vector<Document> SearchServer::FindAllDocuments(ExecutionPolicy&& policy, const 
                           }
                           const auto& document_data = documents_.at(document_id);
                           if (predicate(document_id, document_data.status, document_data.rating)) {
-                              document_to_relevance[document_id].ref_to_value += term_freq * inverse_document_freq;
+                              cm_document_to_relevance[document_id].ref_to_value += term_freq * inverse_document_freq;
                           }
                       }
                   });
 
-    const auto docs = document_to_relevance.BuildOrdinaryVector();
+    const auto docs = cm_document_to_relevance.BuildOrdinaryVector();
     std::vector<Document> matched_documents(docs.size());
     std::transform(policy, std::make_move_iterator(docs.begin()), std::make_move_iterator(docs.end()), matched_documents.begin(),
                    [this](const auto item) -> Document {
