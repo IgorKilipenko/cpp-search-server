@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ostream>
+#include <string>
 #include <vector>
 
 using namespace std;
@@ -31,6 +32,26 @@ enum class DocumentStatus {
     BANNED,
     REMOVED,
 };
+
+inline ostream& operator<<(ostream& out, const DocumentStatus& status) {
+    string result;
+    switch (status) {
+        case DocumentStatus::ACTUAL:
+            result = "ACTUAL";
+            break;
+        case DocumentStatus::IRRELEVANT:
+            result = "IRRELEVANT";
+            break;
+        case DocumentStatus::BANNED:
+            result = "BANNED";
+            break;
+        case DocumentStatus::REMOVED:
+            result = "REMOVED";
+            break;
+    }
+    out << result;
+    return out;
+}
 
 void PrintDocument(const Document& document);
 
