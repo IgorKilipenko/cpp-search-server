@@ -293,45 +293,55 @@ vector<Document> SearchServer::FindAllDocuments(const Query& query, T predicate)
     size_t items_per_thread = max(static_cast<size_t>(size / thread_count), 1ul);
     thread_count = size % items_per_thread ? size / items_per_thread + 1 : size / items_per_thread;*/
 
-    ConcurrentMap<int, double> document_to_relevance(word_to_document_freqs_.size());
+    if (query.plus_words.empty()) {
+        return {};
+    }
 
-    std::for_each(std::execution::par, query.plus_words.begin(), query.plus_words.end(), [this, &document_to_relevance, predicate](string_view word) {
-        auto ptr = word_to_document_freqs_.find(word);
+    ConcurrentSet<int> cm_exclude_doc_ids{word_to_document_freqs_.size() * (query.minus_words.empty() ? 0ul : 1ul)};
+    std::for_each(std::execution::par, query.minus_words.begin(), query.minus_words.end(), [this, &cm_exclude_doc_ids](const string_view minus_word) {
+        auto ptr = word_to_document_freqs_.find(minus_word);
         if (ptr == word_to_document_freqs_.end()) {
             return;
         }
 
         const auto words = ptr->second;
 
-        const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
-        for (const auto [document_id, term_freq] : words) {
-            const auto& document_data = documents_.at(document_id);
-            if (predicate(document_id, document_data.status, document_data.rating)) {
-                document_to_relevance[document_id].ref_to_value += term_freq * inverse_document_freq;
-            }
+        for (const auto& [document_id, _] : words) {
+            cm_exclude_doc_ids[document_id].ref_to_value = document_id;
         }
     });
 
-    std::for_each(std::execution::par, query.minus_words.begin(), query.minus_words.end(),
-                  [this, &document_to_relevance](const string_view minus_word) {
-                      auto ptr = word_to_document_freqs_.find(minus_word);
+    std::set<int> exclude_doc_ids = cm_exclude_doc_ids.BuildOrdinarySet();
+    ConcurrentMap<int, double> document_to_relevance(word_to_document_freqs_.size());
+
+    std::for_each(std::execution::par, query.plus_words.begin(), query.plus_words.end(),
+                  [this, &document_to_relevance, predicate, exclude_doc_ids](string_view word) {
+                      auto ptr = word_to_document_freqs_.find(word);
                       if (ptr == word_to_document_freqs_.end()) {
                           return;
                       }
 
                       const auto words = ptr->second;
 
-                      for (const auto [document_id, _] : words) {
-                          document_to_relevance.Erase(document_id);
+                      const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
+                      for (const auto& [document_id, term_freq] : words) {
+                          if (!exclude_doc_ids.empty() && exclude_doc_ids.count(document_id)) {
+                              continue;
+                          }
+                          const auto& document_data = documents_.at(document_id);
+                          if (predicate(document_id, document_data.status, document_data.rating)) {
+                              document_to_relevance[document_id].ref_to_value += term_freq * inverse_document_freq;
+                          }
                       }
                   });
 
-    const auto docs = document_to_relevance.BuildOrdinaryMap();
+    const auto docs = document_to_relevance.BuildOrdinaryVector();
     std::vector<Document> matched_documents(docs.size());
     std::transform(std::execution::par, std::make_move_iterator(docs.begin()), std::make_move_iterator(docs.end()), matched_documents.begin(),
                    [this](const auto item) -> Document {
                        return {item.first, item.second, documents_.at(item.first).rating};
                    });
+
     return matched_documents;
 }
 
