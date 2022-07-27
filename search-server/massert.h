@@ -4,6 +4,7 @@
 #include <string>
 
 using namespace std;
+namespace tests {
 
 #if !defined(ASSERT)
 
@@ -44,3 +45,4 @@ inline void AssertImpl(bool value, const string& expr_str, const string& file, c
 #define ASSERT_HINT(expr, hint) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, (hint))
 
 #endif  // !ASSERT
+}  // namespace tests

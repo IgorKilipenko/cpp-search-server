@@ -12,10 +12,12 @@
 #include <string_view>
 #include <vector>
 
-#include "../massert.hpp"
+#include "../test_framework.h"
 #include "../string_processing.h"
 
 using namespace std;
+
+namespace tests {
 
 using MatchingDocument = tuple<vector<std::string_view>, DocumentStatus>;
 
@@ -614,25 +616,28 @@ void TestFindTopDocuments() {
 }
 
 void TestSearchServer() {
-    RUN_TEST(TestSplitWords);
+    TestRunner tr;
 
-    RUN_TEST(TestAddDocument);
+    RUN_TEST(tr, TestSplitWords);
 
-    RUN_TEST(TestStopWords);
+    RUN_TEST(tr, TestAddDocument);
 
-    RUN_TEST(TestMinusWords);
+    RUN_TEST(tr, TestStopWords);
 
-    RUN_TEST(TestMatchDocumentsSeq);
+    RUN_TEST(tr, TestMinusWords);
 
-    RUN_TEST(TestMatchDocumentsPar);
+    RUN_TEST(tr, TestMatchDocumentsSeq);
 
-    RUN_TEST(TestRelevanceSortOrder);
+    RUN_TEST(tr, TestMatchDocumentsPar);
 
-    RUN_TEST(TestRatingCalculation);
+    RUN_TEST(tr, TestRelevanceSortOrder);
 
-    RUN_TEST(TestFilteringWihtPredicate);
+    RUN_TEST(tr, TestRatingCalculation);
 
-    RUN_TEST(TestFindDocumentsBySpecifiedStatus);
+    RUN_TEST(tr, TestFilteringWihtPredicate);
 
-    RUN_TEST(TestFindTopDocuments);
+    RUN_TEST(tr, TestFindDocumentsBySpecifiedStatus);
+
+    RUN_TEST(tr, TestFindTopDocuments);
 }
+}  // namespace tests

@@ -1,8 +1,10 @@
 #include <iostream>
 #include <string>
 
-#include "server_test.h"
 #include "../search_server.h"
+#include "server_test.h"
+
+using namespace tests;
 
 int main() {
     TestSearchServer();
