@@ -12,11 +12,9 @@
 #include <string_view>
 #include <vector>
 
-using namespace std;
-
 template <typename Iterator>
-set<string, std::less<>> MakeUniqueNonEmptyStrings(Iterator begin, Iterator end) {
-    set<string, std::less<>> non_empty_strings;
+std::set<std::string, std::less<>> MakeUniqueNonEmptyStrings(Iterator begin, Iterator end) {
+    std::set<std::string, std::less<>> non_empty_strings;
     std::for_each(begin, end, [&non_empty_strings](const auto str) {
         if (!str.empty()) {
             non_empty_strings.emplace(str);
@@ -26,23 +24,24 @@ set<string, std::less<>> MakeUniqueNonEmptyStrings(Iterator begin, Iterator end)
 }
 
 template <template <typename...> class Container, typename T, std::enable_if_t<std::is_convertible<T, std::string_view>::value, bool> = true>
-set<string, std::less<>> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
+std::set<std::string, std::less<>> MakeUniqueNonEmptyStrings(const Container<T>& strings) {
     return MakeUniqueNonEmptyStrings(strings.begin(), strings.end());
 }
 
 /// Splits a raw text string into list of space-separated words
-vector<string_view> SplitIntoWords(string_view text);
+std::vector<std::string_view> SplitIntoWords(std::string_view text);
 
-string JoinWithExclude(const set<string>& strings, const set<string>& exclude_words, string separator = ","s);
+std::string JoinWithExclude(const std::set<std::string>& strings, const std::set<std::string>& exclude_words, const std::string& separator = ",");
 
 template <typename T>
-string JoinWithExclude(const map<string_view, T>& strings, const set<string>& exclude_words, string separator = ","s,
-                       shared_ptr<function<string(const string&)>> preprocessor = nullptr) {
-    string result;
-    string sep = "";
+std::string JoinWithExclude(const std::map<std::string_view, T>& strings, const std::set<std::string>& exclude_words,
+                            const std::string& separator = ",",
+                            std::shared_ptr<std::function<std::string(const std::string&)>> preprocessor = nullptr) {
+    std::string result;
+    std::string sep = "";
     const bool exclude_words_is_empty = exclude_words.empty();
     for (const auto& [str_view, _] : strings) {
-        string str = static_cast<const string>(str_view);
+        std::string str = static_cast<const std::string>(str_view);
         if (exclude_words_is_empty || !exclude_words.count(str)) {
             result += sep + (preprocessor != nullptr ? (*preprocessor)(str) : str);
             if (sep.empty() && !separator.empty()) {
@@ -53,19 +52,19 @@ string JoinWithExclude(const map<string_view, T>& strings, const set<string>& ex
     return result;
 }
 
-size_t BuildHash(const string& str);
+size_t BuildHash(const std::string& str);
 
-size_t BuildHash(const set<string>& strings, const set<string>& exclude_words, string separator = ","s);
+size_t BuildHash(const std::set<std::string>& strings, const std::set<std::string>& exclude_words, const std::string& separator = ",");
 
 template <typename T>
-size_t BuildHash(const map<string_view, T>& strings, const set<string>& exclude_words, string separator = ","s,
-                 shared_ptr<function<string(const string&)>> preprocessor = nullptr) {
-    string str = JoinWithExclude(strings, exclude_words, separator, preprocessor);
-    return hash<string>{}(str);
+size_t BuildHash(const std::map<std::string_view, T>& strings, const std::set<std::string>& exclude_words, const std::string& separator = ",",
+                 std::shared_ptr<std::function<std::string(const std::string&)>> preprocessor = nullptr) {
+    std::string str = JoinWithExclude(strings, exclude_words, separator, preprocessor);
+    return std::hash<std::string>{}(str);
 }
 
 template <typename ExecutionPolicy>
-size_t CountWords(ExecutionPolicy&& policy, string_view str) {
+size_t CountWords(ExecutionPolicy&& policy, std::string_view str) {
     if (str.empty()) {
         return 0;
     }
@@ -75,25 +74,25 @@ size_t CountWords(ExecutionPolicy&& policy, string_view str) {
     if (ptr == str.end()) {
         return 0;
     }
-    size_t size = std::transform_reduce(policy, ptr, prev(str.end()), next(ptr), 0ul, std::plus<>{},
+    size_t size = std::transform_reduce(policy, ptr, std::prev(str.end()), std::next(ptr), 0ul, std::plus<>{},
                                         [](const char cur, const char next) {
                                             return cur != ' ' && next == ' ';
                                         }) +
-                  (*prev(str.end()) != ' ');
+                  (*std::prev(str.end()) != ' ');
     return size;
 }
 
-size_t CountWords(string_view str);
+size_t CountWords(std::string_view str);
 
-inline string ToString(const string_view str_view) {
-    return string(str_view.data(), str_view.size());
+inline std::string ToString(const std::string_view str_view) {
+    return std::string(str_view.data(), str_view.size());
 }
 
-template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, string_view>::value, bool> = true>
-Container<string> ToString(const Container<T>& str_views) {
-    vector<string> result;
+template <template <typename...> class Container, typename T, std::enable_if_t<std::is_same<T, std::string_view>::value, bool> = true>
+Container<std::string> ToString(const Container<T>& str_views) {
+    std::vector<std::string> result;
     result.reserve(str_views.size());
-    std::for_each(std::execution::seq, str_views.begin(), str_views.end(), [&result](const string_view view) {
+    std::for_each(std::execution::seq, str_views.begin(), str_views.end(), [&result](const std::string_view view) {
         result.push_back(ToString(view));
     });
     return result;
