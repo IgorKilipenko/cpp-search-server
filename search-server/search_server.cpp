@@ -84,73 +84,8 @@ const map<string_view, double>& SearchServer::GetWordFrequencies(int document_id
     return document_to_words_freqs_.at(document_id);
 }
 
-template <>
-void SearchServer::RemoveDocument(std::execution::sequenced_policy policy, int document_id) {
-    /*if (document_ids_.empty() || !documents_.count(document_id)) {
-        return;
-    }
-
-    document_ids_.erase(std::remove(policy, document_ids_.begin(), document_ids_.end(), document_id), document_ids_.end());
-    documents_.erase(document_id);
-
-    auto doc_words_ptr = document_to_words_freqs_.find(document_id);
-    if (doc_words_ptr == document_to_words_freqs_.end() || word_to_document_freqs_.empty()) {
-        return;
-    }
-
-    for (auto& [cur_word, _] : doc_words_ptr->second) {
-        auto docs_ptr = word_to_document_freqs_.find(cur_word);
-        if (docs_ptr == word_to_document_freqs_.end() || docs_ptr->second.empty()) {
-            continue;
-        }
-        docs_ptr->second.erase(document_id);
-    }
-
-    document_to_words_freqs_.erase(doc_words_ptr);
-*/
-    /*for (auto& [_, ids] : hash_content_) {
-        if (ids.empty()) {
-            continue;
-        }
-        ids.erase(document_id);
-    }*/
-    /*
-        for (auto ptr = hash_content_.begin(); ptr != hash_content_.end(); ++ptr) {
-            ptr->second.erase(document_id);
-            ptr = ptr->second.empty() ? hash_content_.erase(ptr) : next(ptr);
-        }
-        */
-}
-
 void SearchServer::RemoveDocument(int document_id) {
     RemoveDocument(std::execution::seq, document_id);
-}
-
-template <>
-void SearchServer::RemoveDocument(std::execution::parallel_policy policy, int document_id) {
-    if (document_ids_.empty() || !documents_.count(document_id)) {
-        return;
-    }
-    auto doc_words_ptr = document_to_words_freqs_.find(document_id);
-    if (doc_words_ptr == document_to_words_freqs_.end() || word_to_document_freqs_.empty()) {
-        return;
-    }
-
-    set<string> exclude_words{};
-    auto hash = BuildHash(doc_words_ptr->second, exclude_words);
-    auto& hash_ids = hash_content_.at(hash);
-    hash_ids.erase(document_id);
-
-    vector<string_view> words{doc_words_ptr->second.size()};
-    std::transform(policy, doc_words_ptr->second.begin(), doc_words_ptr->second.end(), words.begin(), [](const auto& item) {
-        return item.first;
-    });
-
-    EraseFromWordToDocumentFreqs(policy, document_id, std::move(words), word_to_document_freqs_);
-
-    document_ids_.erase(std::remove(policy, document_ids_.begin(), document_ids_.end(), document_id), document_ids_.end());
-    documents_.erase(document_id);
-    document_to_words_freqs_.erase(doc_words_ptr);
 }
 
 void SearchServer::RemoveDuplicates() {

@@ -87,10 +87,8 @@ class SearchServer {
 
     void RemoveDocument(int document_id);
 
-    template <typename ExecutionPolicy, std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
-                                                             std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
-                                                         bool> = true>
-    void RemoveDocument(ExecutionPolicy policy, int document_id);
+    template <typename ExecutionPolicy, EnableForExecutionPolicy<ExecutionPolicy> = true>
+    void RemoveDocument(ExecutionPolicy&& policy, int document_id);
 
     void RemoveDuplicates();
 
@@ -388,4 +386,34 @@ vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy&& policy, const 
 template <class ExecutionPolicy, EnableForExecutionPolicy<ExecutionPolicy>>
 vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query) const {
     return FindTopDocuments(policy, raw_query, DocumentStatus::ACTUAL);
+}
+
+template <class ExecutionPolicy, EnableForExecutionPolicy<ExecutionPolicy>>
+void SearchServer::RemoveDocument(ExecutionPolicy&& policy, int document_id) {
+    if (document_ids_.empty() || !documents_.count(document_id)) {
+        return;
+    }
+    auto doc_words_ptr = document_to_words_freqs_.find(document_id);
+    if (doc_words_ptr == document_to_words_freqs_.end() || word_to_document_freqs_.empty()) {
+        return;
+    }
+
+    set<string> exclude_words{};
+    auto hash = BuildHash(doc_words_ptr->second, exclude_words);
+    auto& hash_ids = hash_content_.at(hash);
+    hash_ids.erase(document_id);
+    if (hash_ids.empty()) {
+        hash_content_.erase(hash);
+    }
+
+    vector<string_view> words{doc_words_ptr->second.size()};
+    std::transform(policy, doc_words_ptr->second.begin(), doc_words_ptr->second.end(), words.begin(), [](const auto& item) {
+        return item.first;
+    });
+
+    EraseFromWordToDocumentFreqs(policy, document_id, std::move(words), word_to_document_freqs_);
+
+    document_ids_.erase(std::remove(policy, document_ids_.begin(), document_ids_.end(), document_id), document_ids_.end());
+    documents_.erase(document_id);
+    document_to_words_freqs_.erase(doc_words_ptr);
 }
