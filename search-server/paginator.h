@@ -5,22 +5,20 @@
 
 #include "document.h"
 
-using namespace std;
-
 template <typename TDocument = Document>
-class Page : protected vector<TDocument> {
+class Page : protected std::vector<TDocument> {
    public:
     using InIterator = typename Page::const_iterator;
 
-    Page() : vector<TDocument>() {}
+    Page() : std::vector<TDocument>() {}
 
-    explicit Page(int count) : vector<TDocument>(count) {}
+    explicit Page(int count) : std::vector<TDocument>(count) {}
 
-    Page(int count, const TDocument& doc) : vector<TDocument>(count, doc) {}
+    Page(int count, const TDocument& doc) : std::vector<TDocument>(count, doc) {}
 
-    Page(InIterator begin, InIterator end) : vector<TDocument>(begin, end) {}
+    Page(InIterator begin, InIterator end) : std::vector<TDocument>(begin, end) {}
 
-    friend ostream& operator<<(ostream& os, Page page) {
+    friend std::ostream& operator<<(std::ostream& os, Page page) {
         for (auto ptr = page.begin(); ptr != page.end(); ptr++) {
             os << *ptr;
         }
@@ -41,11 +39,11 @@ class Page : protected vector<TDocument> {
     auto end() const;
 
    private:
-    using super = vector<TDocument>;
+    using super = std::vector<TDocument>;
 };
 
 template <class TPage = Page<Document>>
-class Paginator : protected vector<TPage> {
+class Paginator : protected std::vector<TPage> {
    public:
     using DocIterator = typename TPage::InIterator;
 
@@ -81,7 +79,7 @@ class Paginator : protected vector<TPage> {
     size_t PageSize() const;
 
    private:
-    using super = vector<TPage>;
+    using super = std::vector<TPage>;
 
     size_t page_size_;
 };

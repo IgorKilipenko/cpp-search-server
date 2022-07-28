@@ -216,7 +216,3 @@ void MatchDocuments(const SearchServer& search_server, const string& query) {
         cout << "Ошибка матчинга документов на запрос "s << query << ": "s << e.what() << endl;
     }
 }
-
-void RemoveDuplicates(SearchServer& search_server) {
-    search_server.RemoveDuplicates();
-}
