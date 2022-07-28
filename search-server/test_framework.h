@@ -174,11 +174,11 @@ class TestRunner {
         AssertEqual(x, y, __assert_equal_private_os.str());                                      \
     }
 
-#define ASSERT_EQUAL_HINT(x, y, hint)                                                            \
-    {                                                                                            \
-        std::ostringstream __assert_equal_private_os;                                            \
+#define ASSERT_EQUAL_HINT(x, y, hint)                                                                                   \
+    {                                                                                                                   \
+        std::ostringstream __assert_equal_private_os;                                                                   \
         __assert_equal_private_os << #x << " != " << #y << ", " << FILE_NAME << ":" << __LINE__ << " HINT: " << (hint); \
-        AssertEqual(x, y, __assert_equal_private_os.str());                                      \
+        AssertEqual(x, y, __assert_equal_private_os.str());                                                             \
     }
 
 /**

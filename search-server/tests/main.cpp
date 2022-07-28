@@ -5,10 +5,11 @@
 #include "server_test.h"
 
 using namespace tests;
+using namespace std;
 
 int main() {
     TestSearchServer();
-    cout << "Search server testing finished"s << endl;
+    cout << endl << "Search server testing finished"s << endl << endl;
 
     return 0;
 }

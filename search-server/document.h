@@ -4,8 +4,6 @@
 #include <string>
 #include <vector>
 
-using namespace std;
-
 struct Document {
     int id = 0;
 
@@ -17,7 +15,9 @@ struct Document {
 
     Document(int id, double relevance, int rating) : id{id}, relevance{relevance}, rating{rating} {}
 
-    friend ostream& operator<<(ostream& out, const Document& document) {
+    friend std::ostream& operator<<(std::ostream& out, const Document& document) {
+        using namespace std::string_literals;
+
         out << "{ "s
             << "document_id = "s << document.id << ", "s
             << "relevance = "s << document.relevance << ", "s
@@ -33,8 +33,8 @@ enum class DocumentStatus {
     REMOVED,
 };
 
-inline ostream& operator<<(ostream& out, const DocumentStatus& status) {
-    string result;
+inline std::ostream& operator<<(std::ostream& out, const DocumentStatus& status) {
+    std::string result;
     switch (status) {
         case DocumentStatus::ACTUAL:
             result = "ACTUAL";
@@ -55,4 +55,4 @@ inline ostream& operator<<(ostream& out, const DocumentStatus& status) {
 
 void PrintDocument(const Document& document);
 
-void PrintMatchDocumentResult(int document_id, const vector<string_view>& words, DocumentStatus status);
+void PrintMatchDocumentResult(int document_id, const std::vector<std::string_view>& words, DocumentStatus status);
