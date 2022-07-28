@@ -281,21 +281,6 @@ void SearchServer::EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id
                                                 std::map<std::string, std::map<int, double>, std::less<>>& word_to_document_freqs) {
     std::mutex mutex;
     std::for_each(policy, words.begin(), words.end(), [&word_to_document_freqs, id, &policy, &mutex](const std::string_view cur_word) {
-        /*
-         *! Использование итераторов по сравнению с например такой версией:
-         *!
-         *! >  if (word_to_document_freqs.count(cur_word)) {
-         *! >       word_to_document_freqs[static_cast<std::string>(cur_word)].erase(id);
-         *! >  }
-         *!
-         *! или такой:
-         *!
-         *! > docs_ptr->second.erase(id)
-         *!
-         *! дает существенный прирост производительности на данных из бенчмарка
-         *! как в параллельном так и в последовательном режиме
-         */
-
         auto docs_ptr = word_to_document_freqs.find(cur_word);
         if (docs_ptr == word_to_document_freqs.end() || docs_ptr->second.empty()) {
             return;
@@ -376,19 +361,19 @@ void SearchServer::RemoveDocument(ExecutionPolicy&& policy, int document_id) {
         return;
     }
 
-    std::vector<std::string_view> words{doc_words_ptr->second.size()};
-    std::transform(policy, doc_words_ptr->second.begin(), doc_words_ptr->second.end(), words.begin(), [](const auto& item) {
-        return item.first;
-    });
-
     std::set<std::string> exclude_words{};
-    auto hash = BuildHash(words, exclude_words);
+    auto hash = BuildHash(doc_words_ptr->second, exclude_words);
     ASSERT(hash_content_.count(hash));
     auto& hash_ids = hash_content_[hash];
     hash_ids.erase(document_id);
     if (hash_ids.empty()) {
         hash_content_.erase(hash);
     }
+
+    std::vector<std::string_view> words{doc_words_ptr->second.size()};
+    std::transform(policy, doc_words_ptr->second.begin(), doc_words_ptr->second.end(), words.begin(), [](const auto& item) {
+        return item.first;
+    });
 
     auto doc_id_ptr = std::find(document_ids_.begin(), document_ids_.end(), document_id);
     ASSERT(doc_id_ptr != document_ids_.end());
