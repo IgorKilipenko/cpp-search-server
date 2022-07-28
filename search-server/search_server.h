@@ -26,14 +26,25 @@ using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
 constexpr const double THRESHOLD = 1e-6;
+/*
+template <typename ExecutionPolicy, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool> = false>
+struct IsExecutionPolicy : std::false_type {};
 
-template <typename T>
-struct is_execution_policy : std::false_type {};
+template <class ExecutionPolicy, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool> = true>
+struct IsExecutionPolicy : std::true_type {};*/
 
-template <typename ExecutionPolicy, std::enable_if_t<std::is_convertible<decay_t<ExecutionPolicy>, std::execution::sequenced_policy>::value ||
-                                                         std::is_convertible<decay_t<ExecutionPolicy>, std::execution::parallel_policy>::value,
-                                                     bool> = true>
-struct is_execution_policy_ : std::true_type {};
+
+template <class ExecutionPolicy>
+using IsExecutionPolicy = std::is_execution_policy<std::decay_t<ExecutionPolicy>>;
+
+/*template <class ExecutionPolicy>
+struct IsExecutionPolicy : std::is_execution_policy<std::decay_t<ExecutionPolicy>> {};*/
+
+template<class ExecutionPolicy>
+using EnableIfIsExecutionPolicy = typename std::enable_if_t<IsExecutionPolicy<ExecutionPolicy>::value, bool>;
+/*
+template <class ExecutionPolicy>
+struct EnableIfIsExecutionPolicy : std::enable_if_t<IsExecutionPolicy<ExecutionPolicy>::value, bool> {};*/
 
 class SearchServer {
    public:
@@ -53,20 +64,24 @@ class SearchServer {
     void AddDocument(int document_id, const string_view document, DocumentStatus status = DocumentStatus::ACTUAL, const vector<int>& ratings = {});
 
     /// Find most matched documents for request
+    /*template <typename ExecutionPolicy, typename T = function<bool(int, DocumentStatus, int)>,
+              std::enable_if_t<IsExecutionPolicy<ExecutionPolicy>::value, bool> = true>*/
     template <typename ExecutionPolicy, typename T = function<bool(int, DocumentStatus, int)>,
-              std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool> = true>
+              EnableIfIsExecutionPolicy<ExecutionPolicy> = true>
     vector<Document> FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query, T predicate) const;
 
     /// Find most matched documents for request
     template <typename T = function<bool(int, DocumentStatus, int)>>
     vector<Document> FindTopDocuments(const string_view raw_query, T predicate) const;
 
-    template <class ExecutionPolicy, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool> = true>
+    /*template <class ExecutionPolicy, std::enable_if_t<IsExecutionPolicy<ExecutionPolicy>::value, bool> = true>*/
+    template <class ExecutionPolicy, EnableIfIsExecutionPolicy<ExecutionPolicy> = true>
     vector<Document> FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query) const;
 
     vector<Document> FindTopDocuments(const string_view raw_query) const;
 
-    template <class ExecutionPolicy, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool> = true>
+    /*template <class ExecutionPolicy, std::enable_if_t<IsExecutionPolicy<ExecutionPolicy>::value, bool> = true>*/
+    template <class ExecutionPolicy, EnableIfIsExecutionPolicy<ExecutionPolicy> = true>
     vector<Document> FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query, DocumentStatus status) const;
 
     vector<Document> FindTopDocuments(const string_view raw_query, DocumentStatus status) const;
@@ -243,7 +258,8 @@ SearchServer::SearchServer(const Container& stop_words) : stop_words_(MakeUnique
     }
 }
 
-template <typename ExecutionPolicy, typename T, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool>>
+template <typename ExecutionPolicy, typename T,
+            EnableIfIsExecutionPolicy<ExecutionPolicy>>
 vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query, T predicate) const {
     auto query = ParseQuery(raw_query, false);
     if (query.plus_words.empty()) {
@@ -379,14 +395,14 @@ vector<Document> SearchServer::FindTopDocuments(const string_view raw_query, T p
     return FindTopDocuments(std::execution::seq, raw_query, predicate);
 }
 
-template <class ExecutionPolicy, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool>>
+template <class ExecutionPolicy, EnableIfIsExecutionPolicy<ExecutionPolicy>>
 vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query, DocumentStatus status) const {
     return FindTopDocuments(policy, raw_query, [status](int id, DocumentStatus doc_status, [[maybe_unused]] int rating) -> bool {
         return (doc_status == status);
     });
 }
 
-template <class ExecutionPolicy, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool>>
+template <class ExecutionPolicy, EnableIfIsExecutionPolicy<ExecutionPolicy>>
 vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query) const {
     return FindTopDocuments(policy, raw_query, DocumentStatus::ACTUAL);
 }
