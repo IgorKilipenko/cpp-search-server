@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <cassert>
 #include <chrono>
 #include <cstddef>
 #include <execution>
@@ -22,6 +21,7 @@
 #include "document.h"
 #include "paginator.h"
 #include "string_processing.h"
+#include "test_framework.h"
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
 constexpr const double THRESHOLD = 1e-6;
@@ -156,8 +156,8 @@ class SearchServer {
 
     static bool IsValidWord(const std::string_view word);
 
-    template <typename ExecutionPolicy>
-    static void EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id, std::vector<std::string_view>&& words,
+    template <typename ExecutionPolicy, typename WordsContainer>
+    static void EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id, WordsContainer&& words,
                                              std::map<std::string, std::map<int, double>, std::less<>>& word_to_document_freqs);
 };
 
@@ -276,10 +276,11 @@ std::vector<Document> SearchServer::FindAllDocuments(const Query& query, Documen
     return FindAllDocuments(std::execution::seq, query, predicate);
 }
 
-template <typename ExecutionPolicy>
-void SearchServer::EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id, std::vector<std::string_view>&& words,
+template <typename ExecutionPolicy, typename WordsContainer>
+void SearchServer::EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id, WordsContainer&& words,
                                                 std::map<std::string, std::map<int, double>, std::less<>>& word_to_document_freqs) {
-    std::for_each(policy, words.begin(), words.end(), [&word_to_document_freqs, id, &policy](const std::string_view cur_word) {
+    std::mutex mutex;
+    std::for_each(policy, words.begin(), words.end(), [&word_to_document_freqs, id, &policy, &mutex](const std::string_view cur_word) {
         /*
          *! Использование итераторов по сравнению с например такой версией:
          *!
@@ -294,7 +295,7 @@ void SearchServer::EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id
          *! дает существенный прирост производительности на данных из бенчмарка
          *! как в параллельном так и в последовательном режиме
          */
-         
+
         auto docs_ptr = word_to_document_freqs.find(cur_word);
         if (docs_ptr == word_to_document_freqs.end() || docs_ptr->second.empty()) {
             return;
@@ -302,8 +303,13 @@ void SearchServer::EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id
         auto ptr = find_if(policy, docs_ptr->second.begin(), docs_ptr->second.end(), [id](const std::pair<int, double>& item) {
             return item.first == id;
         });
-        assert(ptr != docs_ptr->second.end());
+        ASSERT(ptr != docs_ptr->second.end());
         docs_ptr->second.erase(ptr);
+
+        if (docs_ptr->second.empty()) {
+            std::lock_guard<std::mutex> lock(mutex);
+            word_to_document_freqs.erase(docs_ptr);
+        }
     });
 }
 
@@ -364,17 +370,10 @@ void SearchServer::RemoveDocument(ExecutionPolicy&& policy, int document_id) {
     if (document_ids_.empty() || !documents_.count(document_id)) {
         return;
     }
+
     auto doc_words_ptr = document_to_words_freqs_.find(document_id);
     if (doc_words_ptr == document_to_words_freqs_.end() || word_to_document_freqs_.empty()) {
         return;
-    }
-
-    std::set<std::string> exclude_words{};
-    auto hash = BuildHash(doc_words_ptr->second, exclude_words);
-    auto& hash_ids = hash_content_.at(hash);
-    hash_ids.erase(document_id);
-    if (hash_ids.empty()) {
-        hash_content_.erase(hash);
     }
 
     std::vector<std::string_view> words{doc_words_ptr->second.size()};
@@ -382,11 +381,19 @@ void SearchServer::RemoveDocument(ExecutionPolicy&& policy, int document_id) {
         return item.first;
     });
 
-    EraseFromWordToDocumentFreqs(policy, document_id, std::move(words), word_to_document_freqs_);
+    std::set<std::string> exclude_words{};
+    auto hash = BuildHash(words, exclude_words);
+    ASSERT(hash_content_.count(hash));
+    auto& hash_ids = hash_content_[hash];
+    hash_ids.erase(document_id);
+    if (hash_ids.empty()) {
+        hash_content_.erase(hash);
+    }
 
     auto doc_id_ptr = std::find(document_ids_.begin(), document_ids_.end(), document_id);
-    assert(doc_id_ptr != document_ids_.end());
+    ASSERT(doc_id_ptr != document_ids_.end());
     document_ids_.erase(doc_id_ptr);
     documents_.erase(document_id);
     document_to_words_freqs_.erase(doc_words_ptr);
+    EraseFromWordToDocumentFreqs(policy, document_id, std::move(words), word_to_document_freqs_);
 }
