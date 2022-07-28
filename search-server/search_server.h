@@ -83,7 +83,7 @@ class SearchServer {
 
     IdsConstIterator end() const;
 
-    map<string_view, double> GetWordFrequencies(int document_id) const;
+    const map<string_view, double>& GetWordFrequencies(int document_id) const;
 
     void RemoveDocument(int document_id);
 
@@ -313,7 +313,7 @@ vector<Document> SearchServer::FindAllDocuments(ExecutionPolicy&& policy, const 
                           }
                       }
                   });
-    
+
     const auto docs = cm_document_to_relevance.BuildOrdinaryVector();
     std::vector<Document> matched_documents(docs.size());
     std::transform(policy, std::make_move_iterator(docs.begin()), std::make_move_iterator(docs.end()), matched_documents.begin(),
@@ -332,19 +332,12 @@ vector<Document> SearchServer::FindAllDocuments(const Query& query, T predicate)
 template <typename ExecutionPolicy>
 void SearchServer::EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id, vector<string_view>&& words,
                                                 map<std::string, map<int, double>, std::less<>>& word_to_document_freqs) {
-    std::for_each(policy, words.begin(), words.end(), [&](const string_view cur_word) {
+    std::for_each(policy, words.begin(), words.end(), [&word_to_document_freqs, id](const string_view cur_word) {
         auto docs_ptr = word_to_document_freqs.find(cur_word);
         if (docs_ptr == word_to_document_freqs.end() || docs_ptr->second.empty()) {
             return;
         }
-        auto& ids_freq = docs_ptr->second;
-        auto ptr = find_if(policy, ids_freq.begin(), ids_freq.end(), [id](const pair<int, double>& item) {
-            return item.first == id;
-        });
-        if (ptr == ids_freq.end()) {
-            return;
-        }
-        ids_freq.erase(ptr);
+        docs_ptr->second.erase(id);
     });
 }
 
