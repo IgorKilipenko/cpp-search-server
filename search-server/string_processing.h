@@ -33,15 +33,14 @@ std::vector<std::string_view> SplitIntoWords(std::string_view text);
 
 std::string JoinWithExclude(const std::set<std::string>& strings, const std::set<std::string>& exclude_words, const std::string& separator = ",");
 
-template <typename T>
-std::string JoinWithExclude(const std::map<std::string_view, T>& strings, const std::set<std::string>& exclude_words,
-                            const std::string& separator = ",",
+template <typename Iterator>
+std::string JoinWithExclude(Iterator begin, Iterator end, const std::set<std::string>& exclude_words, const std::string& separator = ",",
                             std::shared_ptr<std::function<std::string(const std::string&)>> preprocessor = nullptr) {
     std::string result;
     std::string sep = "";
     const bool exclude_words_is_empty = exclude_words.empty();
-    for (const auto& [str_view, _] : strings) {
-        std::string str = static_cast<const std::string>(str_view);
+    for (auto ptr = begin; ptr != end; ++ptr) {
+        const std::string str = static_cast<std::string>(*ptr);
         if (exclude_words_is_empty || !exclude_words.count(str)) {
             result += sep + (preprocessor != nullptr ? (*preprocessor)(str) : str);
             if (sep.empty() && !separator.empty()) {
@@ -52,6 +51,23 @@ std::string JoinWithExclude(const std::map<std::string_view, T>& strings, const 
     return result;
 }
 
+inline std::string JoinWithExclude(const std::vector<std::string_view>& strings, const std::set<std::string>& exclude_words,
+                                   const std::string& separator = ",",
+                                   std::shared_ptr<std::function<std::string(const std::string&)>> preprocessor = nullptr) {
+    return JoinWithExclude(strings.begin(), strings.end(), exclude_words, separator, preprocessor);
+}
+
+template <typename T>
+std::string JoinWithExclude(const std::map<std::string_view, T>& strings, const std::set<std::string>& exclude_words,
+                            const std::string& separator = ",",
+                            std::shared_ptr<std::function<std::string(const std::string&)>> preprocessor = nullptr) {
+    std::vector<std::string_view> tmp{strings.size()};
+    std::transform(strings.begin(), strings.end(), tmp.begin(), [](const auto item) {
+        return item.first;
+    });
+    return JoinWithExclude(std::make_move_iterator(tmp.begin()), std::make_move_iterator(tmp.end()), exclude_words, separator, preprocessor);
+}
+
 size_t BuildHash(const std::string& str);
 
 size_t BuildHash(const std::set<std::string>& strings, const std::set<std::string>& exclude_words, const std::string& separator = ",");
@@ -59,6 +75,12 @@ size_t BuildHash(const std::set<std::string>& strings, const std::set<std::strin
 template <typename T>
 size_t BuildHash(const std::map<std::string_view, T>& strings, const std::set<std::string>& exclude_words, const std::string& separator = ",",
                  std::shared_ptr<std::function<std::string(const std::string&)>> preprocessor = nullptr) {
+    std::string str = JoinWithExclude(strings, exclude_words, separator, preprocessor);
+    return std::hash<std::string>{}(str);
+}
+
+inline size_t BuildHash(const std::vector<std::string_view>& strings, const std::set<std::string>& exclude_words, const std::string& separator = ",",
+                        std::shared_ptr<std::function<std::string(const std::string&)>> preprocessor = nullptr) {
     std::string str = JoinWithExclude(strings, exclude_words, separator, preprocessor);
     return std::hash<std::string>{}(str);
 }

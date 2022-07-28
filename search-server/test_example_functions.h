@@ -56,8 +56,8 @@ inline void TestToString() {
     std::string_view view{str};
     view = view.substr(5);
     assert(str.substr(5) == ToString(view));
-    assert(str.substr(5) == static_cast<string>(view));
-    assert(str.substr(5) == string(view));
+    assert(str.substr(5) == static_cast<std::string>(view));
+    assert(str.substr(5) == std::string(view));
     assert(str.substr(5) == view);
     std::cerr << "Done." << std::endl << std::endl;
 }
