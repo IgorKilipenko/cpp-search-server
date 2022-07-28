@@ -33,10 +33,10 @@ set<string, std::less<>> MakeUniqueNonEmptyStrings(const Container<T>& strings) 
 /// Splits a raw text string into list of space-separated words
 vector<string_view> SplitIntoWords(string_view text);
 
-string JoinWithExclude(const set<string>& strings, const set<string>& exclude_words, string separator = ","s);
+string JoinWithExclude(const set<string>& strings, const set<string>& exclude_words, const string& separator = ","s);
 
 template <typename T>
-string JoinWithExclude(const map<string_view, T>& strings, const set<string>& exclude_words, string separator = ","s,
+string JoinWithExclude(const map<string_view, T>& strings, const set<string>& exclude_words, const string& separator = ","s,
                        shared_ptr<function<string(const string&)>> preprocessor = nullptr) {
     string result;
     string sep = "";
@@ -55,10 +55,10 @@ string JoinWithExclude(const map<string_view, T>& strings, const set<string>& ex
 
 size_t BuildHash(const string& str);
 
-size_t BuildHash(const set<string>& strings, const set<string>& exclude_words, string separator = ","s);
+size_t BuildHash(const set<string>& strings, const set<string>& exclude_words, const string& separator = ","s);
 
 template <typename T>
-size_t BuildHash(const map<string_view, T>& strings, const set<string>& exclude_words, string separator = ","s,
+size_t BuildHash(const map<string_view, T>& strings, const set<string>& exclude_words, const string& separator = ","s,
                  shared_ptr<function<string(const string&)>> preprocessor = nullptr) {
     string str = JoinWithExclude(strings, exclude_words, separator, preprocessor);
     return hash<string>{}(str);

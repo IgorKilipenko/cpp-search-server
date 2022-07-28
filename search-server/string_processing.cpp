@@ -35,12 +35,12 @@ size_t BuildHash(const string& str) {
     return hash<string>{}(str);
 }
 
-size_t BuildHash(const set<string>& strings, const set<string>& exclude_words, string separator) {
+size_t BuildHash(const set<string>& strings, const set<string>& exclude_words, const string& separator) {
     string str = JoinWithExclude(strings, exclude_words, separator);
     return hash<string>{}(str);
 }
 
-string JoinWithExclude(const set<string>& strings, const set<string>& exclude_words, string separator) {
+string JoinWithExclude(const set<string>& strings, const set<string>& exclude_words, const string& separator) {
     string result;
     string sep = "";
     const bool exclude_words_is_empty = exclude_words.empty();
