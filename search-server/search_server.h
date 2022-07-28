@@ -278,12 +278,15 @@ std::vector<Document> SearchServer::FindAllDocuments(const Query& query, Documen
 template <typename ExecutionPolicy>
 void SearchServer::EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id, std::vector<std::string_view>&& words,
                                                 std::map<std::string, std::map<int, double>, std::less<>>& word_to_document_freqs) {
-    std::for_each(policy, words.begin(), words.end(), [&word_to_document_freqs, id](const std::string_view cur_word) {
+    std::for_each(policy, words.begin(), words.end(), [&word_to_document_freqs, id, &policy](const std::string_view cur_word) {
         auto docs_ptr = word_to_document_freqs.find(cur_word);
         if (docs_ptr == word_to_document_freqs.end() || docs_ptr->second.empty()) {
             return;
         }
-        docs_ptr->second.erase(id);
+        auto& ids_freq = docs_ptr->second;
+        ids_freq.erase(find_if(policy, ids_freq.begin(), ids_freq.end(), [id](const std::pair<int, double>& item) {
+            return item.first == id;
+        }));
     });
 }
 
@@ -364,7 +367,7 @@ void SearchServer::RemoveDocument(ExecutionPolicy&& policy, int document_id) {
 
     EraseFromWordToDocumentFreqs(policy, document_id, std::move(words), word_to_document_freqs_);
 
-    document_ids_.erase(std::remove(policy, document_ids_.begin(), document_ids_.end(), document_id), document_ids_.end());
+    document_ids_.erase(std::find(document_ids_.begin(), document_ids_.end(), document_id));
     documents_.erase(document_id);
     document_to_words_freqs_.erase(doc_words_ptr);
 }
