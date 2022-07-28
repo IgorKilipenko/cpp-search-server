@@ -183,45 +183,6 @@ auto Paginate(const Container& c, size_t page_size) {
 /// Remove all documents duplicates from database
 void RemoveDuplicates(SearchServer& search_server);
 
-template <typename TDict, typename TKey>
-auto EraseFromContainer(TKey id, TDict& container) {
-    auto ptr = container.find(id);
-    if (ptr != container.end()) {
-        return container.erase(ptr);
-    }
-    return container.end();
-}
-
-template <typename ExecutionPolicy, template <typename, typename> class Container, typename Value, typename Allocator = std::allocator<Value>>
-auto EraseFromContainer(ExecutionPolicy&& policy, Value id, Container<Value, Allocator>& container) {
-    auto ptr = find(policy, container.begin(), container.end(), id);
-    if (ptr != container.end()) {
-        return container.erase(ptr);
-    }
-    return container.end();
-}
-
-template <typename T>
-auto EraseFromContainer(T id, vector<T>& container) {
-    return EraseFromContainer(std::execution::seq, id, container);
-}
-
-template <typename ExecutionPolicy, template <typename, typename> class Container, typename Key, typename Value>
-auto EraseFromDictionary(ExecutionPolicy&& policy, Key id, Container<Key, Value>& container) {
-    auto ptr = std::find_if(policy, container.begin(), container.end(), [id](auto item) {
-        return item.first == id;
-    });
-    if (ptr != container.end()) {
-        return container.erase(ptr);
-    }
-    return container.end();
-}
-
-template <template <typename, typename> class Container, typename Key, typename Value>
-auto EraseFromDictionary(Key id, Container<Key, Value>& container) {
-    EraseFromDictionary(std::execution::seq, id, container);
-}
-
 // ----------------------------------------------------------------
 // SearchServer template members implementation
 // ----------------------------------------------------------------
