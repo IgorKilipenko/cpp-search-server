@@ -27,6 +27,14 @@ using namespace std;
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
 constexpr const double THRESHOLD = 1e-6;
 
+template <typename T>
+struct is_execution_policy : std::false_type {};
+
+template <typename ExecutionPolicy, std::enable_if_t<std::is_convertible<decay_t<ExecutionPolicy>, std::execution::sequenced_policy>::value ||
+                                                         std::is_convertible<decay_t<ExecutionPolicy>, std::execution::parallel_policy>::value,
+                                                     bool> = true>
+struct is_execution_policy_ : std::true_type {};
+
 class SearchServer {
    public:
     using IdsConstIterator = vector<int>::const_iterator;
@@ -46,25 +54,19 @@ class SearchServer {
 
     /// Find most matched documents for request
     template <typename ExecutionPolicy, typename T = function<bool(int, DocumentStatus, int)>,
-              std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
-                                   std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
-                               bool> = true>
+              std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool> = true>
     vector<Document> FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query, T predicate) const;
 
     /// Find most matched documents for request
     template <typename T = function<bool(int, DocumentStatus, int)>>
     vector<Document> FindTopDocuments(const string_view raw_query, T predicate) const;
 
-    template <typename ExecutionPolicy, std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
-                                                             std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
-                                                         bool> = true>
+    template <class ExecutionPolicy, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool> = true>
     vector<Document> FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query) const;
 
     vector<Document> FindTopDocuments(const string_view raw_query) const;
 
-    template <typename ExecutionPolicy, std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
-                                                             std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
-                                                         bool> = true>
+    template <class ExecutionPolicy, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool> = true>
     vector<Document> FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query, DocumentStatus status) const;
 
     vector<Document> FindTopDocuments(const string_view raw_query, DocumentStatus status) const;
@@ -241,10 +243,7 @@ SearchServer::SearchServer(const Container& stop_words) : stop_words_(MakeUnique
     }
 }
 
-template <typename ExecutionPolicy, typename T,
-          std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
-                               std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
-                           bool>>
+template <typename ExecutionPolicy, typename T, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool>>
 vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query, T predicate) const {
     auto query = ParseQuery(raw_query, false);
     if (query.plus_words.empty()) {
@@ -380,18 +379,14 @@ vector<Document> SearchServer::FindTopDocuments(const string_view raw_query, T p
     return FindTopDocuments(std::execution::seq, raw_query, predicate);
 }
 
-template <typename ExecutionPolicy, std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
-                                                         std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
-                                                     bool>>
+template <class ExecutionPolicy, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool>>
 vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query, DocumentStatus status) const {
     return FindTopDocuments(policy, raw_query, [status](int id, DocumentStatus doc_status, [[maybe_unused]] int rating) -> bool {
         return (doc_status == status);
     });
 }
 
-template <typename ExecutionPolicy, std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
-                                                         std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
-                                                     bool>>
+template <class ExecutionPolicy, std::enable_if_t<std::is_execution_policy<std::decay_t<ExecutionPolicy>>::value, bool>>
 vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query) const {
     return FindTopDocuments(policy, raw_query, DocumentStatus::ACTUAL);
 }
