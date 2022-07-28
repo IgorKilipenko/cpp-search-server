@@ -35,7 +35,8 @@ std::string JoinWithExclude(const std::set<std::string>& strings, const std::set
 
 template <typename T>
 std::string JoinWithExclude(const std::map<std::string_view, T>& strings, const std::set<std::string>& exclude_words,
-                            const std::string& separator = ",", std::shared_ptr<std::function<std::string(const std::string&)>> preprocessor = nullptr) {
+                            const std::string& separator = ",",
+                            std::shared_ptr<std::function<std::string(const std::string&)>> preprocessor = nullptr) {
     std::string result;
     std::string sep = "";
     const bool exclude_words_is_empty = exclude_words.empty();
