@@ -51,8 +51,7 @@ class SearchServer {
     void AddDocument(int document_id, const string_view document, DocumentStatus status = DocumentStatus::ACTUAL, const vector<int>& ratings = {});
 
     /// Find most matched documents for request
-    template <typename ExecutionPolicy, typename DocumentPredicate,
-              EnableForExecutionPolicy<ExecutionPolicy> = true>
+    template <typename ExecutionPolicy, typename DocumentPredicate, EnableForExecutionPolicy<ExecutionPolicy> = true>
     vector<Document> FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query, DocumentPredicate predicate) const;
 
     /// Find most matched documents for request
@@ -74,7 +73,7 @@ class SearchServer {
 
     tuple<vector<string_view>, DocumentStatus> MatchDocument(const string_view raw_query, int document_id) const;
 
-    template <typename ExecutionPolicy>
+    template <typename ExecutionPolicy, EnableForExecutionPolicy<ExecutionPolicy> = true>
     tuple<vector<string_view>, DocumentStatus> MatchDocument(ExecutionPolicy&& policy, const string_view raw_query, int document_id) const;
 
     set<std::string, std::less<>> GetStopWords() const;
@@ -107,7 +106,7 @@ class SearchServer {
         vector<string_view> plus_words;
         vector<string_view> minus_words;
 
-        template <typename ExecutionPolicy>
+        template <typename ExecutionPolicy, EnableForExecutionPolicy<ExecutionPolicy> = true>
         static void MakeUnique(ExecutionPolicy&& policy, vector<string_view>& words) {
             std::sort(policy, words.begin(), words.end());
             auto last = std::unique(policy, words.begin(), words.end());
@@ -118,7 +117,7 @@ class SearchServer {
             Query::MakeUnique(std::execution::seq, words);
         }
 
-        template <typename ExecutionPolicy>
+        template <typename ExecutionPolicy, EnableForExecutionPolicy<ExecutionPolicy> = true>
         void MakeUnique(ExecutionPolicy&& policy) {
             Query::MakeUnique(policy, plus_words);
             Query::MakeUnique(policy, minus_words);
@@ -148,10 +147,7 @@ class SearchServer {
 
     double ComputeWordInverseDocumentFreq(const string_view word) const;
 
-    template <typename ExecutionPolicy, typename DocumentPredicate,
-              std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
-                                   std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
-                               bool> = true>
+    template <typename ExecutionPolicy, typename DocumentPredicate, EnableForExecutionPolicy<ExecutionPolicy> = true>
     vector<Document> FindAllDocuments(ExecutionPolicy&& policy, const Query& query, DocumentPredicate predicate) const;
 
     template <typename DocumentPredicate>
@@ -239,8 +235,7 @@ SearchServer::SearchServer(const Container& stop_words) : stop_words_(MakeUnique
     }
 }
 
-template <typename ExecutionPolicy, typename DocumentPredicate,
-            EnableForExecutionPolicy<ExecutionPolicy>>
+template <typename ExecutionPolicy, typename DocumentPredicate, EnableForExecutionPolicy<ExecutionPolicy>>
 vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy&& policy, const string_view raw_query, DocumentPredicate predicate) const {
     auto query = ParseQuery(raw_query, false);
     if (query.plus_words.empty()) {
@@ -261,17 +256,14 @@ vector<Document> SearchServer::FindTopDocuments(ExecutionPolicy&& policy, const 
     return matched_documents;
 }
 
-template <typename ExecutionPolicy, typename DocumentPredicate,
-          std::enable_if_t<std::is_convertible<ExecutionPolicy, std::execution::sequenced_policy>::value ||
-                               std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value,
-                           bool>>
+template <typename ExecutionPolicy, typename DocumentPredicate, EnableForExecutionPolicy<ExecutionPolicy>>
 vector<Document> SearchServer::FindAllDocuments(ExecutionPolicy&& policy, const Query& query, DocumentPredicate predicate) const {
     if (query.plus_words.empty()) {
         return {};
     }
 
     constexpr bool is_seq = !std::is_convertible<ExecutionPolicy, std::execution::parallel_policy>::value;
-    size_t default_bucket_size = is_seq ? 1ul : word_to_document_freqs_.size();
+    size_t default_bucket_size = is_seq ? 1ul : std::min(word_to_document_freqs_.size(), 1000ul);
 
     ConcurrentSet<int> cm_exclude_doc_ids{default_bucket_size * (query.minus_words.empty() ? 0ul : 1ul)};
     std::for_each(policy, query.minus_words.begin(), query.minus_words.end(), [this, &cm_exclude_doc_ids](const string_view minus_word) {
@@ -337,7 +329,7 @@ void SearchServer::EraseFromWordToDocumentFreqs(ExecutionPolicy&& policy, int id
     });
 }
 
-template <typename ExecutionPolicy>
+template <typename ExecutionPolicy, EnableForExecutionPolicy<ExecutionPolicy>>
 tuple<vector<string_view>, DocumentStatus> SearchServer::MatchDocument(ExecutionPolicy&& policy, const string_view raw_query, int document_id) const {
     auto word_freqs_ptr = document_to_words_freqs_.find(document_id);
     if (word_freqs_ptr == document_to_words_freqs_.end()) {
