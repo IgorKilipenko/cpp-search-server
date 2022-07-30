@@ -1,13 +1,16 @@
+#include <algorithm>
 #include <array>
-#include <cassert>
-#include <chrono>
+#include <functional>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
+#include <random>
+#include <set>
 #include <sstream>
 #include <string>
-#include <tuple>
-#include <unordered_map>
-#include <vector>
+#include <unordered_set>
+
+#include "log_duration.h"
 
 using namespace std;
 
@@ -22,21 +25,31 @@ public:
         return AsTuple() == other.AsTuple();
     }
 
+    bool operator<(const VehiclePlate& other) const {
+        return AsTuple() < other.AsTuple();
+    }
+
     VehiclePlate(char l0, char l1, int digits, char l2, int region) : letters_{l0, l1, l2}, digits_(digits), region_(region) {}
 
     string ToString() const {
         ostringstream out;
         out << letters_[0] << letters_[1];
-
-        // чтобы дополнить цифровую часть номера слева нулями
-        // до трёх цифр, используем подобные манипуляторы:
-        // setfill задаёт символ для заполнения,
-        // right задаёт выравнивание по правому краю,
-        // setw задаёт минимальное желаемое количество знаков
         out << setfill('0') << right << setw(3) << digits_;
         out << letters_[2] << setw(2) << region_;
 
         return out.str();
+    }
+
+    const array<char, 3>& GetLetters() const {
+        return letters_;
+    }
+
+    int GetDigits() const {
+        return digits_;
+    }
+
+    int GetRegion() const {
+        return region_;
     }
 
 private:
@@ -45,185 +58,114 @@ private:
     int region_;
 };
 
+struct PlateHasherTrivial {
+    size_t operator()(const VehiclePlate& plate) const {
+        return static_cast<size_t>(plate.GetDigits());
+    }
+};
+
+struct PlateHasherRegion {
+    size_t operator()(const VehiclePlate& plate) const {
+        return static_cast<size_t>(plate.GetDigits() + plate.GetRegion() * 1000);
+    }
+};
+
+struct PlateHasherString {
+    size_t operator()(const VehiclePlate& plate) const {
+        return hasher(plate.ToString());
+    }
+
+    hash<string> hasher;
+};
+
+struct PlateHasherAll {
+    // реализуйте собственный хешер, который будет
+    // эффективнее и лучше всех остальных
+    size_t operator()(const VehiclePlate& plate) const {
+        size_t result = static_cast<size_t>(plate.GetDigits() + plate.GetRegion() * 1000);
+        auto letters = plate.GetLetters();
+        result += std::hash<string>{}(std::string(std::make_move_iterator(letters.begin()), std::make_move_iterator(letters.end())));
+        return result;
+    }
+};
+
 ostream& operator<<(ostream& out, VehiclePlate plate) {
     out << plate.ToString();
     return out;
 }
 
-class VehiclePlateHasher {
+class PlateGenerator {
+    char GenerateChar() {
+        uniform_int_distribution<short> char_gen{0, static_cast<short>(possible_chars_.size() - 1)};
+        return possible_chars_[char_gen(engine_)];
+    }
+
+    int GenerateNumber() {
+        uniform_int_distribution<short> num_gen{0, 999};
+        return num_gen(engine_);
+    }
+
+    int GenerateRegion() {
+        uniform_int_distribution<short> region_gen{0, static_cast<short>(possible_regions_.size() - 1)};
+        return possible_regions_[region_gen(engine_)];
+    }
+
 public:
-    size_t operator()(const VehiclePlate& plate) const {
-        // измените эту функцию, чтобы она учитывала все данные номера
-        // рекомендуется использовать метод ToString() и существующий
-        // класс hash<string>
-        return hasher_(plate.ToString());
+    VehiclePlate Generate() {
+        return VehiclePlate(GenerateChar(), GenerateChar(), GenerateNumber(), GenerateChar(), GenerateRegion());
     }
 
 private:
-    std::hash<std::string> hasher_;
-};
+    mt19937 engine_;
 
-// выбросьте это исключение в случае ошибки парковки
-struct ParkingException {};
+    // допустимые значения сохраним в static переменных
+    // они объявлены inline, чтобы их определение не надо было выносить вне класса
+    inline static const array possible_regions_ = {
+        1,  2,   102, 3,   4,   5,   6,   7,  8,   9,  10, 11,  12, 13, 113, 14,  15,  16,  116, 17, 18, 19,  20, 21, 121, 22,  23,  93, 123, 24, 84,
+        88, 124, 25,  125, 26,  27,  28,  29, 30,  31, 32, 33,  34, 35, 36,  136, 37,  38,  85,  39, 91, 40,  41, 82, 42,  142, 43,  44, 45,  46, 47,
+        48, 49,  50,  90,  150, 190, 51,  52, 152, 53, 54, 154, 55, 56, 57,  58,  59,  81,  159, 60, 61, 161, 62, 63, 163, 64,  164, 65, 66,  96, 67,
+        68, 69,  70,  71,  72,  73,  173, 74, 174, 75, 80, 76,  77, 97, 99,  177, 199, 197, 777, 78, 98, 178, 79, 83, 86,  87,  89,  94, 95};
 
-template <typename Clock>
-class Parking {
-    // при обращении к типу внутри шаблонного параметра мы обязаны использовать
-    // typename; чтобы этого избежать, объявим псевдонимы для нужных типов
-    using Duration = typename Clock::duration;
-    using TimePoint = typename Clock::time_point;
-
-public:
-    Parking(int cost_per_second) : cost_per_second_(cost_per_second) {}
-
-    // запарковать машину с указанным номером
-    void Park(VehiclePlate car) {
-        // место для вашей реализации
-        if (now_parked_.count(car)) {
-            throw ParkingException();
-        }
-        now_parked_[car] = Clock::now();
-    }
-
-    // забрать машину с указанным номером
-    void Withdraw(const VehiclePlate& car) {
-        // место для вашей реализации
-        if (now_parked_.count(car) == 0) {
-            throw ParkingException();
-        }
-        auto time = now_parked_.at(car);
-        complete_parks_[car] = Clock::now() - time;
-        now_parked_.erase(car);
-    }
-
-    // получить счёт за конкретный автомобиль
-    int64_t GetCurrentBill(const VehiclePlate& car) const {
-        auto duration = complete_parks_.count(car) ? complete_parks_.at(car) : Duration(0);
-        duration += now_parked_.count(car) ? (Clock::now() - now_parked_.at(car)) : Duration(0);
-        auto result = std::chrono::duration_cast<std::chrono::seconds>(duration).count() * cost_per_second_;
-        return result;
-    }
-
-    // завершить расчётный период
-    // те машины, которые находятся на парковке на данный момент, должны
-    // остаться на парковке, но отсчёт времени для них начинается с нуля
-    unordered_map<VehiclePlate, int64_t, VehiclePlateHasher> EndPeriodAndGetBills() {
-        // место для вашей реализации
-        unordered_map<VehiclePlate, int64_t, VehiclePlateHasher> result;
-        auto time = Clock::now();
-        for (auto& parked : complete_parks_) {
-            auto bill = GetCurrentBill(parked.first);
-            if (bill != 0) {
-                result[parked.first] = bill;
-            }
-        }
-        complete_parks_.clear();
-
-        for (auto& parked : now_parked_) {
-            auto bill = GetCurrentBill(parked.first);
-            if (bill != 0 && result.count(parked.first) == 0) {
-                result[parked.first] += bill;
-            }
-            parked.second = time;
-        }
-        return result;
-    }
-
-    // не меняйте этот метод
-    auto& GetNowParked() const {
-        return now_parked_;
-    }
-
-    // не меняйте этот метод
-    auto& GetCompleteParks() const {
-        return complete_parks_;
-    }
-
-private:
-    int cost_per_second_;
-    unordered_map<VehiclePlate, TimePoint, VehiclePlateHasher> now_parked_;
-    unordered_map<VehiclePlate, Duration, VehiclePlateHasher> complete_parks_;
-};
-
-// эти часы удобно использовать для тестирования
-// они покажут столько времени, сколько вы задали явно
-class TestClock {
-public:
-    using time_point = chrono::system_clock::time_point;
-    using duration = chrono::system_clock::duration;
-
-    static void SetNow(int seconds) {
-        current_time_ = seconds;
-    }
-
-    static time_point now() {
-        return start_point_ + chrono::seconds(current_time_);
-    }
-
-private:
-    inline static time_point start_point_ = chrono::system_clock::now();
-    inline static int current_time_ = 0;
+    // постфикс s у литерала тут недопустим, он приведёт к неопределённому поведению
+    inline static const string_view possible_chars_ = "ABCEHKMNOPTXY"sv;
 };
 
 int main() {
-    Parking<TestClock> parking(10);
+    static const int N = 1'000'000;
 
-    TestClock::SetNow(10);
-    parking.Park({'A', 'A', 111, 'A', 99});
+    PlateGenerator generator;
+    vector<VehiclePlate> fill_vector;
+    vector<VehiclePlate> find_vector;
 
-    TestClock::SetNow(20);
-    parking.Withdraw({'A', 'A', 111, 'A', 99});
-    parking.Park({'B', 'B', 222, 'B', 99});
+    generate_n(back_inserter(fill_vector), N, [&]() {
+        return generator.Generate();
+    });
+    generate_n(back_inserter(find_vector), N, [&]() {
+        return generator.Generate();
+    });
 
-    TestClock::SetNow(40);
-    assert(parking.GetCurrentBill({'A', 'A', 111, 'A', 99}) == 100);
-    assert(parking.GetCurrentBill({'B', 'B', 222, 'B', 99}) == 200);
-    parking.Park({'A', 'A', 111, 'A', 99});
-
-    TestClock::SetNow(50);
-    assert(parking.GetCurrentBill({'A', 'A', 111, 'A', 99}) == 200);
-    assert(parking.GetCurrentBill({'B', 'B', 222, 'B', 99}) == 300);
-    assert(parking.GetCurrentBill({'C', 'C', 333, 'C', 99}) == 0);
-    parking.Withdraw({'B', 'B', 222, 'B', 99});
-
-    TestClock::SetNow(70);
+    int found;
     {
-        // проверим счёт
-        auto bill = parking.EndPeriodAndGetBills();
-
-        // так как внутри макроса используется запятая,
-        // нужно заключить его аргумент в дополнительные скобки
-        assert(
-            (bill == unordered_map<VehiclePlate, int64_t, VehiclePlateHasher>{
-                         {{'A', 'A', 111, 'A', 99}, 400},
-                         {{'B', 'B', 222, 'B', 99}, 300},
-                     }));
+        LOG_DURATION("unordered_set");
+        unordered_set<VehiclePlate, PlateHasherAll> container;
+        for (auto& p : fill_vector) {
+            container.insert(p);
+        }
+        found = count_if(find_vector.begin(), find_vector.end(), [&](const VehiclePlate& plate) {
+            return container.count(plate) > 0;
+        });
     }
+    cout << "Found matches (1): "s << found << endl;
 
-    TestClock::SetNow(80);
     {
-        // проверим счёт
-        auto bill = parking.EndPeriodAndGetBills();
-
-        // так как внутри макроса используется запятая,
-        // нужно заключить его аргумент в дополнительные скобки
-        assert(
-            (bill == unordered_map<VehiclePlate, int64_t, VehiclePlateHasher>{
-                         {{'A', 'A', 111, 'A', 99}, 100},
-                     }));
+        LOG_DURATION("set");
+        set<VehiclePlate> container;
+        for (auto& p : fill_vector) {
+            container.insert(p);
+        }
+        found = count_if(find_vector.begin(), find_vector.end(), [&](const VehiclePlate& plate) {
+            return container.count(plate) > 0;
+        });
     }
-
-    try {
-        parking.Park({'A', 'A', 111, 'A', 99});
-        assert(false);
-    } catch (ParkingException) {
-    }
-
-    try {
-        parking.Withdraw({'B', 'B', 222, 'B', 99});
-        assert(false);
-    } catch (ParkingException) {
-    }
-
-    cout << "Success!"s << endl;
+    cout << "Found matches (2): "s << found << endl;
 }
