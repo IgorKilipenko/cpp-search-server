@@ -1,70 +1,37 @@
 #include <algorithm>
-#include <atomic>
 #include <cstddef>
-#include <execution>
 #include <iostream>
-#include <iterator>
-#include <mutex>
-#include <sstream>
 #include <string>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
+#include <vector>
 
 using namespace std;
 
-template <typename Hash>
-int FindCollisions(const Hash& hasher, istream& text) {
-    // место для вашей реализации
-    std::unordered_map<size_t, unordered_set<std::string>> words;
-    size_t collisions = 0;
-    string word;
-    vector<std::string> input;
-    while (text >> word) {
-        input.push_back(std::move(word));
-    }
-
-    std::mutex mutex;
-    std::for_each(std::execution::par, std::make_move_iterator(input.begin()), std::make_move_iterator(input.end()), [&](const std::string& word) {
-        const auto hash = hasher(word);
-        std::lock_guard lock(mutex);
-        if (words.count(hash) && !words[hash].count(word)) {
-            ++collisions;
-        }
-        words[hash].insert(std::move(word));
-    });
-
-    return collisions;
-}
-
-// Это плохой хешер. Его можно использовать для тестирования.
-// Подумайте, в чём его недостаток
-struct HasherDummyOld {
-    size_t operator()(const string& str) const {
-        size_t res = 0;
-        for (char c : str) {
-            res += static_cast<size_t>(c);
-        }
-        return res;
-    }
+struct Circle {
+    double x;
+    double y;
+    double r;
 };
 
-struct DummyHash {
-    size_t operator()(const string&) const {
-        return 42;
+struct Dumbbell {
+    Circle circle1;
+    Circle circle2;
+    string text;
+};
+
+struct DumbbellHash {
+    size_t operator()(const Dumbbell& val) const {
+        vector<double> vals = {val.circle1.x, val.circle1.y, val.circle1.r, val.circle2.x, val.circle2.y, val.circle2.r};
+        size_t result = 0;
+        std::for_each(vals.begin(), vals.end(), [&](const double val) {
+            result = result * 37 + static_cast<size_t>(val*100);
+        }); 
+        result += std::hash<std::string>{}(val.text);
+        return result;
     }
 };
 
 int main() {
-    DummyHash dummy_hash;
-    hash<string> good_hash;
-
-    {
-        istringstream stream("I love C++"s);
-        cout << FindCollisions(dummy_hash, stream) << endl;
-    }
-    {
-        istringstream stream("I love C++"s);
-        cout << FindCollisions(good_hash, stream) << endl;
-    }
+    DumbbellHash hash;
+    Dumbbell dumbbell{{10, 11.5, 2.3}, {3.14, 15, -8}, "abc"s};
+    cout << "Dumbbell hash "s << hash(dumbbell);
 }
