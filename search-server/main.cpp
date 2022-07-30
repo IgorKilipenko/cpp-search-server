@@ -1,21 +1,34 @@
 #include <array>
-#include <execution>
+#include <cassert>
+#include <cstddef>
+#include <functional>
 #include <iomanip>
 #include <iostream>
-#include <optional>
 #include <sstream>
 #include <string>
+#include <tuple>
+#include <unordered_map>
 #include <vector>
 
 using namespace std;
 
 class VehiclePlate {
+   private:
+    auto AsTuple() const {
+        return tie(letters_, digits_, region_);
+    }
+
    public:
+    bool operator==(const VehiclePlate& other) const {
+        return AsTuple() == other.AsTuple();
+    }
+    VehiclePlate() = default;
     VehiclePlate(char l0, char l1, int digits, char l2, int region) : letters_{l0, l1, l2}, digits_(digits), region_(region) {}
 
     string ToString() const {
         ostringstream out;
         out << letters_[0] << letters_[1];
+
         // чтобы дополнить цифровую часть номера слева нулями
         // до трёх цифр, используем подобные манипуляторы:
         // setfill задаёт символ для заполнения,
@@ -31,13 +44,6 @@ class VehiclePlate {
         return digits_;
     }
 
-    friend bool operator==(const VehiclePlate& lhs, const VehiclePlate& rhs) {
-        return lhs.region_ == rhs.region_ && lhs.digits_ == rhs.digits_ && lhs.letters_ == rhs.letters_;
-    }
-    friend bool operator!=(const VehiclePlate& lhs, const VehiclePlate& rhs) {
-        return !(lhs == rhs);
-    }
-
    private:
     array<char, 3> letters_;
     int digits_;
@@ -49,59 +55,69 @@ ostream& operator<<(ostream& out, VehiclePlate plate) {
     return out;
 }
 
-template <typename T>
-class HashableContainer {
+class VehiclePlateHasher {
    public:
-    void Insert(T elem) {
-        int index = elem.Hash();
-
-        // если вектор недостаточно велик для этого индекса,
-        // то увеличим его, выделив место с запасом
-        if (index >= int(elements_.size())) {
-            elements_.resize(index * 2 + 1);
-        }
-
-        auto& item = elements_[index];
-        auto ptr = std::find(std::execution::par, item.begin(), item.end(), elem);
-        if (ptr == item.end()) {
-            item.push_back(std::move(elem));
-        }
-    }
-
-    void PrintAll(ostream& out) const {
-        for (auto& e : elements_) {
-            if (e.empty()) {
-                continue;
-            }
-            for (auto item : e) {
-                out << item << endl;
-            }
-        }
-    }
-
-    const auto& GetVector() const {
-        return elements_;
+    size_t operator()(const VehiclePlate& plate) const {
+        // измените эту функцию, чтобы она учитывала все данные номера
+        // рекомендуется использовать метод ToString() и существующий
+        // класс hash<string>
+        return hasher_(plate.ToString());
     }
 
    private:
-    vector<vector<T>> elements_;
+    std::hash<string> hasher_;
+};
+
+class ParkingCounter {
+   public:
+    ParkingCounter() : car_to_parks_{} {}
+    // зарегистрировать парковку автомобиля
+    void Park(VehiclePlate car) {
+        // место для вашей реализации
+        ++car_to_parks_[car];
+    }
+
+    // метод возвращает количество зарегистрированных
+    // парковок автомобиля
+    int GetCount(const VehiclePlate& car) const {
+        // место для вашей реализации
+        return car_to_parks_.count(car) ? car_to_parks_.at(car) : 0;
+    }
+
+    auto& GetAllData() const {
+        return car_to_parks_;
+    }
+
+   private:
+    // для хранения данных используйте контейнер unordered_map
+    // назовите поле класса car_to_parks_
+    std::unordered_map<VehiclePlate, int, VehiclePlateHasher> car_to_parks_;
 };
 
 int main() {
-    HashableContainer<VehiclePlate> plate_base;
-    plate_base.Insert({'B', 'H', 840, 'E', 99});
-    plate_base.Insert({'O', 'K', 942, 'K', 78});
-    plate_base.Insert({'O', 'K', 942, 'K', 78});
-    plate_base.Insert({'O', 'K', 942, 'K', 78});
-    plate_base.Insert({'O', 'K', 942, 'K', 78});
-    plate_base.Insert({'H', 'E', 968, 'C', 79});
-    plate_base.Insert({'T', 'A', 326, 'X', 83});
-    plate_base.Insert({'H', 'H', 831, 'P', 116});
-    plate_base.Insert({'P', 'M', 884, 'K', 23});
-    plate_base.Insert({'O', 'C', 34, 'P', 24});
-    plate_base.Insert({'M', 'Y', 831, 'M', 43});
-    plate_base.Insert({'K', 'T', 478, 'P', 49});
-    plate_base.Insert({'X', 'P', 850, 'A', 50});
+    ParkingCounter parking;
 
-    plate_base.PrintAll(cout);
+    parking.Park({'B', 'H', 840, 'E', 99});
+    parking.Park({'O', 'K', 942, 'K', 78});
+    parking.Park({'O', 'K', 942, 'K', 78});
+    parking.Park({'O', 'K', 942, 'K', 78});
+    parking.Park({'O', 'K', 942, 'K', 78});
+    parking.Park({'H', 'E', 968, 'C', 79});
+    parking.Park({'T', 'A', 326, 'X', 83});
+    parking.Park({'H', 'H', 831, 'P', 116});
+    parking.Park({'A', 'P', 831, 'Y', 99});
+    parking.Park({'P', 'M', 884, 'K', 23});
+    parking.Park({'O', 'C', 34, 'P', 24});
+    parking.Park({'M', 'Y', 831, 'M', 43});
+    parking.Park({'B', 'P', 831, 'M', 79});
+    parking.Park({'O', 'K', 942, 'K', 78});
+    parking.Park({'K', 'T', 478, 'P', 49});
+    parking.Park({'X', 'P', 850, 'A', 50});
+
+    assert(parking.GetCount({'O', 'K', 942, 'K', 78}) == 5);
+    assert(parking.GetCount({'A', 'B', 111, 'C', 99}) == 0);
+
+    for (const auto& [plate, count] : parking.GetAllData()) {
+        cout << plate << " "s << count << endl;
+    }
 }
