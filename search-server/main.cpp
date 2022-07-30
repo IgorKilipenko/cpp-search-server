@@ -1,76 +1,54 @@
+#include <algorithm>
+#include <cassert>
+#include <cstddef>
 #include <execution>
 #include <iostream>
-#include <random>
-#include <string>
 #include <vector>
-
-#include "log_duration.h"
-#include "process_queries.h"
-#include "search_server.h"
-#include "test_example_functions.h"
 
 using namespace std;
 
+class MoneyBox {
+   public:
+    explicit MoneyBox(vector<int64_t> nominals) : nominals_(move(nominals)), counts_(nominals_.size()) {}
+
+    const vector<int>& GetCounts() const {
+        return counts_;
+    }
+
+    void PushCoin(int64_t value) {
+        auto idx = GetIndex(value);
+        ++counts_[idx];
+    }
+
+    void PrintCoins(ostream& out) const {
+        for (int i = 0; i < counts_.size(); ++i) {
+            if (counts_[i]) {
+                out << nominals_[i] << ": " << counts_[i] << std::endl;
+            }
+        }
+    }
+
+   private:
+    const vector<int64_t> nominals_;
+    vector<int> counts_;
+
+    size_t GetIndex(int64_t nominal) const {
+        auto ptr = find(std::execution::par, nominals_.begin(), nominals_.end(), nominal);
+        assert(ptr != nominals_.end());
+        return ptr - nominals_.begin();
+    }
+};
+
+ostream& operator<<(ostream& out, const MoneyBox& cash) {
+    cash.PrintCoins(out);
+    return out;
+}
+
 int main() {
-    {
-        TestParFindTopDocuments();
-
-        mt19937 generator;
-
-        const auto dictionary = GenerateDictionary(generator, 1000, 10);
-        const auto documents = GenerateQueries(generator, dictionary, 10'000, 70);
-
-        SearchServer search_server(dictionary[0]);
-        for (size_t i = 0; i < documents.size(); ++i) {
-            search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
-        }
-
-        const auto queries = GenerateQueries(generator, dictionary, 100, 70, 0.1);
-
-        TEST_FIND_TOP_DOCUMENTS(seq);
-        TEST_FIND_TOP_DOCUMENTS(par);
-    }
-    {
-        TestParMatchDocument();
-
-        mt19937 generator;
-
-        const auto dictionary = GenerateDictionary(generator, 1000, 10);
-        const auto documents = GenerateQueries(generator, dictionary, 10'000, 70);
-
-        const string query = GenerateQuery(generator, dictionary, 500, 0.1);
-
-        SearchServer search_server(dictionary[0]);
-        for (size_t i = 0; i < documents.size(); ++i) {
-            search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
-        }
-
-        TEST_MATCH_DOCUMENT(seq);
-        TEST_MATCH_DOCUMENT(par);
-    }
-    {
-        TestParRemoveDocument();
-
-        mt19937 generator;
-
-        const auto dictionary = GenerateDictionary(generator, 10'000, 25);
-        const auto documents = GenerateQueries(generator, dictionary, 10'000, 100);
-
-        {
-            SearchServer search_server(dictionary[0]);
-            for (size_t i = 0; i < documents.size(); ++i) {
-                search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
-            }
-
-            TEST_REMOVE_DOCUMENT(seq);
-        }
-        {
-            SearchServer search_server(dictionary[0]);
-            for (size_t i = 0; i < documents.size(); ++i) {
-                search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, {1, 2, 3});
-            }
-
-            TEST_REMOVE_DOCUMENT(par);
-        }
-    }
+    MoneyBox cash({1, 500, 10000});
+    cash.PushCoin(500);
+    cash.PushCoin(500);
+    cash.PushCoin(10000);
+    assert((cash.GetCounts() == vector<int>{0, 2, 1}));
+    cout << cash << endl;
 }
