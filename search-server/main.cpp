@@ -16,53 +16,16 @@ void DeleteTree(TreeNode<T>* node) {
     DeleteTree(node->right);
     delete node;
 }
-/*
-template <typename T>
-bool CheckTreeProperty(const TreeNode<T>* node) {
-    if (!node->left && !node->right) {
-        return true;
-    }
-    if (node->left && node->value < node->left->value) {
-        return false;
-    }
-    if (node->right && node->right->value < node->value) {
-        return false;
-    }
-    if (node->left && node->right && node->right->value < node->left->value) {
-        return false;
-    }
-
-    bool reult = CheckTreeProperty(node->left);
-    reult = reult && CheckTreeProperty(node->right);
-
-    return reult;
-}*/
 
 template <typename T>
 bool CheckTreeProperty(const TreeNode<T>* node, const T* min, const T* max) {
-    if (min && node->value < *min) {
-        return false;
-    }
-    if (max && *max < node->value) {
-        return false;
-    }
-    if (!node->left && !node->right) {
+    if (!node) {
         return true;
     }
-    bool result = node->left == nullptr;
-    result = !result &&
-             CheckTreeProperty(
-                 node->left, node->left->left ? &(node->left->left->value) : nullptr, node->left->right ? &(node->left->right->value) : nullptr);
-    
-    if (!result) {
+    if (((max) && node->value > *max) || ((min) && node->value < *min)) {
         return false;
     }
-
-    result = node->right == nullptr;
-    result = !result &&
-             CheckTreeProperty(
-                 node->right, node->right->left ? &(node->right->left->value) : nullptr, node->right->right ? &(node->right->right->value) : nullptr);
-    return result;
+    return CheckTreeProperty<T>(node->left, min, &node->value) && CheckTreeProperty<T>(node->right, &node->value, max);
 }
 
 template <typename T>
