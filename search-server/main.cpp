@@ -1,13 +1,18 @@
 #include <cassert>
+#include <iostream>
+#include <iterator>
 
-template <typename T>
+using namespace std;
+
+template <class T>
 struct TreeNode {
     T value;
+    TreeNode* parent = nullptr;
     TreeNode* left = nullptr;
     TreeNode* right = nullptr;
 };
 
-template <typename T>
+template <class T>
 void DeleteTree(TreeNode<T>* node) {
     if (!node) {
         return;
@@ -17,30 +22,116 @@ void DeleteTree(TreeNode<T>* node) {
     delete node;
 }
 
-template <typename T>
-bool CheckTreeProperty(const TreeNode<T>* node, const T* min, const T* max) {
-    if (!node) {
-        return true;
+template <class T>
+void PrintTree(const TreeNode<T>* root, ostream& out = cout) {
+    out << " ( "s;
+    out << root->value;
+    if (root->left || root->right) {
+        if (root->left) {
+            PrintTree(root->left, out);
+        } else {
+            out << "*"s;
+        }
+        if (root->right) {
+            PrintTree(root->right, out);
+        } else {
+            out << "*"s;
+        }
     }
-    if (((max) && node->value > *max) || ((min) && node->value < *min)) {
-        return false;
-    }
-    return CheckTreeProperty<T>(node->left, min, &node->value) && CheckTreeProperty<T>(node->right, &node->value, max);
+    out << " ) "s;
 }
 
-template <typename T>
-bool CheckTreeProperty(const TreeNode<T>* node) {
-    return CheckTreeProperty<T>(node, nullptr, nullptr);
+template <class T>
+ostream& operator<<(ostream& out, const TreeNode<T>* node) {
+    PrintTree(node, out);
+    return out;
+}
+
+template <class T>
+TreeNode<T>* GetRoot(TreeNode<T>* node) {
+    assert(node);
+    TreeNode<T>* root = node;
+    while (root->parent) {
+        root = root->parent;
+    }
+    return root;
+}
+
+template <class T>
+TreeNode<T>* begin(TreeNode<T>* node) {
+    /*if (!node) {
+        return nullptr;
+    }
+
+    TreeNode<T>* root = GetRoot(node);
+    TreeNode<T>* result = root;
+    while (result->left) {
+        result = result->left;
+    }
+    return result;*/
+    if (!node) {
+        return nullptr;
+    }
+    TreeNode<T>* result = node;
+    while (result->left) {
+        result = result->left;
+    }
+    return result;
+}
+
+template <class T>
+TreeNode<T>* next(TreeNode<T>* node) {
+    if (!node) {
+        return nullptr;
+    }
+
+    if (node->right) {
+        auto right = node->right;
+        TreeNode<T>* result = right;
+        while (result->left) {
+            result = result->left;
+        }
+        return result;
+    }
+    TreeNode<T>* result = node;
+    while (result && result->parent) {
+        if (result->parent->left == result) {
+            result = result->parent;
+            break;
+        }
+        if (result->parent->right == result) {
+            result = result->parent->parent ? result->parent : nullptr;
+        }
+    }
+    return result;
+}
+
+// функция создаёт новый узел с заданным значением и потомками
+TreeNode<int>* N(int val, TreeNode<int>* left = nullptr, TreeNode<int>* right = nullptr) {
+    auto res = new TreeNode<int>{val, nullptr, left, right};
+    if (left) {
+        left->parent = res;
+    }
+    if (right) {
+        right->parent = res;
+    }
+
+    return res;
 }
 
 int main() {
     using T = TreeNode<int>;
-    T* root1 = new T{6, new T{4, new T{3}, new T{5}}, new T{7}};
-    assert(CheckTreeProperty(root1));
 
-    T* root2 = new T{6, new T{4, new T{3}, new T{5}}, new T{7, new T{8}}};
-    assert(!CheckTreeProperty(root2));
+    T* root = N(6, N(4, N(3), N(5)), N(8, N(7)));
+    cout << root << endl;
 
-    DeleteTree(root1);
-    DeleteTree(root2);
+    T* iter = begin(root);
+
+    while (iter) {
+        cout << iter->value << " "s;
+        iter = next(iter);
+    }
+    cout << endl;
+
+    DeleteTree(root);
 }
