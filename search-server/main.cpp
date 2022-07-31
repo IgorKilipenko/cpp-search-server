@@ -59,16 +59,6 @@ TreeNode<T>* GetRoot(TreeNode<T>* node) {
 
 template <class T>
 TreeNode<T>* begin(TreeNode<T>* node) {
-    /*if (!node) {
-        return nullptr;
-    }
-
-    TreeNode<T>* root = GetRoot(node);
-    TreeNode<T>* result = root;
-    while (result->left) {
-        result = result->left;
-    }
-    return result;*/
     if (!node) {
         return nullptr;
     }
@@ -84,14 +74,8 @@ TreeNode<T>* next(TreeNode<T>* node) {
     if (!node) {
         return nullptr;
     }
-
     if (node->right) {
-        auto right = node->right;
-        TreeNode<T>* result = right;
-        while (result->left) {
-            result = result->left;
-        }
-        return result;
+        return begin(node->right);
     }
     TreeNode<T>* result = node;
     while (result && result->parent) {
