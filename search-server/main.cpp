@@ -4,8 +4,8 @@
 #include <numeric>
 #include <vector>
 
-// не меняйте файлы json.h и json.cpp
-#include "json.h"
+// не меняйте файлы xml.h и xml.cpp
+#include "xml.h"
 
 using namespace std;
 
@@ -15,10 +15,9 @@ struct Spending {
 };
 
 int CalculateTotalSpendings(const vector<Spending>& spendings) {
-    return accumulate(
-        spendings.begin(), spendings.end(), 0, [](int current, const Spending& spending){
-            return current + spending.amount;
-        });
+    return accumulate(spendings.begin(), spendings.end(), 0, [](int current, const Spending& spending) {
+        return current + spending.amount;
+    });
 }
 
 string FindMostExpensiveCategory(const vector<Spending>& spendings) {
@@ -29,23 +28,21 @@ string FindMostExpensiveCategory(const vector<Spending>& spendings) {
     return max_element(begin(spendings), end(spendings), compare_by_amount)->category;
 }
 
-vector<Spending> LoadFromJson(istream& input) {
+vector<Spending> LoadFromXml(istream& input) {
     // место для вашей реализации
-    // пример корректного JSON-документа в условии
+    // пример корректного XML-документа в условии
     Document json = Load(input);
     const Node& root = json.GetRoot();
-    const std::vector<Node>& data = root.AsArray();
+    const std::vector<Node>& data = root.Children();
     vector<Spending> result{data.size()};
-    std::transform(data.begin(), data.end(), result.begin(), [](const Node& node) -> Spending{ 
-        const auto& map = node.AsMap();
-        return {map.at("category").AsString(), map.at("amount").AsInt()};
+    std::transform(data.begin(), data.end(), result.begin(), [](const Node& node) -> Spending {
+        return {node.AttributeValue<std::string>("category"), node.AttributeValue<int>("amount")};
     });
     return result;
 }
 
 int main() {
-    // не меняйте main
-    const vector<Spending> spendings = LoadFromJson(cin);
+    const vector<Spending> spendings = LoadFromXml(cin);
     cout << "Total "sv << CalculateTotalSpendings(spendings) << '\n';
     cout << "Most expensive is "sv << FindMostExpensiveCategory(spendings) << '\n';
 }
