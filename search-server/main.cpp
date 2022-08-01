@@ -1,121 +1,51 @@
+#include <algorithm>
 #include <cassert>
 #include <iostream>
-#include <iterator>
+#include <numeric>
+#include <vector>
+
+// не меняйте файлы json.h и json.cpp
+#include "json.h"
 
 using namespace std;
 
-template <class T>
-struct TreeNode {
-    T value;
-    TreeNode* parent = nullptr;
-    TreeNode* left = nullptr;
-    TreeNode* right = nullptr;
+struct Spending {
+    string category;
+    int amount;
 };
 
-template <class T>
-void DeleteTree(TreeNode<T>* node) {
-    if (!node) {
-        return;
-    }
-    DeleteTree(node->left);
-    DeleteTree(node->right);
-    delete node;
+int CalculateTotalSpendings(const vector<Spending>& spendings) {
+    return accumulate(
+        spendings.begin(), spendings.end(), 0, [](int current, const Spending& spending){
+            return current + spending.amount;
+        });
 }
 
-template <class T>
-void PrintTree(const TreeNode<T>* root, ostream& out = cout) {
-    out << " ( "s;
-    out << root->value;
-    if (root->left || root->right) {
-        if (root->left) {
-            PrintTree(root->left, out);
-        } else {
-            out << "*"s;
-        }
-        if (root->right) {
-            PrintTree(root->right, out);
-        } else {
-            out << "*"s;
-        }
-    }
-    out << " ) "s;
+string FindMostExpensiveCategory(const vector<Spending>& spendings) {
+    assert(!spendings.empty());
+    auto compare_by_amount = [](const Spending& lhs, const Spending& rhs) {
+        return lhs.amount < rhs.amount;
+    };
+    return max_element(begin(spendings), end(spendings), compare_by_amount)->category;
 }
 
-template <class T>
-ostream& operator<<(ostream& out, const TreeNode<T>* node) {
-    PrintTree(node, out);
-    return out;
-}
-
-template <class T>
-TreeNode<T>* GetRoot(TreeNode<T>* node) {
-    assert(node);
-    TreeNode<T>* root = node;
-    while (root->parent) {
-        root = root->parent;
-    }
-    return root;
-}
-
-template <class T>
-TreeNode<T>* begin(TreeNode<T>* node) {
-    if (!node) {
-        return nullptr;
-    }
-    TreeNode<T>* result = node;
-    while (result->left) {
-        result = result->left;
-    }
+vector<Spending> LoadFromJson(istream& input) {
+    // место для вашей реализации
+    // пример корректного JSON-документа в условии
+    Document json = Load(input);
+    const Node& root = json.GetRoot();
+    const std::vector<Node>& data = root.AsArray();
+    vector<Spending> result{data.size()};
+    std::transform(data.begin(), data.end(), result.begin(), [](const Node& node) -> Spending{ 
+        const auto& map = node.AsMap();
+        return {map.at("category").AsString(), map.at("amount").AsInt()};
+    });
     return result;
-}
-
-template <class T>
-TreeNode<T>* next(TreeNode<T>* node) {
-    if (!node) {
-        return nullptr;
-    }
-    if (node->right) {
-        return begin(node->right);
-    }
-    TreeNode<T>* result = node;
-    while (result && result->parent) {
-        if (result->parent->left == result) {
-            result = result->parent;
-            break;
-        }
-        if (result->parent->right == result) {
-            result = result->parent->parent ? result->parent : nullptr;
-        }
-    }
-    return result;
-}
-
-// функция создаёт новый узел с заданным значением и потомками
-TreeNode<int>* N(int val, TreeNode<int>* left = nullptr, TreeNode<int>* right = nullptr) {
-    auto res = new TreeNode<int>{val, nullptr, left, right};
-    if (left) {
-        left->parent = res;
-    }
-    if (right) {
-        right->parent = res;
-    }
-
-    return res;
 }
 
 int main() {
-    using T = TreeNode<int>;
-
-    T* root = N(6, N(4, N(3), N(5)), N(8, N(7)));
-    cout << root << endl;
-
-    T* iter = begin(root);
-
-    while (iter) {
-        cout << iter->value << " "s;
-        iter = next(iter);
-    }
-    cout << endl;
-
-    DeleteTree(root);
+    // не меняйте main
+    const vector<Spending> spendings = LoadFromJson(cin);
+    cout << "Total "sv << CalculateTotalSpendings(spendings) << '\n';
+    cout << "Most expensive is "sv << FindMostExpensiveCategory(spendings) << '\n';
 }

@@ -19,6 +19,7 @@ set(LIBS
     ${SRC_DIR}/string_processing.cpp
     ${SRC_DIR}/process_queries.cpp
     ${SRC_DIR}/test_example_functions.cpp
+    ${SRC_DIR}/json.cpp
 )
 
 if (DEFINED TESTS AND TESTS)
