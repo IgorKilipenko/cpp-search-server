@@ -6,33 +6,37 @@
 #include <unordered_map>
 #include <vector>
 
-class Node {
-public:
-    explicit Node(std::vector<Node> array);
-    explicit Node(std::map<std::string, Node> map);
-    explicit Node(int value);
-    explicit Node(std::string value);
+namespace json {
 
-    const std::vector<Node>& AsArray() const;
-    const std::map<std::string, Node>& AsMap() const;
-    int AsInt() const;
-    const std::string& AsString() const;
+    class Node {
+    public:
+        explicit Node(std::vector<Node> array);
+        explicit Node(std::map<std::string, Node> map);
+        explicit Node(int value);
+        explicit Node(std::string value);
 
-private:
-    std::vector<Node> as_array_;
-    std::map<std::string, Node> as_map_;
-    int as_int_;
-    std::string as_string_;
-};
+        const std::vector<Node>& AsArray() const;
+        const std::map<std::string, Node>& AsMap() const;
+        int AsInt() const;
+        const std::string& AsString() const;
 
-class Document {
-public:
-    explicit Document(Node root);
+    private:
+        std::vector<Node> as_array_;
+        std::map<std::string, Node> as_map_;
+        int as_int_;
+        std::string as_string_;
+    };
 
-    const Node& GetRoot() const;
+    class Document {
+    public:
+        explicit Document(Node root);
 
-private:
-    Node root_;
-};
+        const Node& GetRoot() const;
 
-Document Load(std::istream& input);
+    private:
+        Node root_;
+    };
+
+    Document Load(std::istream& input);
+
+}

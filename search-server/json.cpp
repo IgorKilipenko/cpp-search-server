@@ -2,98 +2,102 @@
 
 using namespace std;
 
-Node::Node(vector<Node> array) : as_array_(move(array)) {}
+namespace json {
 
-Node::Node(map<string, Node> map) : as_map_(move(map)) {}
+    Node::Node(vector<Node> array) : as_array_(move(array)) {}
 
-Node::Node(int value) : as_int_(value) {}
+    Node::Node(map<string, Node> map) : as_map_(move(map)) {}
 
-Node::Node(string value) : as_string_(move(value)) {}
+    Node::Node(int value) : as_int_(value) {}
 
-const vector<Node>& Node::AsArray() const {
-    return as_array_;
-}
+    Node::Node(string value) : as_string_(move(value)) {}
 
-const map<string, Node>& Node::AsMap() const {
-    return as_map_;
-}
+    const vector<Node>& Node::AsArray() const {
+        return as_array_;
+    }
 
-int Node::AsInt() const {
-    return as_int_;
-}
+    const map<string, Node>& Node::AsMap() const {
+        return as_map_;
+    }
 
-const string& Node::AsString() const {
-    return as_string_;
-}
+    int Node::AsInt() const {
+        return as_int_;
+    }
 
-Document::Document(Node root) : root_(move(root)) {}
+    const string& Node::AsString() const {
+        return as_string_;
+    }
 
-const Node& Document::GetRoot() const {
-    return root_;
-}
+    Document::Document(Node root) : root_(move(root)) {}
 
-Node LoadNode(istream& input);
+    const Node& Document::GetRoot() const {
+        return root_;
+    }
 
-Node LoadArray(istream& input) {
-    vector<Node> result;
+    Node LoadNode(istream& input);
 
-    for (char c; input >> c && c != ']';) {
-        if (c != ',') {
-            input.putback(c);
+    Node LoadArray(istream& input) {
+        vector<Node> result;
+
+        for (char c; input >> c && c != ']';) {
+            if (c != ',') {
+                input.putback(c);
+            }
+            result.push_back(LoadNode(input));
         }
-        result.push_back(LoadNode(input));
+
+        return Node(move(result));
     }
 
-    return Node(move(result));
-}
-
-Node LoadInt(istream& input) {
-    int result = 0;
-    while (isdigit(input.peek())) {
-        result *= 10;
-        result += input.get() - '0';
+    Node LoadInt(istream& input) {
+        int result = 0;
+        while (isdigit(input.peek())) {
+            result *= 10;
+            result += input.get() - '0';
+        }
+        return Node(result);
     }
-    return Node(result);
-}
 
-Node LoadString(istream& input) {
-    string line;
-    getline(input, line, '"');
-    return Node(move(line));
-}
+    Node LoadString(istream& input) {
+        string line;
+        getline(input, line, '"');
+        return Node(move(line));
+    }
 
-Node LoadDict(istream& input) {
-    map<string, Node> result;
+    Node LoadDict(istream& input) {
+        map<string, Node> result;
 
-    for (char c; input >> c && c != '}';) {
-        if (c == ',') {
+        for (char c; input >> c && c != '}';) {
+            if (c == ',') {
+                input >> c;
+            }
+
+            string key = LoadString(input).AsString();
             input >> c;
+            result.insert({move(key), LoadNode(input)});
         }
 
-        string key = LoadString(input).AsString();
+        return Node(move(result));
+    }
+
+    Node LoadNode(istream& input) {
+        char c;
         input >> c;
-        result.insert({move(key), LoadNode(input)});
+
+        if (c == '[') {
+            return LoadArray(input);
+        } else if (c == '{') {
+            return LoadDict(input);
+        } else if (c == '"') {
+            return LoadString(input);
+        } else {
+            input.putback(c);
+            return LoadInt(input);
+        }
     }
 
-    return Node(move(result));
-}
-
-Node LoadNode(istream& input) {
-    char c;
-    input >> c;
-
-    if (c == '[') {
-        return LoadArray(input);
-    } else if (c == '{') {
-        return LoadDict(input);
-    } else if (c == '"') {
-        return LoadString(input);
-    } else {
-        input.putback(c);
-        return LoadInt(input);
+    Document Load(istream& input) {
+        return Document{LoadNode(input)};
     }
-}
 
-Document Load(istream& input) {
-    return Document{LoadNode(input)};
 }
