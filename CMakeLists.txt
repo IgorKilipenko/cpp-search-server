@@ -22,6 +22,8 @@ set(LIBS
     ${SRC_DIR}/json.cpp
     ${SRC_DIR}/xml.cpp
     ${SRC_DIR}/ini.cpp
+    ${SRC_DIR}/libstat.cpp
+    ${SRC_DIR}/libstat_test.cpp
 )
 
 if (DEFINED TESTS AND TESTS)
