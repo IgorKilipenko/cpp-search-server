@@ -1,25 +1,58 @@
 #pragma once
 
 #include <cmath>
+#include <iostream>
+#include <type_traits>
 
-struct Coordinates {
-    double lat;
-    double lng;
-    bool operator==(const Coordinates& other) const {
-        return lat == other.lat && lng == other.lng;
+namespace transport_catalogue::geo {
+    static constexpr double PI() {
+        return std::atan(1) * 4.;
     }
-    bool operator!=(const Coordinates& other) const {
-        return !(*this == other);
-    }
-};
+    static const double EARTH_RADIUS = 6371000.;
 
-inline double ComputeDistance(Coordinates from, Coordinates to) {
-    using namespace std;
-    if (from == to) {
-        return 0;
+    struct Coordinates {
+        double lat = 0.;
+        double lng = 0.;
+        
+        bool operator==(const Coordinates& other) const {
+            return lat == other.lat && lng == other.lng;
+        }
+
+        bool operator!=(const Coordinates& other) const {
+            return !(*this == other);
+        }
+
+        Coordinates() : Coordinates(0., 0.) {
+            std::cerr << "Coordinates def constructor" << std::endl;
+        }
+
+        Coordinates(double lat, double lng) : lat{lat}, lng{lng} {
+            std::cerr << "Coordinates first constructor" << std::endl;
+        }
+
+        Coordinates(Coordinates&& other) : lat{std::move(other.lat)}, lng{std::move(other.lng)} {
+            std::cerr << "Coordinates move constructor" << std::endl;
+        }
+
+        Coordinates(const Coordinates& other) : lat{other.lat}, lng{other.lng} {
+            std::cerr << "Coordinates copy constructor" << std::endl;
+        };
+        
+        Coordinates& operator=(const Coordinates& other) = default;
+
+        //Coordinates& operator=(const Coordinates& other) = delete;
+        //Coordinates(const Coordinates& other) = delete;
+    };
+
+    inline double ComputeDistance(Coordinates from, Coordinates to) {
+        using namespace std;
+        if (from == to) {
+            return 0;
+        }
+        static const double dr = PI() /*3.1415926535*/ / 180.;
+        return std::acos(
+                   std::sin(from.lat * dr) * std::sin(to.lat * dr) +
+                   std::cos(from.lat * dr) * std::cos(to.lat * dr) * std::cos(std::abs(from.lng - to.lng) * dr)) *
+               EARTH_RADIUS;
     }
-    static const double dr = 3.1415926535 / 180.;
-    return acos(sin(from.lat * dr) * sin(to.lat * dr)
-                + cos(from.lat * dr) * cos(to.lat * dr) * cos(abs(from.lng - to.lng) * dr))
-        * 6371000;
 }
