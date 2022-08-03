@@ -3,6 +3,7 @@
 #include <deque>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 
 #include "geo.h"
@@ -14,8 +15,14 @@ namespace transport_catalogue {
         std::string name;
         Coordinates coordinates;
         Stop() = default;
-        Stop(std::string name, Coordinates&& coordinates): name{name}, coordinates{std::move(coordinates)} {}
-        Stop(std::string name, const Coordinates& coordinates): name{name}, coordinates{coordinates} {}
+        /*Stop(std::string&& name, Coordinates&& coordinates): name{std::move(name)}, coordinates{std::move(coordinates)} {}
+        Stop(const std::string& name, const Coordinates& coordinates): name{name}, coordinates{coordinates} {}*/
+        template <
+            typename String, typename Coordinates,
+            std::enable_if_t<
+                std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, transport_catalogue::Coordinates>,
+                bool> = true>
+        Stop(String&& name, Coordinates&& coordinates) : name{std::move(name)}, coordinates{std::move(coordinates)} {}
     };
 
     class TransportCatalogue {
