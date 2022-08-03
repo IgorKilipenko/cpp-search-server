@@ -13,8 +13,10 @@ endif()
 
 set(LIBS 
     ${MAIN_FILE}
+    ${SRC_DIR}/transport_catalogue.cpp
     ${SRC_DIR}/input_reader.cpp
     ${SRC_DIR}/stat_reader.cpp
+    ${SRC_DIR}/input_reader.cpp
 )
 
 if (DEFINED TESTS AND TESTS)
