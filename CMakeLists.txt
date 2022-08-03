@@ -1,29 +1,20 @@
 cmake_minimum_required(VERSION 3.14)
 set(CMAKE_VERBOSE_MAKEFILE ON)
-set(PROJECT_NAME "search-server")
+set(PROJECT_NAME "transport-catalogue")
 project(${PROJECT_NAME} CXX)
 
-set(SRC_DIR ./search-server)
+set(SRC_DIR ./transport-catalogue)
 set(MAIN_FILE ${SRC_DIR}/main.cpp )
 
 if (DEFINED TESTS AND TESTS)
-    set(TESTS_DIR ./search-server/tests)
+    set(TESTS_DIR ${SRC_DIR}/tests)
     set(MAIN_FILE ${TESTS_DIR}/main.cpp )
 endif()
 
 set(LIBS 
     ${MAIN_FILE}
-    ${SRC_DIR}/search_server.cpp
-    ${SRC_DIR}/document.cpp
-    ${SRC_DIR}/read_input_functions.cpp
-    ${SRC_DIR}/string_processing.cpp
-    ${SRC_DIR}/process_queries.cpp
-    ${SRC_DIR}/test_example_functions.cpp
-    ${SRC_DIR}/json.cpp
-    ${SRC_DIR}/xml.cpp
-    ${SRC_DIR}/ini.cpp
-    ${SRC_DIR}/libstat.cpp
-    ${SRC_DIR}/libstat_test.cpp
+    ${SRC_DIR}/input_reader.cpp
+    ${SRC_DIR}/stat_reader.cpp
 )
 
 if (DEFINED TESTS AND TESTS)
