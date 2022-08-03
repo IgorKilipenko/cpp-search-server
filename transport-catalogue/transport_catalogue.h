@@ -27,8 +27,12 @@ namespace transport_catalogue {
 
     class TransportCatalogue {
     public:
-        template <typename LatLng>
-        const Stop& AddStop(const std::string_view name, LatLng&& coordinates);
+        template <
+            typename String, typename Coordinates,
+            std::enable_if_t<
+                std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, transport_catalogue::Coordinates>,
+                bool> = true>
+        const Stop& AddStop(String&& name, Coordinates&& coordinates);
 
         const std::deque<Stop>& GetStops() const;
 
@@ -41,8 +45,11 @@ namespace transport_catalogue {
 }
 
 namespace transport_catalogue {
-    template <typename LatLng>
-    const Stop& TransportCatalogue::AddStop(const std::string_view name, LatLng&& coordinates) {
-        return stops_.emplace_back(static_cast<std::string>(name), std::move(coordinates));
+    template <
+        typename String, typename Coordinates,
+        std::enable_if_t<
+            std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, transport_catalogue::Coordinates>, bool>>
+    const Stop& TransportCatalogue::AddStop(String&& name, Coordinates&& coordinates) {
+        return stops_.emplace_back(std::move(name), std::move(coordinates));
     }
 }
