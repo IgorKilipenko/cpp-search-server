@@ -10,6 +10,7 @@
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "geo.h"
@@ -27,7 +28,9 @@ namespace transport_catalogue::data {
                 std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, data::Coordinates>, bool> = true>
         Stop(String&& name, Coordinates&& coordinates) : name{std::move(name)}, coordinates{std::move(coordinates)} {}
         Stop(Stop&& other) : name{std::move(other.name)}, coordinates{std::move(other.coordinates)} {
+#if (TRACE_DEBUG)
             std::cerr << "Stop move constructor" << std::endl;
+#endif
         }
     };
 
@@ -42,7 +45,9 @@ namespace transport_catalogue::data {
             std::enable_if_t<std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Route>, data::Route>, bool> = true>
         Bus(String&& name, Route&& route) : name{std::move(name)}, route{std::move(route)} {}
         Bus(Bus&& other) : name{std::move(other.name)}, route{std::move(other.route)} {
+#if (TRACE_DEBUG)
             std::cerr << "Bus move constructor" << std::endl;
+#endif
         }
         /*Bus(const Bus& other) : name{other.name}, route{other.route} {
             std::cerr << "Bus copy constructor" << std::endl;
@@ -54,7 +59,6 @@ namespace transport_catalogue::data {
         size_t total_stops{};
         size_t unique_stops{};
         double route_length{};
-        double route_distance{};
     };
 
     class Hasher {
@@ -119,10 +123,12 @@ namespace transport_catalogue::data {
         const Bus& AddBus(String&& name, RawRouteContainer&& stops);
 
         template <typename StringView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool> = true>
-        const Bus* const GetBus(StringView&& name) const;
+        const Bus* GetBus(StringView&& name) const;
 
         template <typename StringView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool> = true>
-        const Stop* const GetStop(StringView&& name) const;
+        const Stop* GetStop(StringView&& name) const;
+
+        const BusRouteInfo GetBusInfo(const Bus* bus) const;
 
     private:
         StopsTable stops_;
@@ -133,7 +139,7 @@ namespace transport_catalogue::data {
 
         template <
             typename StringView, typename TableView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool> = true>
-        const Stop* const GetItem(StringView&& name, const TableView& table) const;
+        const auto* GetItem(StringView&& name, const TableView& table) const;
 
         void LockDatabase() {
             mutex_.lock();
@@ -146,6 +152,10 @@ namespace transport_catalogue::data {
         std::lock_guard<std::mutex> LockGuard() {
             return std::lock_guard<std::mutex>{mutex_};
         }
+
+        double CalcDistance(const Stop* from_stop, const Stop* to_stop) {
+            return ComputeDistance(from_stop->coordinates, to_stop->coordinates);
+        }
     };
 }
 
@@ -153,6 +163,8 @@ namespace transport_catalogue {
     using Coordinates = data::Coordinates;
     using Stop = data::Stop;
     using Bus = data::Bus;
+    using Route = data::Route;
+    using BusInfo = data::BusRouteInfo;
 
     class TransportCatalogue {
     public:
@@ -168,16 +180,18 @@ namespace transport_catalogue {
         const Stop& AddStop(String&& name, Coordinates&& coordinates);
 
         template <typename StringView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool> = true>
-        const Bus* const GetBus(StringView&& name) const;
+        const Bus* GetBus(StringView&& name) const;
 
         template <typename StringView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool> = true>
-        const std::deque<Stop>& GetStop(StringView&& name) const;
+        const Stop* GetStop(StringView&& name) const;
 
         const std::deque<Stop>& GetStops() const;
 
         const std::shared_ptr<Database> GetDatabaseForWrite() const;
 
         const std::shared_ptr<const Database> GetDatabaseReadOnly() const;
+
+        const BusInfo GetBusInfo(const Bus* bus) const;
 
     private:
         std::shared_ptr<Database> db_;
@@ -236,29 +250,27 @@ namespace transport_catalogue::data {
 
     template <class Owner>
     template <typename StringView, typename TableView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool>>
-    const Stop* const Database<Owner>::GetItem(StringView&& name, const TableView& table) const {
+    const auto* Database<Owner>::GetItem(StringView&& name, const TableView& table) const {
         auto ptr = table.find(std::move(name));
-        if (ptr == table.end()) {
-            return nullptr;
-        }
-        return ptr->second;
+        return ptr == table.end() ? nullptr : ptr->second;
     }
 
     template <class Owner>
     template <typename StringView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool>>
-    const Bus* const Database<Owner>::GetBus(StringView&& name) const {
+    const Bus* Database<Owner>::GetBus(StringView&& name) const {
         /*auto ptr = name_to_bus_.find(std::move(name));
         if (ptr == name_to_bus_.end()) {
             return nullptr;
         }
         return ptr->second;*/
 
-        return GetItem(std::move(name), name_to_bus_);
+        const Bus* result = GetItem(std::move(name), name_to_bus_);
+        return result;
     }
 
     template <class Owner>
     template <typename StringView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool>>
-    const Stop* const Database<Owner>::GetStop(StringView&& name) const {
+    const Stop* Database<Owner>::GetStop(StringView&& name) const {
         /*auto ptr = name_to_stop_.find(std::move(name));
         if (ptr == name_to_stop_.end()) {
             return nullptr;
@@ -282,6 +294,25 @@ namespace transport_catalogue::data {
     const typename Database<Owner>::NameToStopView& Database<Owner>::GetNameToStopView() const {
         return name_to_stop_;
     }
+
+    template <class Owner>
+    const BusRouteInfo Database<Owner>::GetBusInfo(const Bus* bus) const {
+        BusInfo info;
+        double route_length = 0;
+        const Route& route = bus->route;
+
+        std::unordered_set<const Stop*> unique_stops(route.begin(), route.end());
+
+        for (auto i = 0; i < route.size() - 1; ++i) {
+            route_length += geo::ComputeDistance(route[i]->coordinates, route[i + 1]->coordinates);
+        }
+
+        info.total_stops = route.size();
+        info.unique_stops = unique_stops.size();
+        info.route_length = route_length;
+
+        return info;
+    }
 }
 
 namespace transport_catalogue {
@@ -294,12 +325,12 @@ namespace transport_catalogue {
     }
 
     template <typename StringView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool>>
-    const Bus* const TransportCatalogue::GetBus(StringView&& name) const {
+    const Bus* TransportCatalogue::GetBus(StringView&& name) const {
         return db_->GetBus(std::move(name));
     }
 
     template <typename StringView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool>>
-    const std::deque<Stop>& TransportCatalogue::GetStop(StringView&& name) const {
+    const Stop* TransportCatalogue::GetStop(StringView&& name) const {
         return db_->GetStop(std::move(name));
     }
 }
