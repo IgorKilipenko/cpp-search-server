@@ -19,8 +19,6 @@ namespace transport_catalogue::data {
         std::string name;
         Coordinates coordinates;
         Stop() = default;
-        /*Stop(std::string&& name, Coordinates&& coordinates): name{std::move(name)}, coordinates{std::move(coordinates)} {}
-        Stop(const std::string& name, const Coordinates& coordinates): name{name}, coordinates{coordinates} {}*/
         template <
             typename String, typename Coordinates,
             std::enable_if_t<
@@ -95,8 +93,9 @@ namespace transport_catalogue::data {
 
         template <
             typename String, typename RawRouteContainer,
-            std::enable_if_t<std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<RawRouteContainer>, std::vector<std::string_view>>, bool> =
-                true>
+            std::enable_if_t<
+                std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<RawRouteContainer>, std::vector<std::string_view>>,
+                bool> = true>
         const Bus& AddBus(String&& name, RawRouteContainer&& stops) {
             Route route{stops.size()};
             std::transform(stops.begin(), stops.end(), route.begin(), [&](const std::string_view stop) {
