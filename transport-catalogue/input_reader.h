@@ -17,7 +17,7 @@ namespace transport_catalogue::io::detail {
     size_t TrimStart(std::string_view& str, const char ch = ' ');
     size_t TrimEnd(std::string_view& str, const char ch = ' ');
     void Trim(std::string_view& str, const char ch = ' ');
-    std::vector<std::string_view> SplitIntoWords(std::string_view str, const char ch = ' ');
+    std::vector<std::string_view> SplitIntoWords(std::string_view str, const char ch = ' ', size_t max_count = 0);
 }
 
 namespace transport_catalogue::io {
@@ -28,7 +28,8 @@ namespace transport_catalogue::io {
         using StopsContainer = std::unordered_map<std::string_view, Coordinates>;
 
     public:
-        using StopCmdResult = std::pair<std::string_view, Coordinates>;
+        using StopRequest = std::pair<std::string_view, Coordinates>;
+        using RouteRequest = std::tuple<std::string_view, std::vector<std::string_view>, bool>;
 
         struct RawRequest {
             std::string_view command;
@@ -42,7 +43,10 @@ namespace transport_catalogue::io {
             static constexpr const std::string_view STOP = "Stop"sv;
             static constexpr const std::string_view BUS = "Bus"sv;
         };
-        StopCmdResult ParseStopCmd(const RawRequest& req) const;
+
+        StopRequest ParseStop(const RawRequest& req) const;
+
+        RouteRequest ParseBusRoute(const RawRequest& req) const;
 
         std::shared_ptr<std::pair<std::string_view, std::string_view>> SplitKeyValue(const std::string_view str) const;
 
@@ -54,7 +58,15 @@ namespace transport_catalogue::io {
 
         bool IsAddStopRequest(const std::string_view req) const;
 
-        bool IsAddBusRequest(const std::string_view req) const;
+        bool IsAddRouteRequest(const std::string_view req) const;
+
+        bool IsCircularRoute(const std::string_view args) const;
+
+        bool IsBidirectionalRoute(const std::string_view args) const;
+
+    private:
+        static const char CIRCULAR_ROUTE_SEPARATOR = '>';
+        static const char BIDIRECTIONAL_ROUTE_SEPARATOR = '-';
     };
 
     class Reader {
@@ -64,9 +76,9 @@ namespace transport_catalogue::io {
             RequestType type = RequestType::ADD;
             Stop value;
         };
-        
+
         Reader(TransportCatalogue::Database& db, std::istream& in_stream = std::cin) : in_stream_{in_stream}, catalog_db_{db} {}
-        
+
         template <typename TOut = std::string>
         TOut Read() const;
 
@@ -74,7 +86,7 @@ namespace transport_catalogue::io {
 
         std::vector<std::string> ReadLines(size_t count) const;
 
-        void ReadRequest(const std::string_view raw_cmd) const;
+        void ReadRequest(const Parser::RawRequest& raw_req) const;
 
         void PorccessRequests() const;
 
@@ -86,11 +98,11 @@ namespace transport_catalogue::io {
 }
 
 namespace transport_catalogue::io {
-        template <typename TOut>
-        TOut Reader::Read() const {
-            TOut result;
-            in_stream_ >> result;
-            in_stream_.get();
-            return result;
-        }
+    template <typename TOut>
+    TOut Reader::Read() const {
+        TOut result;
+        in_stream_ >> result;
+        in_stream_.get();
+        return result;
+    }
 }

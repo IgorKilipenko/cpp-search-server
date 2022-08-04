@@ -1,5 +1,11 @@
 #include "input_reader.h"
 
+#include <cassert>
+#include <cstddef>
+#include <iterator>
+#include <string_view>
+#include <vector>
+
 namespace transport_catalogue::io::detail {
     size_t TrimStart(std::string_view& str, const char ch) {
         size_t idx = str.find_first_not_of(ch);
@@ -21,18 +27,26 @@ namespace transport_catalogue::io::detail {
         TrimStart(str, ch);
         TrimEnd(str, ch);
     }
-    std::vector<std::string_view> SplitIntoWords(std::string_view str, const char ch) {
+    std::vector<std::string_view> SplitIntoWords(const std::string_view str, const char ch, size_t max_count) {
         if (str.empty()) {
             return {};
         }
+        std::string_view str_cpy = str;
         std::vector<std::string_view> result;
-        str.remove_prefix(std::min(str.find_first_not_of(ch), str.size()));
+        Trim(str_cpy);
 
         do {
-            int64_t space = str.find(ch, 0);
-            result.push_back(space == static_cast<int64_t>(str.npos) ? str.substr(0) : str.substr(0, space));
-            str.remove_prefix(std::min(str.find_first_not_of(ch, space), str.size()));
-        } while (!str.empty());
+            int64_t pos = str_cpy.find(ch, 0);
+            std::string_view substr = (pos == static_cast<int64_t>(str_cpy.npos)) ? str_cpy.substr(0) : str_cpy.substr(0, pos);
+            Trim(substr);
+            result.push_back(std::move(substr));
+            str_cpy.remove_prefix(std::min(str_cpy.find_first_not_of(ch, pos), str_cpy.size()));
+            if (max_count  && result.size() == max_count-1) {
+                Trim(str_cpy);
+                result.push_back(std::move(str_cpy));
+                break;
+            }
+        } while (!str_cpy.empty());
 
         return result;
     }
@@ -54,33 +68,61 @@ namespace transport_catalogue::io {
         return result;
     }
 
-    void Reader::ReadRequest(const std::string_view raw_cmd) const {
-        std::string_view cmd = raw_cmd;
+    void Reader::ReadRequest(const Parser::RawRequest& raw_req) const {
+        assert(!raw_req.value.empty() && !raw_req.args.empty() && !raw_req.command.empty());
+        /*std::string_view cmd = raw_cmd;
         detail::Trim(cmd);
         assert(!cmd.empty());
-        auto raw_req = parser_.SplitRequest(cmd);
+        auto raw_req = parser_.SplitRequest(cmd);*/
         if (parser_.IsAddStopRequest(raw_req.command)) {
             // auto stop_result_ptr = parser_.ParseStopCmd(raw_cmd);
-            auto [name, point] = parser_.ParseStopCmd(raw_req);
+            auto [name, point] = parser_.ParseStop(raw_req);
             catalog_db_.AddStop(Stop{static_cast<std::string>(name), std::move(point)});
 
-        } else if (parser_.IsAddBusRequest(raw_req.command)) {
+        } else if (parser_.IsAddRouteRequest(raw_req.command)) {
+            auto [name, route, _] = parser_.ParseBusRoute(raw_req);
+            catalog_db_.AddBus(static_cast<std::string>(name), std::move(route));
         }
     }
 
     void Reader::PorccessRequests() const {
         size_t n = Read<size_t>();
+
         auto lines = ReadLines(n);
-        std::for_each(lines.begin(), lines.end(), [&](const std::string_view raw_cmd) {
-            ReadRequest(raw_cmd);
+        std::vector<Parser::RawRequest> requests{n};
+        std::transform(
+            std::make_move_iterator(lines.begin()), std::make_move_iterator(lines.end()), requests.begin(), [this](const std::string_view str) {
+                return parser_.SplitRequest(str);
+            });
+        std::sort(requests.begin(), requests.end(), [](const  Parser::RawRequest& lhs, const  Parser::RawRequest& rhs) {
+            return (lhs.command == Parser::Names::STOP ? 0 : 1) < (rhs.command == Parser::Names::STOP ? 0 : 1);
+        });
+        std::for_each(std::make_move_iterator(requests.begin()), std::make_move_iterator(requests.end()), [&](const  Parser::RawRequest& raw_req) {
+            ReadRequest(raw_req);
         });
     }
 }
 
 namespace transport_catalogue::io {
-    Parser::StopCmdResult Parser::ParseStopCmd(const RawRequest& req) const {
+    Parser::StopRequest Parser::ParseStop(const RawRequest& req) const {
         assert(!req.value.empty() && !req.args.empty() && req.command == Names::STOP);
+
         return {req.value, ParseLatLng(req.args)};
+    }
+
+    Parser::RouteRequest Parser::ParseBusRoute(const RawRequest& req) const {
+        assert(!req.value.empty() && !req.args.empty() && req.command == Names::BUS);
+        assert(IsCircularRoute(req.args) || IsBidirectionalRoute(req.args));
+
+        bool is_circular = IsCircularRoute(req.args);
+
+        RouteRequest result = {
+            std::move(req.value), detail::SplitIntoWords(req.args, is_circular ? CIRCULAR_ROUTE_SEPARATOR : BIDIRECTIONAL_ROUTE_SEPARATOR),
+            std::move(is_circular)};
+
+        assert(!IsCircularRoute(req.args) || std::get<1>(result).front() == std::get<1>(result).back());
+
+        return result;
     }
 
     std::shared_ptr<std::pair<std::string_view, std::string_view>> Parser::SplitKeyValue(const std::string_view str) const {
@@ -99,7 +141,7 @@ namespace transport_catalogue::io {
     Parser::RawRequest Parser::SplitRequest(const std::string_view str) const {
         auto key_val_ptr = SplitKeyValue(str);
         assert(key_val_ptr != nullptr);
-        auto data = detail::SplitIntoWords(key_val_ptr->first);
+        auto data = detail::SplitIntoWords(key_val_ptr->first, ' ', 2);
         assert(data.size() == 2);
         return RawRequest(data[0], data[1], key_val_ptr->second);
     }
@@ -117,7 +159,18 @@ namespace transport_catalogue::io {
     bool Parser::IsAddStopRequest(const std::string_view req) const {
         return IsRequestType(req, Names::STOP);
     }
-    bool Parser::IsAddBusRequest(const std::string_view req) const {
+
+    bool Parser::IsAddRouteRequest(const std::string_view req) const {
         return IsRequestType(req, Names::BUS);
+    }
+
+    bool Parser::IsCircularRoute(const std::string_view args) const {
+        //assert(args.find(BIDIRECTIONAL_ROUTE_SEPARATOR) == args.npos);
+        return args.find(CIRCULAR_ROUTE_SEPARATOR) != args.npos;
+    }
+
+    bool Parser::IsBidirectionalRoute(const std::string_view args) const {
+        //assert(args.find(CIRCULAR_ROUTE_SEPARATOR) == args.npos);
+        return args.find(BIDIRECTIONAL_ROUTE_SEPARATOR) != args.npos;
     }
 }
