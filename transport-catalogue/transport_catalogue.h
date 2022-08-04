@@ -75,9 +75,6 @@ namespace transport_catalogue::data {
                 std::is_same_v<std::decay_t<String>, std::string> && std::is_convertible_v<std::decay_t<Coordinates>, data::Coordinates>, bool> =
                 true>
         const Stop& AddStop(String&& name, Coordinates&& coordinates) {
-            /*const Stop& stop = stops_.emplace(std::move(name), std::move(coordinates));
-            name_to_stop_[stop.name] = &stop;
-            return stop;*/
             return AddStop({std::move(name), std::move(coordinates)});
         }
 
@@ -169,8 +166,6 @@ namespace transport_catalogue {
         std::enable_if_t<
             std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, transport_catalogue::Coordinates>, bool>>
     const Stop& TransportCatalogue::AddStop(String&& name, Coordinates&& coordinates) {
-        // return db_.stops_.emplace(std::move(name), std::move(coordinates));
-        // return db_->AddStop({std::move(name), std::move(coordinates)});
         return db_->AddStop(std::move(name), std::move(coordinates));
     }
 }

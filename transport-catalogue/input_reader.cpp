@@ -70,12 +70,7 @@ namespace transport_catalogue::io {
 
     void Reader::ReadRequest(const Parser::RawRequest& raw_req) const {
         assert(!raw_req.value.empty() && !raw_req.args.empty() && !raw_req.command.empty());
-        /*std::string_view cmd = raw_cmd;
-        detail::Trim(cmd);
-        assert(!cmd.empty());
-        auto raw_req = parser_.SplitRequest(cmd);*/
         if (parser_.IsAddStopRequest(raw_req.command)) {
-            // auto stop_result_ptr = parser_.ParseStopCmd(raw_cmd);
             auto [name, point] = parser_.ParseStop(raw_req);
             catalog_db_.AddStop(Stop{static_cast<std::string>(name), std::move(point)});
 
