@@ -10,7 +10,7 @@
 
 #include "geo.h"
 
-namespace transport_catalogue::database {
+namespace transport_catalogue::data {
     using Coordinates = geo::Coordinates;
 
     struct Stop {
@@ -22,7 +22,7 @@ namespace transport_catalogue::database {
         template <
             typename String, typename Coordinates,
             std::enable_if_t<
-                std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, database::Coordinates>, bool> = true>
+                std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, data::Coordinates>, bool> = true>
         Stop(String&& name, Coordinates&& coordinates) : name{std::move(name)}, coordinates{std::move(coordinates)} {}
     };
 
@@ -32,7 +32,7 @@ namespace transport_catalogue::database {
 
     public:
         using StopsTable = std::deque<Stop>;
-        using NameToStopView = std::unordered_map<std::string_view, const database::Stop*>;
+        using NameToStopView = std::unordered_map<std::string_view, const data::Stop*>;
 
         const StopsTable& GetStopsTable() const {
             return stops_;
@@ -42,7 +42,7 @@ namespace transport_catalogue::database {
             return name_to_stop_;
         }
 
-        template <typename Stop, std::enable_if_t<std::is_same_v<std::decay_t<Stop>, database::Stop>, bool> = true>
+        template <typename Stop, std::enable_if_t<std::is_same_v<std::decay_t<Stop>, data::Stop>, bool> = true>
         const Stop& AddStop(Stop&& stop) {
             return stops_.emplace_back(std::move(stop));
         }
@@ -50,7 +50,7 @@ namespace transport_catalogue::database {
         template <
             typename String, typename Coordinates,
             std::enable_if_t<
-                std::is_same_v<std::decay_t<String>, std::string> && std::is_convertible_v<std::decay_t<Coordinates>, database::Coordinates>, bool> = true>
+                std::is_same_v<std::decay_t<String>, std::string> && std::is_convertible_v<std::decay_t<Coordinates>, data::Coordinates>, bool> = true>
         const Stop& AddStop(String&& name, Coordinates&& coordinates) {
             return stops_.emplace(std::move(name), std::move(coordinates));
         }
@@ -75,12 +75,12 @@ namespace transport_catalogue::database {
 }
 
 namespace transport_catalogue {
-    using Coordinates = database::Coordinates;
-    using Stop = database::Stop;
+    using Coordinates = data::Coordinates;
+    using Stop = data::Stop;
 
     class TransportCatalogue {
     public:
-        using Database = database::Database<TransportCatalogue>;
+        using Database = data::Database<TransportCatalogue>;
         TransportCatalogue() : db_{new Database()} {}
         TransportCatalogue(std::shared_ptr<Database> db) : db_{db} {}
 

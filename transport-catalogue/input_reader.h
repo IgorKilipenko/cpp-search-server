@@ -29,6 +29,7 @@ namespace transport_catalogue::io {
 
     public:
         using StopCmdResult = std::pair<std::string_view, Coordinates>;
+
         struct RawRequest {
             std::string_view command;
             std::string_view value;
@@ -41,46 +42,19 @@ namespace transport_catalogue::io {
             static constexpr const std::string_view STOP = "Stop"sv;
             static constexpr const std::string_view BUS = "Bus"sv;
         };
-        StopCmdResult ParseStopCmd(const RawRequest& req) const {
-            assert (!req.value.empty() && !req.args.empty() && req.command == Names::STOP);
-            return {req.value, ParseLatLng(req.args)};
-        }
+        StopCmdResult ParseStopCmd(const RawRequest& req) const;
 
-        std::shared_ptr<std::pair<std::string_view, std::string_view>> SplitKeyValue(const std::string_view str) const {
-            size_t idx = str.find(':');
-            if (idx == std::string::npos) {
-                return nullptr;
-            }
-            std::string_view key = str.substr(0, idx);
-            detail::TrimEnd(key);
-            std::string_view value = str.substr(idx + 1);
-            detail::TrimStart(value);
-            std::pair<std::string_view, std::string_view> result{key, value};
-            return std::make_shared<std::pair<std::string_view, std::string_view>>(std::move(result));
-        }
+        std::shared_ptr<std::pair<std::string_view, std::string_view>> SplitKeyValue(const std::string_view str) const;
 
-        RawRequest SplitRequest(const std::string_view str) const {
-            auto key_val_ptr = SplitKeyValue(str);
-            assert(key_val_ptr != nullptr);
-            auto data = detail::SplitIntoWords(key_val_ptr->first);
-            assert(data.size() == 2);
-            return RawRequest(data[0], data[1], key_val_ptr->second);
-        }
+        RawRequest SplitRequest(const std::string_view str) const;
 
-        Coordinates ParseLatLng(std::string_view str, const char sep = ',') const {
-            auto point = detail::SplitIntoWords(str, sep);
-            assert(point.size() == 2);
-            return {std::stod(static_cast<std::string>(point[0])), std::stod(static_cast<std::string>(point[1]))};
-        }
-        bool IsRequestType(const std::string_view req, const std::string_view type) const {
-            return type == req.substr(0, type.size());
-        }
-        bool IsAddStopRequest(const std::string_view req) const {
-            return IsRequestType(req, Names::STOP);
-        }
-        bool IsAddBusRequest(const std::string_view req) const {
-            return IsRequestType(req, Names::BUS);
-        }
+        Coordinates ParseLatLng(std::string_view str, const char sep = ',') const;
+
+        bool IsRequestType(const std::string_view req, const std::string_view type) const;
+
+        bool IsAddStopRequest(const std::string_view req) const;
+
+        bool IsAddBusRequest(const std::string_view req) const;
     };
 
     class Reader {
@@ -90,49 +64,33 @@ namespace transport_catalogue::io {
             RequestType type = RequestType::ADD;
             Stop value;
         };
+        
         Reader(TransportCatalogue::Database& db, std::istream& in_stream = std::cin) : in_stream_{in_stream}, catalog_db_{db} {}
+        
         template <typename TOut = std::string>
-        TOut Read() {
-            TOut result;
-            in_stream_ >> result;
-            in_stream_.get();
-            return result;
-        }
-        std::string ReadRawLine();
-        std::vector<std::string> ReadLines(size_t count) {
-            std::vector<std::string> result{count};
-            int idx = 0;
-            for (std::string line; idx < count && std::getline(in_stream_, line); ++idx) {
-                result[idx] = line;
-            }
-            return result;
-        }
-        void ReadRequest(const std::string_view raw_cmd) {
-            std::string_view cmd = raw_cmd;
-            detail::Trim(cmd);
-            assert(!cmd.empty());
-            auto raw_req = parser_.SplitRequest(cmd);
-            if (parser_.IsAddStopRequest(raw_req.command)) {
-                //auto stop_result_ptr = parser_.ParseStopCmd(raw_cmd);
-                auto [name, point] = parser_.ParseStopCmd(raw_req);
-                catalog_db_.AddStop(Stop{static_cast<std::string>(name), std::move(point)});
+        TOut Read() const;
 
-            } else if (parser_.IsAddBusRequest(raw_req.command)) {
-                
-            }
-        }
+        std::string ReadLine() const;
 
-        void PorccessRequests() {
-            size_t n = Read<size_t>();
-            auto lines = ReadLines(n);
-            std::for_each(lines.begin(), lines.end(), [&](const std::string_view raw_cmd) {
-                ReadRequest(raw_cmd);
-            });
-        }
+        std::vector<std::string> ReadLines(size_t count) const;
+
+        void ReadRequest(const std::string_view raw_cmd) const;
+
+        void PorccessRequests() const;
 
     private:
         std::istream& in_stream_;
         Parser parser_;
         TransportCatalogue::Database& catalog_db_;
     };
+}
+
+namespace transport_catalogue::io {
+        template <typename TOut>
+        TOut Reader::Read() const {
+            TOut result;
+            in_stream_ >> result;
+            in_stream_.get();
+            return result;
+        }
 }
