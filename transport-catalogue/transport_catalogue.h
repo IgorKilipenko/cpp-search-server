@@ -22,8 +22,7 @@ namespace transport_catalogue::database {
         template <
             typename String, typename Coordinates,
             std::enable_if_t<
-                std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, database::Coordinates>,
-                bool> = true>
+                std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, database::Coordinates>, bool> = true>
         Stop(String&& name, Coordinates&& coordinates) : name{std::move(name)}, coordinates{std::move(coordinates)} {}
     };
 
@@ -46,6 +45,14 @@ namespace transport_catalogue::database {
         template <typename Stop, std::enable_if_t<std::is_same_v<std::decay_t<Stop>, database::Stop>, bool> = true>
         const Stop& AddStop(Stop&& stop) {
             return stops_.emplace_back(std::move(stop));
+        }
+
+        template <
+            typename String, typename Coordinates,
+            std::enable_if_t<
+                std::is_same_v<std::decay_t<String>, std::string> && std::is_convertible_v<std::decay_t<Coordinates>, database::Coordinates>, bool> = true>
+        const Stop& AddStop(String&& name, Coordinates&& coordinates) {
+            return stops_.emplace(std::move(name), std::move(coordinates));
         }
 
         void LockDatabase() {
@@ -91,6 +98,9 @@ namespace transport_catalogue {
         const std::shared_ptr<Database> GetDatabase() const {
             return db_;
         }
+        const Database& GetDatabaseReadOnly() const {
+            return *db_;
+        }
 
     private:
         std::shared_ptr<Database> db_;
@@ -105,6 +115,7 @@ namespace transport_catalogue {
             std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, transport_catalogue::Coordinates>, bool>>
     const Stop& TransportCatalogue::AddStop(String&& name, Coordinates&& coordinates) {
         // return db_.stops_.emplace(std::move(name), std::move(coordinates));
-        return db_->AddStop({std::move(name), std::move(coordinates)});
+        //return db_->AddStop({std::move(name), std::move(coordinates)});
+        return db_->AddStop(std::move(name), std::move(coordinates));
     }
 }
