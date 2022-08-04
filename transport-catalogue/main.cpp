@@ -42,7 +42,8 @@ int main() {
 
         db_ptr = catalog.GetDatabase();
         auto& db = *db_ptr;
-        auto bus = db.GetBusRoutesTable();
+        [[maybe_unused]]const auto& stop = db.GetStopsTable();
+        [[maybe_unused]]const auto& bus = db.GetBusRoutesTable();
     }
 
     return 0;

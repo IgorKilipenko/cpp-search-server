@@ -24,6 +24,9 @@ namespace transport_catalogue::data {
             std::enable_if_t<
                 std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, data::Coordinates>, bool> = true>
         Stop(String&& name, Coordinates&& coordinates) : name{std::move(name)}, coordinates{std::move(coordinates)} {}
+        Stop(Stop&& other) : name{std::move(other.name)}, coordinates{std::move(other.coordinates)} {
+            std::cerr << "Stop move constructor" << std::endl;
+        }
     };
 
     using Route = std::vector<const Stop*>;
@@ -36,6 +39,13 @@ namespace transport_catalogue::data {
             typename String, typename Route,
             std::enable_if_t<std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Route>, data::Route>, bool> = true>
         Bus(String&& name, Route&& route) : name{std::move(name)}, route{std::move(route)} {}
+        Bus(Bus&& other) : name{std::move(other.name)}, route{std::move(other.route)} {
+            std::cerr << "Bus move constructor" << std::endl;
+        }
+        /*Bus(const Bus& other) : name{other.name}, route{other.route} {
+            std::cerr << "Bus copy constructor" << std::endl;
+        }
+        Bus& operator=(const Bus& other) = default;*/
     };
 
     template <class Owner>
