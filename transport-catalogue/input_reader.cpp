@@ -137,8 +137,16 @@ namespace transport_catalogue::io {
 
         bool is_circular = IsCircularRoute(req.args);
 
+        std::vector<std::string_view> stops = detail::SplitIntoWords(req.args, is_circular ? CIRCULAR_ROUTE_SEPARATOR : BIDIRECTIONAL_ROUTE_SEPARATOR);
+        if (!is_circular && stops.size() > 1) {
+            size_t old_size = stops.size();
+            stops.resize(old_size*2 -1);
+            //std::copy(stops.begin(), stops.begin() + old_size-1, stops.begin() + old_size);
+            std::copy(stops.begin(), stops.begin() + old_size-1, stops.rbegin());
+        }
+
         RouteRequest result = {
-            std::move(req.value), detail::SplitIntoWords(req.args, is_circular ? CIRCULAR_ROUTE_SEPARATOR : BIDIRECTIONAL_ROUTE_SEPARATOR),
+            std::move(req.value), std::move(stops),
             std::move(is_circular)};
 
         assert(!IsCircularRoute(req.args) || std::get<1>(result).front() == std::get<1>(result).back());
