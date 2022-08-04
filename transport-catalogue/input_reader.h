@@ -94,7 +94,11 @@ namespace transport_catalogue::io {
 
         std::vector<std::string> ReadLines(size_t count) const;
 
-        void ReadRequest(const Parser::RawRequest& raw_req) const;
+        void ExecuteRequest(const Parser::RawRequest& raw_req) const;
+
+        void PorccessAddRequests(size_t n) const;
+        
+        void PorccessGetRequests(size_t n) const;
 
         void PorccessRequests() const;
 
