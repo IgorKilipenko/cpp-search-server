@@ -68,22 +68,27 @@ namespace transport_catalogue::io {
         return result;
     }
 
-    void Reader::ReadRequest(const Parser::RawRequest& raw_req) const {
-        assert(!raw_req.value.empty() && !raw_req.args.empty() && !raw_req.command.empty());
+    void Reader::ExecuteRequest(const Parser::RawRequest& raw_req) const {
+        assert(raw_req.type != Parser::RawRequest::Type::UNDEF);
+        assert(!raw_req.value.empty() && !raw_req.command.empty());
 
-        if (parser_.IsAddStopRequest(raw_req.command)) {
-            auto [name, point] = parser_.ParseStop(raw_req);
-            catalog_db_.AddStop(Stop{static_cast<std::string>(name), std::move(point)});
+        if (raw_req.type == Parser::RawRequest::Type::ADD) {
+            assert(!raw_req.args.empty());
 
-        } else if (parser_.IsAddRouteRequest(raw_req.command)) {
-            auto [name, route, _] = parser_.ParseBusRoute(raw_req);
-            catalog_db_.AddBus(static_cast<std::string>(name), std::move(route));
+            if (parser_.IsAddStopRequest(raw_req.command)) {
+                auto [name, point] = parser_.ParseStop(raw_req);
+                catalog_db_.AddStop(Stop{static_cast<std::string>(name), std::move(point)});
+
+            } else if (parser_.IsAddRouteRequest(raw_req.command)) {
+                auto [name, route, _] = parser_.ParseBusRoute(raw_req);
+                catalog_db_.AddBus(static_cast<std::string>(name), std::move(route));
+            }
+        } else if (raw_req.type == Parser::RawRequest::Type::GET) {
+
         }
     }
 
-    void Reader::PorccessRequests() const {
-        size_t n = Read<size_t>();
-
+    void Reader::PorccessAddRequests(size_t n) const {
         auto lines = ReadLines(n);
         std::vector<Parser::RawRequest> requests{n};
         std::transform(
@@ -94,8 +99,25 @@ namespace transport_catalogue::io {
             return (lhs.command == Parser::Names::STOP ? 0 : 1) < (rhs.command == Parser::Names::STOP ? 0 : 1);
         });
         std::for_each(std::make_move_iterator(requests.begin()), std::make_move_iterator(requests.end()), [&](const Parser::RawRequest& raw_req) {
-            ReadRequest(raw_req);
+            ExecuteRequest(raw_req);
         });
+    }
+
+    void Reader::PorccessGetRequests(size_t n) const {
+        auto lines = ReadLines(n);
+        std::vector<Parser::RawRequest> requests{n};
+        std::transform(
+            std::make_move_iterator(lines.begin()), std::make_move_iterator(lines.end()), requests.begin(), [this](const std::string_view str) {
+                return parser_.SplitRequest(str);
+            });
+        std::for_each(std::make_move_iterator(requests.begin()), std::make_move_iterator(requests.end()), [&](const Parser::RawRequest& raw_req) {
+            ExecuteRequest(raw_req);
+        });
+    }
+
+    void Reader::PorccessRequests() const {
+        PorccessAddRequests(Read<size_t>());
+        PorccessGetRequests(Read<size_t>());
     }
 }
 
@@ -135,7 +157,8 @@ namespace transport_catalogue::io {
     }
 
     Parser::RawRequest Parser::SplitRequest(const std::string_view str) const {
-        using namespace std::literals;
+        using namespace std::string_view_literals;
+
         assert(IsAddRequest(str) || IsGetRequest(str));
         static constexpr const std::string_view empty = ""sv;
 
@@ -148,9 +171,9 @@ namespace transport_catalogue::io {
             req_type = key_val_ptr == nullptr ? Parser::RawRequest::Type::GET : Parser::RawRequest::Type::ADD;
             data = detail::SplitIntoWords(key_val_ptr->first, ' ', 2);
             args = key_val_ptr->second;
-            //return RawRequest(data[0], data[1], key_val_ptr->second, req_type);
+            // return RawRequest(data[0], data[1], key_val_ptr->second, req_type);
         } else {
-            auto data = detail::SplitIntoWords(str, ' ', 2);
+            data = detail::SplitIntoWords(str, ' ', 2);
         }
         assert(data.size() == 2);
         return RawRequest(data[0], data[1], args, req_type);
