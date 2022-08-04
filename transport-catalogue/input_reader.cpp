@@ -6,6 +6,8 @@
 #include <string_view>
 #include <vector>
 
+#include "stat_reader.h"
+
 namespace transport_catalogue::io::detail {
     size_t TrimStart(std::string_view& str, const char ch) {
         size_t idx = str.find_first_not_of(ch);
@@ -84,7 +86,8 @@ namespace transport_catalogue::io {
                 catalog_db_.AddBus(static_cast<std::string>(name), std::move(route));
             }
         } else if (raw_req.type == Parser::RawRequest::Type::GET) {
-
+            assert(raw_req.command == Parser::Names::BUS);
+            StatReader::PrintBusInfo(catalog_db_, raw_req.value);
         }
     }
 
