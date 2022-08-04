@@ -1,7 +1,9 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <deque>
+#include <initializer_list>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -46,6 +48,31 @@ namespace transport_catalogue::data {
             std::cerr << "Bus copy constructor" << std::endl;
         }
         Bus& operator=(const Bus& other) = default;*/
+    };
+
+    struct BusRouteInfo {
+        size_t total_stops{};
+        size_t unique_stops{};
+        double route_length{};
+        double route_distance{};
+    };
+
+    class Hasher {
+    public:
+        size_t operator()(const std::pair<const Stop*, const Stop*>& stops) const {
+            return pointer_hasher_(stops.first) + pointer_hasher_(stops.second) * INDEX;
+        }
+        size_t operator()(std::initializer_list<const Stop*> stops) const {
+            size_t hash = 0;
+            for (const Stop* stop : stops) {
+                hash = hash * INDEX + pointer_hasher_(stop);
+            }
+            return hash;
+        }
+
+    private:
+        std::hash<const void*> pointer_hasher_;
+        static const size_t INDEX = 42;
     };
 
     template <class Owner>
