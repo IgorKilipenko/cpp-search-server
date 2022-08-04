@@ -11,4 +11,8 @@ namespace transport_catalogue {
     const std::shared_ptr<const TransportCatalogue::Database> TransportCatalogue::GetDatabaseReadOnly() const {
         return db_;
     }
+
+    const BusInfo TransportCatalogue::GetBusInfo(const Bus* bus) const {
+        return db_->GetBusInfo(bus);
+    }
 }
