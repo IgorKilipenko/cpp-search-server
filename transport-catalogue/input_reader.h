@@ -32,12 +32,16 @@ namespace transport_catalogue::io {
         using RouteRequest = std::tuple<std::string_view, std::vector<std::string_view>, bool>;
 
         struct RawRequest {
+            enum class Type { ADD, GET, UNDEF };
+
             std::string_view command;
             std::string_view value;
             std::string_view args;
+            Type type = Type::UNDEF;
 
             RawRequest() = default;
-            RawRequest(std::string_view command, std::string_view value, std::string_view args) : command{command}, value{value}, args{args} {}
+            RawRequest(std::string_view command, std::string_view value, std::string_view args, Type type)
+                : command{command}, value{value}, args{args}, type{type} {}
         };
         struct Names {
             static constexpr const std::string_view STOP = "Stop"sv;
@@ -63,6 +67,10 @@ namespace transport_catalogue::io {
         bool IsCircularRoute(const std::string_view args) const;
 
         bool IsBidirectionalRoute(const std::string_view args) const;
+
+        bool IsAddRequest(const std::string_view req) const;
+
+        bool IsGetRequest(const std::string_view req) const;
 
     private:
         static const char CIRCULAR_ROUTE_SEPARATOR = '>';
