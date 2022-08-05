@@ -16,9 +16,14 @@ namespace transport_catalogue::io {
     void StatReader::ExecuteRequest(const Parser::RawRequest& raw_req) const {
         assert(raw_req.type == Parser::RawRequest::Type::GET);
         assert(!raw_req.value.empty() && !raw_req.command.empty() && raw_req.args.empty());
+        assert((raw_req.command == Parser::Names::BUS) || (raw_req.command == Parser::Names::STOP));
 
-        assert(raw_req.command == Parser::Names::BUS);
-        StatReader::PrintBusInfo(catalog_db_, raw_req.value);
+        if (raw_req.command == Parser::Names::BUS) {
+            StatReader::PrintBusInfo(catalog_db_, raw_req.value);
+        }
+        if (raw_req.command == Parser::Names::STOP) {
+            StatReader::PrintStopInfo(catalog_db_, raw_req.value);
+        }
     }
 
     void StatReader::PorccessRequests() const {

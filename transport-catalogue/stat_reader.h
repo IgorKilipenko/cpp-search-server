@@ -25,6 +25,30 @@ namespace transport_catalogue::io {
             }
         }
 
+        static void PrintStopInfo(const TransportCatalogue::Database &db, const std::string_view stop_name) {
+            using namespace std::string_view_literals;
+
+            std::cout << "Stop "sv << stop_name << ": "sv;
+            
+            const Stop* stop = db.GetStop(stop_name);
+            if (stop == nullptr) {
+                std::cout << "not found"sv << std::endl;
+                return;
+            }
+
+            const auto &buses_names = db.GetBuses(stop);
+            if (buses_names.empty()) {
+                std::cout << "no buses"sv << std::endl;
+                return;
+            }
+
+            std::cout << "buses"sv;
+            for (const auto &bus : buses_names) {
+                std::cout << " "sv << bus;
+            }
+            std::cout << std::endl;
+        }
+
         void PorccessGetRequests(size_t n) const;
 
         void PorccessRequests() const;
@@ -32,7 +56,7 @@ namespace transport_catalogue::io {
         void ExecuteRequest(const Parser::RawRequest &raw_req) const;
 
     private:
-        const Reader& reader_;
+        const Reader &reader_;
         TransportCatalogue::Database &catalog_db_;
     };
 

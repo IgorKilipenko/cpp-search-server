@@ -1,11 +1,13 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <deque>
 #include <initializer_list>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -77,6 +79,7 @@ namespace transport_catalogue::data {
         using BusRoutesTable = std::deque<Bus>;
         using NameToStopView = std::unordered_map<std::string_view, const data::Stop*>;
         using NameToBusRoutesView = std::unordered_map<std::string_view, const data::Bus*>;
+        using StopToBusesView = std::unordered_map<const Stop*, std::set<std::string_view, std::less<>>>;
 
         const StopsTable& GetStopsTable() const;
 
@@ -95,7 +98,7 @@ namespace transport_catalogue::data {
         const Stop& AddStop(String&& name, Coordinates&& coordinates);
 
         template <typename Bus, std::enable_if_t<std::is_same_v<std::decay_t<Bus>, data::Bus>, bool> = true>
-        const Bus& AddBus(Bus&& bus_route);
+        const Bus& AddBus(Bus&& bus);
 
         template <
             typename String, typename Route,
@@ -108,7 +111,7 @@ namespace transport_catalogue::data {
             std::enable_if_t<
                 std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<RawRouteContainer>, std::vector<std::string_view>>,
                 bool> = true>
-        const Bus& AddBus(String&& name, RawRouteContainer&& stops);
+        const Bus& AddBus(String&& name, RawRouteContainer&& route);
 
         template <typename StringView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool> = true>
         const Bus* GetBus(StringView&& name) const;
@@ -118,11 +121,18 @@ namespace transport_catalogue::data {
 
         const BusRouteInfo GetBusInfo(const Bus* bus) const;
 
+        const std::set<std::string_view, std::less<>>& GetBuses(const Stop* stop) const {
+            static const std::set<std::string_view, std::less<>> empty_result;
+            auto ptr = stop_to_buses_.find(stop);
+            return ptr == stop_to_buses_.end() ? empty_result : ptr->second;
+        }
+
     private:
         StopsTable stops_;
         BusRoutesTable bus_routes_;
         NameToStopView name_to_stop_;
         NameToBusRoutesView name_to_bus_;
+        StopToBusesView stop_to_buses_;
         std::mutex mutex_;
 
         template <
@@ -139,10 +149,6 @@ namespace transport_catalogue::data {
 
         std::lock_guard<std::mutex> LockGuard() {
             return std::lock_guard<std::mutex>{mutex_};
-        }
-
-        double CalcDistance(const Stop* from_stop, const Stop* to_stop) {
-            return ComputeDistance(from_stop->coordinates, to_stop->coordinates);
         }
     };
 }
@@ -208,9 +214,12 @@ namespace transport_catalogue::data {
 
     template <class Owner>
     template <typename Bus, std::enable_if_t<std::is_same_v<std::decay_t<Bus>, data::Bus>, bool>>
-    const Bus& Database<Owner>::AddBus(Bus&& bus_route) {
-        const Bus& new_bus = bus_routes_.emplace_back(std::move(bus_route));
+    const Bus& Database<Owner>::AddBus(Bus&& bus) {
+        const Bus& new_bus = bus_routes_.emplace_back(std::move(bus));
         name_to_bus_[new_bus.name] = &new_bus;
+        std::for_each(new_bus.route.begin(), new_bus.route.end(), [this, &new_bus](const Stop* stop) {
+            stop_to_buses_[stop].insert(new_bus.name);
+        });
         return new_bus;
     }
 
@@ -231,8 +240,10 @@ namespace transport_catalogue::data {
     const Bus& Database<Owner>::AddBus(String&& name, RawRouteContainer&& stops) {
         Route route{stops.size()};
         std::transform(stops.begin(), stops.end(), route.begin(), [&](const std::string_view stop) {
-            return name_to_stop_.at(stop);
+            assert(name_to_stop_.count(stop));
+            return name_to_stop_[stop];
         });
+
         return AddBus(std::move(name), std::move(route));
     }
 
