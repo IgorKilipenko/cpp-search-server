@@ -318,9 +318,9 @@ namespace transport_catalogue::data {
             const Stop* to_stop = GetStop(route[i + 1]->name);
             assert(from_stop && from_stop);
 
-            const auto& [measured_dist, _] = GetDistanceBetweenStops(from_stop, to_stop);
+            const auto& [measured_dist, dist] = GetDistanceBetweenStops(from_stop, to_stop);
             route_length += measured_dist;
-            pseudo_length += geo::ComputeDistance(from_stop->coordinates, to_stop->coordinates);
+            pseudo_length += dist;
         }
 
         info.total_stops = route.size();
