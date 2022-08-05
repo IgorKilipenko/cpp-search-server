@@ -27,11 +27,7 @@ namespace transport_catalogue::data {
             std::enable_if_t<
                 std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Coordinates>, data::Coordinates>, bool> = true>
         Stop(String&& name, Coordinates&& coordinates) : name{std::move(name)}, coordinates{std::move(coordinates)} {}
-        Stop(Stop&& other) : name{std::move(other.name)}, coordinates{std::move(other.coordinates)} {
-#if (TRACE_DEBUG)
-            std::cerr << "Stop move constructor" << std::endl;
-#endif
-        }
+        Stop(Stop&& other) : name{std::move(other.name)}, coordinates{std::move(other.coordinates)} {}
     };
 
     using Route = std::vector<const Stop*>;
@@ -44,15 +40,7 @@ namespace transport_catalogue::data {
             typename String, typename Route,
             std::enable_if_t<std::is_same_v<std::decay_t<String>, std::string> && std::is_same_v<std::decay_t<Route>, data::Route>, bool> = true>
         Bus(String&& name, Route&& route) : name{std::move(name)}, route{std::move(route)} {}
-        Bus(Bus&& other) : name{std::move(other.name)}, route{std::move(other.route)} {
-#if (TRACE_DEBUG)
-            std::cerr << "Bus move constructor" << std::endl;
-#endif
-        }
-        /*Bus(const Bus& other) : name{other.name}, route{other.route} {
-            std::cerr << "Bus copy constructor" << std::endl;
-        }
-        Bus& operator=(const Bus& other) = default;*/
+        Bus(Bus&& other) : name{std::move(other.name)}, route{std::move(other.route)} {}
     };
 
     struct BusRouteInfo {
@@ -258,12 +246,6 @@ namespace transport_catalogue::data {
     template <class Owner>
     template <typename StringView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool>>
     const Bus* Database<Owner>::GetBus(StringView&& name) const {
-        /*auto ptr = name_to_bus_.find(std::move(name));
-        if (ptr == name_to_bus_.end()) {
-            return nullptr;
-        }
-        return ptr->second;*/
-
         const Bus* result = GetItem(std::move(name), name_to_bus_);
         return result;
     }
@@ -271,12 +253,6 @@ namespace transport_catalogue::data {
     template <class Owner>
     template <typename StringView, std::enable_if_t<std::is_convertible_v<std::decay_t<StringView>, std::string_view>, bool>>
     const Stop* Database<Owner>::GetStop(StringView&& name) const {
-        /*auto ptr = name_to_stop_.find(std::move(name));
-        if (ptr == name_to_stop_.end()) {
-            return nullptr;
-        }
-        return ptr->second;*/
-
         return GetItem(std::move(name), name_to_stop_);
     }
 

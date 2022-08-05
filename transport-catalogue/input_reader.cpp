@@ -184,7 +184,6 @@ namespace transport_catalogue::io {
             req_type = key_val_ptr == nullptr ? Parser::RawRequest::Type::GET : Parser::RawRequest::Type::ADD;
             data = detail::SplitIntoWords(key_val_ptr->first, ' ', 2);
             args = key_val_ptr->second;
-            // return RawRequest(data[0], data[1], key_val_ptr->second, req_type);
         } else {
             data = detail::SplitIntoWords(str, ' ', 2);
         }
@@ -211,12 +210,10 @@ namespace transport_catalogue::io {
     }
 
     bool Parser::IsCircularRoute(const std::string_view args) const {
-        // assert(args.find(BIDIRECTIONAL_ROUTE_SEPARATOR) == args.npos);
         return args.find(CIRCULAR_ROUTE_SEPARATOR) != args.npos;
     }
 
     bool Parser::IsBidirectionalRoute(const std::string_view args) const {
-        // assert(args.find(CIRCULAR_ROUTE_SEPARATOR) == args.npos);
         return args.find(BIDIRECTIONAL_ROUTE_SEPARATOR) != args.npos;
     }
 

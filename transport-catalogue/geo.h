@@ -22,34 +22,17 @@ namespace transport_catalogue::geo {
             return !(*this == other);
         }
 
-        Coordinates() : Coordinates(0., 0.) {
-#if (TRACE_DEBUG)
-            std::cerr << "Coordinates def constructor" << std::endl;
-#endif
-        }
+        Coordinates() : Coordinates(0., 0.) {}
 
-        Coordinates(double lat, double lng) : lat{lat}, lng{lng} {
-#if (TRACE_DEBUG)
-            std::cerr << "Coordinates first constructor" << std::endl;
-#endif
-        }
+        Coordinates(double lat, double lng) : lat{lat}, lng{lng} {}
 
-        Coordinates(Coordinates&& other) : lat{std::move(other.lat)}, lng{std::move(other.lng)} {
-#if (TRACE_DEBUG)
-            std::cerr << "Coordinates move constructor" << std::endl;
-#endif
-        }
+        Coordinates(Coordinates&& other) : lat{std::move(other.lat)}, lng{std::move(other.lng)} {}
 
-        Coordinates(const Coordinates& other) : lat{other.lat}, lng{other.lng} {
-#if (TRACE_DEBUG)
-            std::cerr << "Coordinates copy constructor" << std::endl;
-#endif
-        };
+        Coordinates(const Coordinates& other) = default;
 
         Coordinates& operator=(const Coordinates& other) = default;
 
-        // Coordinates& operator=(const Coordinates& other) = delete;
-        // Coordinates(const Coordinates& other) = delete;
+        Coordinates& operator=(Coordinates&& other) = default;
     };
 
     inline double ComputeDistance(Coordinates from, Coordinates to) {
