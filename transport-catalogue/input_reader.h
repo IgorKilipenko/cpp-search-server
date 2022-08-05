@@ -97,10 +97,12 @@ namespace transport_catalogue::io {
         void ExecuteRequest(const Parser::RawRequest& raw_req) const;
 
         void PorccessAddRequests(size_t n) const;
-        
-        void PorccessGetRequests(size_t n) const;
 
         void PorccessRequests() const;
+
+        const Parser& GetParser() const {
+            return parser_;
+        }
 
     private:
         std::istream& in_stream_;

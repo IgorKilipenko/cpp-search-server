@@ -72,23 +72,16 @@ namespace transport_catalogue::io {
     }
 
     void Reader::ExecuteRequest(const Parser::RawRequest& raw_req) const {
-        assert(raw_req.type != Parser::RawRequest::Type::UNDEF);
-        assert(!raw_req.value.empty() && !raw_req.command.empty());
+        assert(raw_req.type == Parser::RawRequest::Type::ADD);
+        assert(!raw_req.value.empty() && !raw_req.command.empty() && !raw_req.args.empty());
 
-        if (raw_req.type == Parser::RawRequest::Type::ADD) {
-            assert(!raw_req.args.empty());
+        if (parser_.IsAddStopRequest(raw_req.command)) {
+            auto [name, point] = parser_.ParseStop(raw_req);
+            catalog_db_.AddStop(Stop{static_cast<std::string>(name), std::move(point)});
 
-            if (parser_.IsAddStopRequest(raw_req.command)) {
-                auto [name, point] = parser_.ParseStop(raw_req);
-                catalog_db_.AddStop(Stop{static_cast<std::string>(name), std::move(point)});
-
-            } else if (parser_.IsAddRouteRequest(raw_req.command)) {
-                auto [name, route, _] = parser_.ParseBusRoute(raw_req);
-                catalog_db_.AddBus(static_cast<std::string>(name), std::move(route));
-            }
-        } else if (raw_req.type == Parser::RawRequest::Type::GET) {
-            assert(raw_req.command == Parser::Names::BUS);
-            StatReader::PrintBusInfo(catalog_db_, raw_req.value);
+        } else if (parser_.IsAddRouteRequest(raw_req.command)) {
+            auto [name, route, _] = parser_.ParseBusRoute(raw_req);
+            catalog_db_.AddBus(static_cast<std::string>(name), std::move(route));
         }
     }
 
@@ -109,20 +102,8 @@ namespace transport_catalogue::io {
         });
     }
 
-    void Reader::PorccessGetRequests(size_t n) const {
-        auto lines = ReadLines(n);
-        std::for_each(
-            std::make_move_iterator(lines.begin()), std::make_move_iterator(lines.end()), [this](const std::string_view str) {
-                if (parser_.IsGetRequest(str)) {
-                    auto raw_req = parser_.SplitRequest(str);
-                    ExecuteRequest(raw_req);
-                }
-            });
-    }
-
     void Reader::PorccessRequests() const {
         PorccessAddRequests(Read<size_t>());
-        PorccessGetRequests(Read<size_t>());
     }
 }
 
