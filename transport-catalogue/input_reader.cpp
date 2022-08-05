@@ -1,5 +1,6 @@
 #include "input_reader.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <iterator>
@@ -93,11 +94,13 @@ namespace transport_catalogue::io {
 
     void Reader::PorccessAddRequests(size_t n) const {
         auto lines = ReadLines(n);
-        std::vector<Parser::RawRequest> requests{n};
-        std::transform(
-            std::make_move_iterator(lines.begin()), std::make_move_iterator(lines.end()), requests.begin(), [this](const std::string_view str) {
-                return parser_.SplitRequest(str);
-            });
+        std::vector<Parser::RawRequest> requests;
+        requests.reserve(n);
+        std::for_each(std::make_move_iterator(lines.begin()), std::make_move_iterator(lines.end()), [this, &requests](const std::string_view str) {
+            if (parser_.IsAddRequest(str)) {
+                requests.push_back(parser_.SplitRequest(str));
+            }
+        });
         std::sort(requests.begin(), requests.end(), [](const Parser::RawRequest& lhs, const Parser::RawRequest& rhs) {
             return (lhs.command == Parser::Names::STOP ? 0 : 1) < (rhs.command == Parser::Names::STOP ? 0 : 1);
         });
@@ -108,14 +111,13 @@ namespace transport_catalogue::io {
 
     void Reader::PorccessGetRequests(size_t n) const {
         auto lines = ReadLines(n);
-        std::vector<Parser::RawRequest> requests{n};
-        std::transform(
-            std::make_move_iterator(lines.begin()), std::make_move_iterator(lines.end()), requests.begin(), [this](const std::string_view str) {
-                return parser_.SplitRequest(str);
+        std::for_each(
+            std::make_move_iterator(lines.begin()), std::make_move_iterator(lines.end()), [this](const std::string_view str) {
+                if (parser_.IsGetRequest(str)) {
+                    auto raw_req = parser_.SplitRequest(str);
+                    ExecuteRequest(raw_req);
+                }
             });
-        std::for_each(std::make_move_iterator(requests.begin()), std::make_move_iterator(requests.end()), [&](const Parser::RawRequest& raw_req) {
-            ExecuteRequest(raw_req);
-        });
     }
 
     void Reader::PorccessRequests() const {
@@ -137,17 +139,16 @@ namespace transport_catalogue::io {
 
         bool is_circular = IsCircularRoute(req.args);
 
-        std::vector<std::string_view> stops = detail::SplitIntoWords(req.args, is_circular ? CIRCULAR_ROUTE_SEPARATOR : BIDIRECTIONAL_ROUTE_SEPARATOR);
+        std::vector<std::string_view> stops =
+            detail::SplitIntoWords(req.args, is_circular ? CIRCULAR_ROUTE_SEPARATOR : BIDIRECTIONAL_ROUTE_SEPARATOR);
         if (!is_circular && stops.size() > 1) {
             size_t old_size = stops.size();
-            stops.resize(old_size*2 -1);
-            //std::copy(stops.begin(), stops.begin() + old_size-1, stops.begin() + old_size);
-            std::copy(stops.begin(), stops.begin() + old_size-1, stops.rbegin());
+            stops.resize(old_size * 2 - 1);
+            // std::copy(stops.begin(), stops.begin() + old_size-1, stops.begin() + old_size);
+            std::copy(stops.begin(), stops.begin() + old_size - 1, stops.rbegin());
         }
 
-        RouteRequest result = {
-            std::move(req.value), std::move(stops),
-            std::move(is_circular)};
+        RouteRequest result = {std::move(req.value), std::move(stops), std::move(is_circular)};
 
         assert(!IsCircularRoute(req.args) || std::get<1>(result).front() == std::get<1>(result).back());
 
@@ -171,6 +172,7 @@ namespace transport_catalogue::io {
         using namespace std::string_view_literals;
 
         assert(IsAddRequest(str) || IsGetRequest(str));
+
         static constexpr const std::string_view empty = ""sv;
 
         Parser::RawRequest::Type req_type = IsAddRequest(str) ? Parser::RawRequest::Type::ADD : Parser::RawRequest::Type::GET;
