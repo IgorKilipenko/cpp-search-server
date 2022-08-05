@@ -15,4 +15,12 @@ namespace transport_catalogue {
     const BusInfo TransportCatalogue::GetBusInfo(const Bus* bus) const {
         return db_->GetBusInfo(bus);
     }
+
+    const Bus* TransportCatalogue::GetBus(const std::string_view name) const {
+        return db_->GetBus(std::move(name));
+    }
+
+    const Stop* TransportCatalogue::GetStop(const std::string_view name) const {
+        return db_->GetStop(std::move(name));
+    }
 }

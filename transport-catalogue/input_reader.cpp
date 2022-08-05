@@ -71,15 +71,20 @@ namespace transport_catalogue::io {
         return result;
     }
 
-    void Reader::ExecuteRequest(const Parser::RawRequest& raw_req) const {
+    void Reader::ExecuteRequest(const Parser::RawRequest& raw_req, std::vector<Parser::DistanceBetween>& out_distances) const {
         assert(raw_req.type == Parser::RawRequest::Type::ADD);
         assert(!raw_req.value.empty() && !raw_req.command.empty() && !raw_req.args.empty());
 
-        if (parser_.IsAddStopRequest(raw_req.command)) {
-            auto [name, point] = parser_.ParseStop(raw_req);
-            catalog_db_.AddStop(Stop{static_cast<std::string>(name), std::move(point)});
+        if (parser_.IsStopRequest(raw_req.command)) {
+            auto stop = parser_.ParseStop(raw_req);
+            catalog_db_.AddStop(Stop{static_cast<std::string>(stop.name), std::move(stop.coordinates)});
+            /*std::for_each(stop.measured_distancies.begin(), stop.measured_distancies.end(), [&out_distances](const auto& dist_btw) {
+                //catalog_db_.AddMasuredDistance(dist_btw.from_stop, dist_btw.to_stop, dist_btw.distance);
+                out_distances.push_back(dist_btw);
+            });*/
+            std::move(stop.measured_distancies.begin(), stop.measured_distancies.end(), std::back_inserter(out_distances));
 
-        } else if (parser_.IsAddRouteRequest(raw_req.command)) {
+        } else if (parser_.IsRouteRequest(raw_req.command)) {
             auto [name, route, _] = parser_.ParseBusRoute(raw_req);
             catalog_db_.AddBus(static_cast<std::string>(name), std::move(route));
         }
@@ -97,8 +102,17 @@ namespace transport_catalogue::io {
         std::sort(requests.begin(), requests.end(), [](const Parser::RawRequest& lhs, const Parser::RawRequest& rhs) {
             return (lhs.command == Parser::Names::STOP ? 0 : 1) < (rhs.command == Parser::Names::STOP ? 0 : 1);
         });
-        std::for_each(std::make_move_iterator(requests.begin()), std::make_move_iterator(requests.end()), [&](const Parser::RawRequest& raw_req) {
-            ExecuteRequest(raw_req);
+
+        std::vector<Parser::DistanceBetween> distances;
+        distances.reserve(requests.size() * 4);
+        std::for_each(
+            std::make_move_iterator(requests.begin()), std::make_move_iterator(requests.end()),
+            [this, &distances](const Parser::RawRequest& raw_req) {
+                ExecuteRequest(raw_req, distances);
+            });
+
+        std::for_each(std::make_move_iterator(distances.begin()), std::make_move_iterator(distances.end()), [this](const auto& distance_btw) {
+            catalog_db_.AddMasuredDistance(distance_btw.from_stop, distance_btw.to_stop, distance_btw.distance);
         });
     }
 
@@ -111,7 +125,15 @@ namespace transport_catalogue::io {
     Parser::StopRequest Parser::ParseStop(const RawRequest& req) const {
         assert(!req.value.empty() && !req.args.empty() && req.command == Names::STOP);
 
-        return {req.value, ParseLatLng(req.args)};
+        auto args = detail::SplitIntoWords(req.args, ARGS_SEPARATOR, 3);
+        assert(args.size() >= 2);
+
+        std::vector<DistanceBetween> distancies;
+        if (args.size() > 2) {
+            distancies = ParseMeasuredDistancies(args.back(), req.value);
+        }
+
+        return {req.value, ParseLatLng(args[0], args[1]), std::move(distancies)};
     }
 
     Parser::RouteRequest Parser::ParseBusRoute(const RawRequest& req) const {
@@ -125,11 +147,10 @@ namespace transport_catalogue::io {
         if (!is_circular && stops.size() > 1) {
             size_t old_size = stops.size();
             stops.resize(old_size * 2 - 1);
-            // std::copy(stops.begin(), stops.begin() + old_size-1, stops.begin() + old_size);
             std::copy(stops.begin(), stops.begin() + old_size - 1, stops.rbegin());
         }
 
-        RouteRequest result = {std::move(req.value), std::move(stops), std::move(is_circular)};
+        RouteRequest result{req.value, std::move(stops), is_circular};
 
         assert(!IsCircularRoute(req.args) || std::get<1>(result).front() == std::get<1>(result).back());
 
@@ -172,21 +193,55 @@ namespace transport_catalogue::io {
         return RawRequest(data[0], data[1], args, req_type);
     }
 
-    Coordinates Parser::ParseLatLng(std::string_view str, const char sep) const {
+    Coordinates Parser::ParseLatLng(const std::string_view str, const char sep) const {
         auto point = detail::SplitIntoWords(str, sep);
-        assert(point.size() == 2);
-        return {std::stod(static_cast<std::string>(point[0])), std::stod(static_cast<std::string>(point[1]))};
+        assert(point.size() >= 2);
+        return ParseLatLng(point[0], point[1]);
+    }
+
+    Coordinates Parser::ParseLatLng(const std::string_view lat_str, const std::string_view lng_str) const {
+        return {std::stod(static_cast<std::string>(lat_str)), std::stod(static_cast<std::string>(lng_str))};
+    }
+
+    std::vector<Parser::DistanceBetween> Parser::ParseMeasuredDistancies(const std::string_view str, const std::string_view from_stop) const {
+        auto distancies = detail::SplitIntoWords(str, ARGS_SEPARATOR);
+        if (distancies.empty()) {
+            return {};
+        }
+
+        std::vector<Parser::DistanceBetween> dists_btw;
+        dists_btw.reserve(distancies.size());
+
+        std::for_each(
+            std::make_move_iterator(distancies.begin()), std::make_move_iterator(distancies.end()),
+            [&dists_btw, from_stop](const std::string_view str) {
+                static const std::string_view sep = " to "sv;
+                size_t idx = str.find(sep);
+                assert(idx != str.npos);
+
+                std::string_view to_stop_name = str.substr(idx + sep.length());
+                detail::Trim(to_stop_name);
+
+                std::string_view distance_str = str.substr(0, idx);
+                detail::Trim(distance_str);
+                assert(distance_str.find('.') != str.npos || distance_str.find('m') != str.npos);
+                detail::TrimEnd(distance_str, 'm');
+
+                dists_btw.push_back({std::stod(static_cast<std::string>(distance_str)), from_stop, to_stop_name});
+            });
+
+        return dists_btw;
     }
 
     bool Parser::IsRequestType(const std::string_view req, const std::string_view type) const {
         return type == req.substr(0, type.size());
     }
 
-    bool Parser::IsAddStopRequest(const std::string_view req) const {
+    bool Parser::IsStopRequest(const std::string_view req) const {
         return IsRequestType(req, Names::STOP);
     }
 
-    bool Parser::IsAddRouteRequest(const std::string_view req) const {
+    bool Parser::IsRouteRequest(const std::string_view req) const {
         return IsRequestType(req, Names::BUS);
     }
 

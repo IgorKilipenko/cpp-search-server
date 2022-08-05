@@ -1,8 +1,12 @@
 
 #include "stat_reader.h"
 
+#include <algorithm>
+#include <iterator>
+#include <string_view>
+
 namespace transport_catalogue::io {
-    
+
     void StatReader::PrintBusInfo(const std::string_view bus_name) const {
         using namespace std::string_view_literals;
 
@@ -14,7 +18,7 @@ namespace transport_catalogue::io {
         } else {
             auto info = catalog_db_.GetBusInfo(bus);
             std::cout << info.total_stops << " stops on route, "sv << info.unique_stops << " unique stops, "sv << std::setprecision(6)
-                      << info.route_length << " route length"sv << std::endl;
+                      << info.route_length << " route length, "sv << info.route_curvature << " curvature"sv <<  std::endl;
         }
     }
 
@@ -36,9 +40,10 @@ namespace transport_catalogue::io {
         }
 
         std::cout << "buses"sv;
-        for (const auto& bus : buses_names) {
+        std::for_each(buses_names.begin(), buses_names.end(), [](const std::string_view bus) {
             std::cout << " "sv << bus;
-        }
+        });
+
         std::cout << std::endl;
     }
 

@@ -28,8 +28,30 @@ namespace transport_catalogue::io {
         using StopsContainer = std::unordered_map<std::string_view, Coordinates>;
 
     public:
-        using StopRequest = std::pair<std::string_view, Coordinates>;
+        // using StopRequest = std::pair<std::string_view, Coordinates>;
         using RouteRequest = std::tuple<std::string_view, std::vector<std::string_view>, bool>;
+
+        struct DistanceBetween {
+            double distance = 0.;
+            std::string_view from_stop;
+            std::string_view to_stop;
+
+            DistanceBetween() = default;
+            DistanceBetween(double distance, std::string_view from_stop, std::string_view to_stop)
+                : distance(distance), from_stop(from_stop), to_stop(to_stop) {}
+        };
+
+        struct StopRequest {
+            std::string_view name;
+            Coordinates coordinates;
+            std::vector<DistanceBetween> measured_distancies;
+
+            StopRequest() = default;
+
+            template <typename StringView, typename Coordinates, typename DistanceBetweenContainer>
+            StopRequest(StringView&& name, Coordinates&& coordinates, DistanceBetweenContainer&& measured_distancies)
+                : name{std::move(name)}, coordinates(std::move(coordinates)), measured_distancies(std::move(measured_distancies)) {}
+        };
 
         struct RawRequest {
             enum class Type { ADD, GET, UNDEF };
@@ -56,13 +78,15 @@ namespace transport_catalogue::io {
 
         RawRequest SplitRequest(const std::string_view str) const;
 
-        Coordinates ParseLatLng(std::string_view str, const char sep = ',') const;
+        Coordinates ParseLatLng(const std::string_view str, const char sep = ARGS_SEPARATOR) const;
+
+        Coordinates ParseLatLng(const std::string_view lat_str, const std::string_view lng_str) const;
 
         bool IsRequestType(const std::string_view req, const std::string_view type) const;
 
-        bool IsAddStopRequest(const std::string_view req) const;
+        bool IsStopRequest(const std::string_view req) const;
 
-        bool IsAddRouteRequest(const std::string_view req) const;
+        bool IsRouteRequest(const std::string_view req) const;
 
         bool IsCircularRoute(const std::string_view args) const;
 
@@ -72,9 +96,12 @@ namespace transport_catalogue::io {
 
         bool IsGetRequest(const std::string_view req) const;
 
+        std::vector<DistanceBetween> ParseMeasuredDistancies(const std::string_view str, const std::string_view from_stop) const;
+
     private:
         static const char CIRCULAR_ROUTE_SEPARATOR = '>';
         static const char BIDIRECTIONAL_ROUTE_SEPARATOR = '-';
+        static const char ARGS_SEPARATOR = ',';
     };
 
     class Reader {
@@ -94,7 +121,7 @@ namespace transport_catalogue::io {
 
         std::vector<std::string> ReadLines(size_t count) const;
 
-        void ExecuteRequest(const Parser::RawRequest& raw_req) const;
+        void ExecuteRequest(const Parser::RawRequest& raw_req, std::vector<Parser::DistanceBetween>& out_distances) const;
 
         void PorccessAddRequests(size_t n) const;
 
