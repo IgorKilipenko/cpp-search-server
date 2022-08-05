@@ -11,9 +11,9 @@ namespace transport_catalogue::io {
     public:
         StatReader(TransportCatalogue::Database &catalog_db, const Reader &reader) : reader_{reader}, catalog_db_{catalog_db} {}
 
-        static void PrintBusInfo(const TransportCatalogue::Database &db, const std::string_view bus_name);
+        void PrintBusInfo(const std::string_view bus_name) const;
 
-        static void PrintStopInfo(const TransportCatalogue::Database &db, const std::string_view stop_name);
+        void PrintStopInfo(const std::string_view stop_name) const;
 
         void PorccessGetRequests(size_t n) const;
 
