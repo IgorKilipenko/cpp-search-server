@@ -124,21 +124,9 @@ namespace transport_catalogue::data {
 
         const BusRouteInfo GetBusInfo(const Bus* bus) const;
 
-        const std::set<std::string_view, std::less<>>& GetBuses(const Stop* stop) const {
-            static const std::set<std::string_view, std::less<>> empty_result;
-            auto ptr = stop_to_buses_.find(stop);
-            return ptr == stop_to_buses_.end() ? empty_result : ptr->second;
-        }
+        const std::set<std::string_view, std::less<>>& GetBuses(const Stop* stop) const;
 
-        std::pair<double, double> GetDistanceBetweenStops(const Stop* from, const Stop* to) const {
-            auto ptr = measured_distances_btw_stops_.find({from, to});
-            if (ptr != measured_distances_btw_stops_.end()) {
-                return ptr->second;
-            } else if (ptr = measured_distances_btw_stops_.find({to, from}); ptr != measured_distances_btw_stops_.end()) {
-                return ptr->second;
-            }
-            return {0., 0.};
-        }
+        std::pair<double, double> GetDistanceBetweenStops(const Stop* from, const Stop* to) const;
 
     private:
         StopsTable stops_;
@@ -291,6 +279,24 @@ namespace transport_catalogue::data {
     }
 
     template <class Owner>
+    const std::set<std::string_view, std::less<>>& Database<Owner>::GetBuses(const Stop* stop) const {
+        static const std::set<std::string_view, std::less<>> empty_result;
+        auto ptr = stop_to_buses_.find(stop);
+        return ptr == stop_to_buses_.end() ? empty_result : ptr->second;
+    }
+
+    template <class Owner>
+    std::pair<double, double> Database<Owner>::GetDistanceBetweenStops(const Stop* from, const Stop* to) const {
+        auto ptr = measured_distances_btw_stops_.find({from, to});
+        if (ptr != measured_distances_btw_stops_.end()) {
+            return ptr->second;
+        } else if (ptr = measured_distances_btw_stops_.find({to, from}); ptr != measured_distances_btw_stops_.end()) {
+            return ptr->second;
+        }
+        return {0., 0.};
+    }
+
+    template <class Owner>
     const typename Database<Owner>::StopsTable& Database<Owner>::GetStopsTable() const {
         return stops_;
     }
@@ -313,7 +319,6 @@ namespace transport_catalogue::data {
         const Route& route = bus->route;
 
         for (auto i = 0; i < route.size() - 1; ++i) {
-            // route_length += geo::ComputeDistance(route[i]->coordinates, route[i + 1]->coordinates);
             const Stop* from_stop = GetStop(route[i]->name);
             const Stop* to_stop = GetStop(route[i + 1]->name);
             assert(from_stop && from_stop);
@@ -326,7 +331,7 @@ namespace transport_catalogue::data {
         info.total_stops = route.size();
         info.unique_stops = std::unordered_set<const Stop*>(route.begin(), route.end()).size();
         info.route_length = route_length;
-        info.route_curvature = route_length / std::max(pseudo_length,1.);
+        info.route_curvature = route_length / std::max(pseudo_length, 1.);
 
         return info;
     }
